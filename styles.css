@@ -656,6 +656,7 @@ select,input,.search{width:100%;min-width:0;height:46px;padding:0 12px;border-ra
 .wallet-card .stock-cash-icon{background:linear-gradient(135deg,#7f61ff,#2f9ee9);box-shadow:0 10px 24px rgba(76,91,220,.26)}
 .stock-cash-card small{display:block;color:var(--muted);font-size:9px;font-weight:900;letter-spacing:.08em}.stock-cash-card b{display:block;margin-top:4px}.stock-cash-card input{width:100%;min-width:0}.stock-cash-card em{text-align:right;font-style:normal;font-weight:900;overflow-wrap:anywhere}
 .stock-rate-pills{justify-content:flex-end;flex-wrap:wrap}.fx-rate{color:var(--text);font-variant-numeric:tabular-nums;background:linear-gradient(135deg,rgba(66,211,181,.13),rgba(64,142,255,.12))}
+.fx-refresh-btn{width:39px;min-width:39px;height:39px;padding:0;border-radius:13px;font-size:18px}.fx-refresh-btn.is-loading{animation:fx-spin .8s linear infinite}@keyframes fx-spin{to{transform:rotate(360deg)}}
 .year-equation{display:block;margin:-4px 0 7px;color:var(--muted);font-size:9px;font-weight:800;letter-spacing:.02em}
 .year-card{min-height:285px}.year-split span:first-child{font-weight:800}
 .yearly-tile.due{background:linear-gradient(145deg,#d7efff,#adcdf7 56%,#9fb7ed)!important;border-color:rgba(49,112,195,.25)!important;color:#102343;box-shadow:0 15px 34px rgba(50,103,178,.13)}

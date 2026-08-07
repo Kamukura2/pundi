@@ -24,6 +24,23 @@ export async function fetchJson(url, options = {}, timeoutMs = 6500) {
   }
 }
 
+export async function fetchText(url, options = {}, timeoutMs = 6500) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { ...options, signal:controller.signal });
+    const body = await response.text().catch(() => "");
+    if (response.status === 429) throw Object.assign(new Error("Provider rate limit reached."), { code:"rate_limited", status:429 });
+    if (!response.ok) throw Object.assign(new Error(`Provider returned ${response.status}.`), { code:"provider_error", status:response.status });
+    return body;
+  } catch (error) {
+    if (error.name === "AbortError") throw Object.assign(new Error("Market provider timed out."), { code:"timeout", status:504 });
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export function apiError(response, error) {
   const status = Number(error.status) || 502;
   return response.status(status).json({ error:error.message || "Stock quote failed.", code:error.code || "quote_failed" });

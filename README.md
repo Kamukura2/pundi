@@ -24,6 +24,7 @@ Deployment-ready continuation of CVFinance v6.3.1. The existing eight-tab UI and
 - JSON export/import and v6.3.1 `localStorage` migration
 - Installable PWA with offline application shell
 - Vercel server routes for Finnhub US quotes and Yahoo Finance delayed IDX quotes
+- Google Finance-first USD/IDR market rate with a dedicated cache-bypassing refresh button; Yahoo intraday and Finnhub remain fallbacks
 - Provider mapping, validation, cache, timeout, quota fallback, stale status, manual override, and optional daily cron refresh
 - Isolated `/api/telegram/cvfinance-webhook` route with deterministic Indonesian money/date parsing
 - Telegram quick transactions, balances, clients, credit, electricity, stocks, targets, and summary commands

@@ -17,6 +17,7 @@ state.language=localStorage.getItem("cvfinance-language-cache")||"en";
 let syncManager;
 let stockRefreshStarted=false;
 let fxRefreshTimer=null;
+let fxRefreshPromise=null;
 const currentYear=()=>new Date().getFullYear();
 
 const fmt=(n,compact=false)=>{
@@ -522,8 +523,9 @@ function renderStocks(){
  stockWalletValue.textContent=fmt(Number(state.stockExtras?.walletUsd||0)*Number(state.usdIdr||0));
  if(typeof usdIdrRate!=="undefined"){
   const meta=state.usdIdrMeta;
-  usdIdrRate.textContent=`1 USD = ${new Intl.NumberFormat("id-ID",{maximumFractionDigits:2}).format(Number(state.usdIdr||0))} IDR${meta?.status?` · ${String(meta.status).toUpperCase()}`:" · SAVED RATE"}`;
-  usdIdrRate.title=meta?.asOf?`Updated ${new Date(meta.asOf).toLocaleString("en-GB",{dateStyle:"medium",timeStyle:"short"})}`:"Last saved exchange rate";
+  const providerLabel={"google-finance":"GOOGLE FINANCE",yahoo:"YAHOO",finnhub:"FINNHUB"}[meta?.provider]||"SAVED RATE";
+  usdIdrRate.textContent=`1 USD = ${new Intl.NumberFormat("id-ID",{maximumFractionDigits:2}).format(Number(state.usdIdr||0))} IDR · ${providerLabel}`;
+  usdIdrRate.title=meta?.asOf?`${providerLabel} · updated ${new Date(meta.asOf).toLocaleString("en-GB",{dateStyle:"medium",timeStyle:"short"})}`:"Last saved exchange rate";
  }
  stockNetcashIdr.onchange=()=>{state.stockExtras ||= {netcashIdr:0,walletUsd:0};state.stockExtras.netcashIdr=Math.max(0,Number(stockNetcashIdr.value||0));save();renderAll();};
  stockWalletUsd.onchange=()=>{state.stockExtras ||= {netcashIdr:0,walletUsd:0};state.stockExtras.walletUsd=Math.max(0,Number(stockWalletUsd.value||0));save();renderAll();};
@@ -845,10 +847,12 @@ async function refreshStockPrices({silent=false}={}){
  if(!silent)toastMsg(`${updated} price${updated===1?"":"s"} updated${failed?`, ${failed} fallback`:""}`);
 }
 
-async function refreshExchangeRate({silent=false}={}){
+async function refreshExchangeRate({silent=false,force=false}={}){
  if(!navigator.onLine)return false;
- try{
-  const quote=await fetchUsdIdrRate();
+ if(fxRefreshPromise)return fxRefreshPromise;
+ fxRefreshPromise=(async()=>{try{
+  if(typeof refreshFxBtn!=="undefined"){refreshFxBtn.disabled=true;refreshFxBtn.classList.add("is-loading");}
+  const quote=await fetchUsdIdrRate({force});
   const rate=Number(quote.rate);
   if(!Number.isFinite(rate)||rate<=0)throw new Error("Invalid USD/IDR rate.");
   const changed=Number(state.usdIdr)!==rate;
@@ -863,11 +867,15 @@ async function refreshExchangeRate({silent=false}={}){
   if(typeof usdIdrRate!=="undefined"){usdIdrRate.textContent=`1 USD = ${new Intl.NumberFormat("id-ID",{maximumFractionDigits:2}).format(Number(state.usdIdr||0))} IDR · SAVED FALLBACK`;usdIdrRate.title=error.message;}
   if(!silent)toastMsg("Live USD/IDR unavailable · saved rate retained");
   return false;
- }
+ }finally{
+  if(typeof refreshFxBtn!=="undefined"){refreshFxBtn.disabled=false;refreshFxBtn.classList.remove("is-loading");}
+  fxRefreshPromise=null;
+ }})();
+ return fxRefreshPromise;
 }
 
 async function refreshMarkets({silent=false}={}){
- await refreshExchangeRate({silent:true});
+ await refreshExchangeRate({silent:true,force:true});
  await refreshStockPrices({silent:true});
  if(!silent)toastMsg("Market prices and USD/IDR updated");
 }
@@ -1081,6 +1089,7 @@ seedDataBtn.onclick=async()=>{
 };
 logoutBtn.onclick=()=>{if(fxRefreshTimer)clearInterval(fxRefreshTimer);syncManager.signOut();};
 refreshStocksBtn.onclick=()=>refreshMarkets();
+refreshFxBtn.onclick=()=>refreshExchangeRate({force:true});
 validateSymbolsBtn.onclick=()=>validateStockSymbols();
 
 let installPrompt=null;

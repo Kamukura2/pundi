@@ -9,9 +9,10 @@ export default async function handler(request, response) {
   try {
     const { user } = await resolveAuthorizedUser(request);
     enforceRateLimit(`fx:${user.id}`, 20);
-    const cached = getCachedQuote("fx:USD-IDR");
+    const forceRefresh = String(request.query?.refresh || "") === "1";
+    const cached = forceRefresh ? null : getCachedQuote("fx:USD-IDR");
     const quote = cached || setCachedQuote("fx:USD-IDR", await fetchUsdIdrQuote());
-    response.setHeader("Cache-Control", "private, max-age=60");
+    response.setHeader("Cache-Control", forceRefresh ? "private, no-store" : "private, max-age=60");
     return response.status(200).json({ ...quote, pair:"USD/IDR", cache:cached ? "hit" : "miss" });
   } catch (error) {
     return apiError(response, error);

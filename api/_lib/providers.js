@@ -1,4 +1,4 @@
-import { fetchJson } from "./http.js";
+import { fetchJson, fetchText } from "./http.js";
 
 const symbolPattern = /^[A-Z0-9.:-]{1,24}$/i;
 
@@ -97,6 +97,37 @@ async function finnhubUsdIdr() {
   return { rate, asOf:new Date().toISOString(), status:"real-time", provider:"finnhub" };
 }
 
+function validUsdIdr(value) {
+  const rate = Number(String(value ?? "").replace(/,/g, ""));
+  return Number.isFinite(rate) && rate >= 10000 && rate <= 50000 ? rate : null;
+}
+
+async function googleFinanceUsdIdr() {
+  const url = new URL("https://www.google.com/finance/quote/USD-IDR");
+  url.searchParams.set("hl", "en");
+  const html = await fetchText(url, {
+    headers:{
+      Accept:"text/html,application/xhtml+xml",
+      "Accept-Language":"en-US,en;q=0.9",
+      "User-Agent":"Mozilla/5.0 (compatible; CVFinance/7.6; personal-use FX lookup)"
+    }
+  });
+  const candidates = [
+    ...[...html.matchAll(/data-last-price="([0-9.,]+)"/gi)].map(match => match[1]),
+    ...[...html.matchAll(/class="[^"]*YMlKec[^\"]*"[^>]*>\s*([0-9.,]+)/gi)].map(match => match[1])
+  ];
+  const rate = candidates.map(validUsdIdr).find(Boolean);
+  if (!rate) throw new Error("Google Finance returned no valid USD/IDR rate.");
+  const timestampMatch = html.match(/data-last-normal-market-timestamp="(\d+)"/i);
+  const timestamp = Number(timestampMatch?.[1] || 0);
+  return {
+    rate,
+    asOf:timestamp ? new Date(timestamp * 1000).toISOString() : new Date().toISOString(),
+    status:"live",
+    provider:"google-finance"
+  };
+}
+
 async function yahooUsdIdr() {
   const failures = [];
   for (const host of ["https://query1.finance.yahoo.com", "https://query2.finance.yahoo.com"]) {
@@ -108,8 +139,22 @@ async function yahooUsdIdr() {
         headers:{ Accept:"application/json,text/plain,*/*", "User-Agent":"Mozilla/5.0 (compatible; CVFinance/7.6; personal-use FX lookup)" }
       });
       const result = data?.chart?.result?.[0];
-      const rate = Number(result?.meta?.regularMarketPrice);
-      const timestamp = Number(result?.meta?.regularMarketTime || 0);
+      const closes = result?.indicators?.quote?.[0]?.close || [];
+      const timestamps = result?.timestamp || [];
+      let rate = null;
+      let timestamp = 0;
+      for (let index = closes.length - 1; index >= 0; index -= 1) {
+        const candidate = validUsdIdr(closes[index]);
+        if (candidate) {
+          rate = candidate;
+          timestamp = Number(timestamps[index] || 0);
+          break;
+        }
+      }
+      if (!rate) {
+        rate = validUsdIdr(result?.meta?.regularMarketPrice);
+        timestamp = Number(result?.meta?.regularMarketTime || 0);
+      }
       if (!Number.isFinite(rate) || rate <= 0) throw new Error("Yahoo Finance returned no USD/IDR rate.");
       return { rate, asOf:timestamp ? new Date(timestamp * 1000).toISOString() : new Date().toISOString(), status:classify(timestamp, "real-time"), provider:"yahoo" };
     } catch (error) {
@@ -121,8 +166,9 @@ async function yahooUsdIdr() {
 
 export async function fetchUsdIdrQuote() {
   const failures = [];
-  try { return await finnhubUsdIdr(); } catch (error) { failures.push(`Finnhub: ${error.message}`); }
+  try { return await googleFinanceUsdIdr(); } catch (error) { failures.push(`Google Finance: ${error.message}`); }
   try { return await yahooUsdIdr(); } catch (error) { failures.push(`Yahoo: ${error.message}`); }
+  try { return await finnhubUsdIdr(); } catch (error) { failures.push(`Finnhub: ${error.message}`); }
   throw Object.assign(new Error(`USD/IDR rate unavailable. ${failures.join(" | ")}`), { code:"fx_unavailable", status:502 });
 }
 

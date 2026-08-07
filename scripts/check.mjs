@@ -130,19 +130,20 @@ assert.equal(idxQuote.price, 4220);
 assert.equal(idxQuote.provider, "yahoo");
 assert.equal(idxQuote.status, "delayed");
 globalThis.fetch = async url => {
-  assert.match(String(url), /forex\/rates\?base=USD/);
-  return new Response(JSON.stringify({base:"USD",quote:{IDR:16321.5}}), {status:200,headers:{"content-type":"application/json"}});
+  assert.match(String(url), /google\.com\/finance\/quote\/USD-IDR/);
+  return new Response('<main data-last-price="17810.25" data-last-normal-market-timestamp="1786134000"><div class="YMlKec fxKbKc">17,810.25</div></main>', {status:200,headers:{"content-type":"text/html"}});
 };
 const fxQuote = await fetchUsdIdrQuote();
-assert.equal(fxQuote.rate, 16321.5);
-assert.equal(fxQuote.provider, "finnhub");
+assert.equal(fxQuote.rate, 17810.25);
+assert.equal(fxQuote.provider, "google-finance");
 globalThis.fetch = async url => {
+  if (String(url).includes("google.com")) return new Response("blocked", {status:503,headers:{"content-type":"text/plain"}});
   if (String(url).includes("finnhub.io")) return new Response(JSON.stringify({error:"plan unavailable"}), {status:403,headers:{"content-type":"application/json"}});
   assert.match(String(url), /\/IDR=X\?/);
-  return new Response(JSON.stringify({chart:{result:[{meta:{regularMarketPrice:16345.75,regularMarketTime:Math.floor(Date.now()/1000)}}],error:null}}), {status:200,headers:{"content-type":"application/json"}});
+  return new Response(JSON.stringify({chart:{result:[{meta:{regularMarketPrice:17914,regularMarketTime:Math.floor(Date.now()/1000)-60},timestamp:[Math.floor(Date.now()/1000)-60,Math.floor(Date.now()/1000)],indicators:{quote:[{close:[17799,17810]}]}}],error:null}}), {status:200,headers:{"content-type":"application/json"}});
 };
 const fallbackFxQuote = await fetchUsdIdrQuote();
-assert.equal(fallbackFxQuote.rate, 16345.75);
+assert.equal(fallbackFxQuote.rate, 17810);
 assert.equal(fallbackFxQuote.provider, "yahoo");
 globalThis.fetch = realFetch;
 
@@ -169,4 +170,4 @@ assert.match(appSource, /backdropPress/, "Dialog dismissal must distinguish back
 assert.match(appSource, /fetchUsdIdrRate/, "USD\/IDR live refresh must be wired into the app");
 assert.match(appSource, /Number\(s\.quantity\)\*stockPrice[\s\S]*s\.currency===\"USD\"\?v\*state\.usdIdr:v/, "US holdings must convert shares times USD price using USD\/IDR");
 
-console.log("CVFinance checks passed: schema, RLS markers, PWA, 8 tabs, v7.6.1 stable target inputs, safe dialog dismissal, live USD/IDR fallback, auditable projections, one-time dated credit, optional stock cash assets, sorting invariants, stock provider abstraction, offline queue coalescing, and JavaScript syntax.");
+console.log("CVFinance checks passed: schema, RLS markers, PWA, 8 tabs, v7.6.2 stable target inputs, safe dialog dismissal, Google-first live USD/IDR with forced refresh and fallback, auditable projections, one-time dated credit, optional stock cash assets, sorting invariants, stock provider abstraction, offline queue coalescing, and JavaScript syntax.");
