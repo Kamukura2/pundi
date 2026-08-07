@@ -1,4 +1,6 @@
-# CVFinance v7.5.1
+# CVFinance v7.5.2
+
+v7.5.2 adds fluid pointer-based sorting across Monthly Budgets, yearly costs, Events, credit, Entrusted Funds, and Clients. Monthly Budget order is now persisted through migration `010`. Insights uses category-specific color identities with light halos and projection KPI cards; Stocks adds a full yearly value chart; the redundant automatic-provider column is removed; and mobile Prospect values are tightened to remain on one line.
 
 v7.5.1 adds non-recurring Entrusted Funds with separate Cash Balance or Stocks deductions, active/settled status, persistent ordering, and an additive RLS-protected Supabase table. History expense categories are now rendered as tags sourced dynamically from Monthly Budgets, so selecting a tag fills that budget's current-month meter. Event urgency colors are inverted: the current month is luminous, another month this year is dark orange, and another year remains gray.
 
@@ -53,6 +55,8 @@ For local full-stack testing, use `vercel dev`; plain `npm run dev` does not emu
 - [Projection and Insight v7.4.0 patch](docs/PATCH_v7_4_0_PROJECTION_INSIGHTS.md)
 - [Remaining Year and Sorting v7.5.0 patch](docs/PATCH_v7_5_0_REMAINING_YEAR_SORTING.md)
 - [Entrusted Funds and Budget Tags v7.5.1 patch](docs/PATCH_v7_5_1_ENTRUSTED_FUNDS_TAGS.md)
+- [Visual, sorting, and multi-user v7.5.2 patch](docs/PATCH_v7_5_2_VISUAL_SORT_MULTIUSER.md)
+- [Second account setup](docs/SECOND_ACCOUNT_SETUP.md)
 - [Manual actions](docs/MANUAL_ACTIONS.md)
 - [Test checklist](docs/TEST_CHECKLIST.md)
 - [Rollback](docs/ROLLBACK.md)

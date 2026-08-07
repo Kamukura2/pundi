@@ -304,6 +304,10 @@
           <small>Total Portfolio Value</small>
           <div id="portfolioValue" class="hero-value private">Rp0</div>
           <div class="hero-inline"><span>Invested <b id="portfolioInvested" class="private">Rp0</b></span><span>Unrealized <b id="portfolioPL" class="private">Rp0</b></span></div>
+          <div class="stock-hero-chart-wrap">
+            <small>Portfolio Value by Year</small>
+            <div id="stockValueTrend" class="chart stock-hero-chart"></div>
+          </div>
         </article>
 
         <article class="panel">
@@ -326,7 +330,7 @@
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Ticker</th><th>Market</th><th>Provider (Auto)</th><th>Provider Symbol</th><th>Currency (Auto)</th><th>Qty (Lot / Shares)</th><th>Avg / Share</th><th>Current / Fallback</th><th>Price State</th><th>Value</th><th>P/L</th><th></th></tr></thead>
+            <thead><tr><th>Ticker</th><th>Market</th><th>Provider Symbol</th><th>Currency (Auto)</th><th>Qty (Lot / Shares)</th><th>Avg / Share</th><th>Current / Fallback</th><th>Price State</th><th>Value</th><th>P/L</th><th></th></tr></thead>
             <tbody id="holdingsBody"></tbody>
           </table>
         </div>
@@ -444,9 +448,10 @@
       </div>
 
       <div class="grid-2 gap-lg">
-        <article class="panel">
+        <article class="panel insight-projection-panel">
           <div class="panel-head"><div><p>Projection</p><h3>Base vs Optimistic</h3></div></div>
           <div id="scenarioCompare" class="chart"></div>
+          <div id="scenarioKpis" class="scenario-kpis"></div>
         </article>
 
         <article class="panel">
@@ -552,7 +557,7 @@
   <form id="authForm" class="auth-card">
     <div class="brand auth-brand"><div class="logo">C</div><div><b>CVFinance</b><small>Private cloud access</small></div></div>
     <h2>Sign in</h2>
-    <p>Use the single private account created in Supabase.</p>
+    <p>Use a private account created in Supabase. Each account has isolated data.</p>
     <label>Email<input id="authEmail" type="email" autocomplete="username" required></label>
     <label>Password<input id="authPassword" type="password" autocomplete="current-password" required></label>
     <button id="authSubmit" class="primary-btn" type="submit">Sign in</button>

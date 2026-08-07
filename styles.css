@@ -287,6 +287,54 @@ select,input,.search{width:100%;min-width:0;height:46px;padding:0 12px;border-ra
 #holdingsBody{min-width:0}.table-wrap:has(#holdingsBody){overflow:visible}.table-wrap:has(#holdingsBody) table{min-width:0;width:100%}.table-wrap:has(#holdingsBody) thead{display:none}.table-wrap:has(#holdingsBody)::after{display:none}
 }
 
+/* v7.5.2 fluid sorting, richer insights, stock horizon and mobile number fit */
+[data-yearly-id],[data-event-id],[data-credit-id],[data-entrusted-id],[data-client-id],[data-budget-id]{cursor:grab;touch-action:pan-y;user-select:none}
+.sorting-active{cursor:grabbing!important;user-select:none!important;overscroll-behavior:none}
+.sorting-active *{cursor:grabbing!important}
+.sort-placeholder{min-height:64px;border:2px dashed rgba(100,102,255,.48);border-radius:20px;background:linear-gradient(135deg,rgba(127,102,255,.12),rgba(57,195,255,.10));box-shadow:inset 0 0 0 5px rgba(255,255,255,.28);transition:height .16s,transform .16s}
+.is-floating{opacity:.96!important;transform:rotate(.35deg) scale(1.018)!important;outline:2px solid #6c7cff!important;box-shadow:0 28px 70px rgba(49,56,160,.34)!important;transition:none!important}
+[data-theme=dark] .sort-placeholder{background:linear-gradient(135deg,rgba(96,72,255,.24),rgba(34,169,224,.16));box-shadow:inset 0 0 0 5px rgba(0,0,0,.18)}
+
+.stock-hero-chart-wrap{margin-top:auto;padding-top:42px;display:grid;gap:9px}
+.stock-hero-chart-wrap>small{color:rgba(255,255,255,.72);font-size:10px;font-weight:850;letter-spacing:.08em;text-transform:uppercase}
+.stock-hero-chart{min-height:300px!important;height:300px}
+.stock-hero-chart svg{overflow:visible}
+#stocks .hero-dark{display:flex;flex-direction:column;min-height:610px}
+#holdingsBody td:nth-child(8),#holdingsBody td:nth-child(11){grid-column:1/-1}
+#holdingsBody td:nth-child(9),#holdingsBody td:nth-child(10){padding:10px;border-radius:13px;background:var(--surface2);font-weight:900;overflow-wrap:anywhere}
+#holdingsBody td:nth-child(10).negative{color:var(--red)!important}#holdingsBody td:nth-child(10).positive{color:var(--green)!important}
+
+.insight-projection-panel{display:flex;flex-direction:column}
+.insight-projection-panel #scenarioCompare{min-height:330px;height:330px}
+.scenario-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:16px}
+.scenario-kpis article{min-width:0;padding:14px 15px;border:1px solid var(--line);border-radius:17px;background:linear-gradient(135deg,rgba(127,102,255,.10),rgba(57,195,255,.08))}
+.scenario-kpis small{display:block;color:var(--muted);font-size:9px;font-weight:850;letter-spacing:.06em;text-transform:uppercase}
+.scenario-kpis strong{display:block;margin-top:6px;font-size:15px;overflow-wrap:anywhere}
+.story-card::before{content:"";position:absolute;left:18px;top:50%;width:116px;height:116px;transform:translateY(-50%);border-radius:50%;background:rgba(255,255,255,.34);filter:blur(1px);box-shadow:0 0 38px rgba(255,255,255,.30)}
+.story-card img{z-index:1}.story-card>div{position:relative;z-index:2}
+.story-card.insight-wallet{background:linear-gradient(135deg,#9d78ff,#6e5bdf 52%,#4ca5ed)}
+.story-card.insight-clients{background:linear-gradient(135deg,#55e8ab,#24c987 52%,#20aebb)}
+.story-card.insight-coffee{background:linear-gradient(135deg,#f4d3a1,#c98952 52%,#875236)}
+.story-card.insight-electricity{background:linear-gradient(135deg,#70e2f6,#29b7dd 52%,#397ce9)}
+.story-card.insight-calendar{background:linear-gradient(135deg,#ffd374,#ff9b5e 52%,#ef6f59)}
+.story-card.insight-stocks{background:linear-gradient(135deg,#ff9c9c,#f15a7d 52%,#bd3f76)}
+.signal-item.insight-wallet .signal-ic{background:linear-gradient(135deg,#a487ff,#6559e8)}
+.signal-item.insight-clients .signal-ic{background:linear-gradient(135deg,#63efb9,#1dad95)}
+.signal-item.insight-coffee .signal-ic{background:linear-gradient(135deg,#edc690,#aa6845)}
+.signal-item.insight-electricity .signal-ic{background:linear-gradient(135deg,#70e4f5,#2e84ec)}
+.signal-item.insight-calendar .signal-ic{background:linear-gradient(135deg,#ffd267,#f27658)}
+.signal-item.insight-stocks .signal-ic{background:linear-gradient(135deg,#ff979d,#c43d7c)}
+.signal-ic{box-shadow:inset 0 0 0 1px rgba(255,255,255,.35),0 8px 22px rgba(45,55,110,.13)}
+
+@media (max-width:1024px){#stocks .hero-dark{min-height:520px}.stock-hero-chart{min-height:230px!important;height:230px}.insight-projection-panel #scenarioCompare{min-height:270px;height:270px}}
+@media (max-width:680px){
+.prospect-snapshot-value{font-size:clamp(25px,7.7vw,35px)!important;letter-spacing:-.07em}
+.prospect-snapshot.current-year{padding-right:58px}
+#stocks .hero-dark{min-height:450px}.stock-hero-chart-wrap{padding-top:28px}.stock-hero-chart{min-height:205px!important;height:205px}
+.scenario-kpis{grid-template-columns:1fr}.insight-projection-panel #scenarioCompare{min-height:220px;height:220px}
+.story-card::before{left:10px;width:94px;height:94px}
+}
+
 /* v7.5 remaining-year model, direct card sorting, archives and chart inspection */
 .yearly-tile,.event-tile,.client-card,.credit-row,.credit-archive-row{cursor:grab;touch-action:pan-y;user-select:none}
 .yearly-tile:active,.event-tile:active,.client-card:active,.credit-row:active,.credit-archive-row:active{cursor:grabbing}
@@ -568,3 +616,28 @@ select,input,.search{width:100%;min-width:0;height:46px;padding:0 12px;border-ra
 .entrusted-row{grid-template-columns:20px 38px minmax(0,1fr) 34px 34px;grid-template-areas:"check icon main edit delete" "amount amount amount amount amount";gap:8px;padding:11px}
 .entrusted-row>input{grid-area:check}.entrusted-source{grid-area:icon;width:38px;height:38px;border-radius:12px}.entrusted-main{grid-area:main}.entrusted-row>strong{grid-area:amount;margin-top:2px}.entrusted-row [data-edit-entrusted]{grid-area:edit}.entrusted-row [data-delete-entrusted]{grid-area:delete}
 }
+
+/* v7.5.2 final cascade */
+.event-tile.event-this-year{background:linear-gradient(145deg,#347fca,#20508d 58%,#183b73)!important;border-color:rgba(46,122,211,.42);color:#fff;box-shadow:0 15px 34px rgba(29,91,170,.20)}
+.event-tile.event-current{background:linear-gradient(145deg,#67e0ee,#38abea 52%,#467cf2)!important;border-color:rgba(63,170,235,.48);color:#fff;box-shadow:0 20px 46px rgba(47,144,224,.30)}
+[data-theme=dark] .event-tile.event-this-year{background:linear-gradient(145deg,#174f88,#0e2f5c 60%,#091f43)!important;color:#fff;box-shadow:none}
+[data-theme=dark] .event-tile.event-current{background:linear-gradient(145deg,#42cde4,#237fc7 58%,#264cb0)!important;color:#fff;box-shadow:0 20px 46px rgba(37,128,213,.24)}
+.is-dragging.is-floating{opacity:.96!important;transform:rotate(.35deg) scale(1.018)!important;outline:2px solid #6c7cff!important;box-shadow:0 28px 70px rgba(49,56,160,.34)!important;transition:none!important}
+.story-card.insight-wallet{background:linear-gradient(135deg,#9d78ff,#6e5bdf 52%,#4ca5ed)!important}
+.story-card.insight-clients{background:linear-gradient(135deg,#55e8ab,#24c987 52%,#20aebb)!important}
+.story-card.insight-coffee{background:linear-gradient(135deg,#f4d3a1,#c98952 52%,#875236)!important}
+.story-card.insight-electricity{background:linear-gradient(135deg,#70e2f6,#29b7dd 52%,#397ce9)!important}
+.story-card.insight-calendar{background:linear-gradient(135deg,#ffd374,#ff9b5e 52%,#ef6f59)!important}
+.story-card.insight-stocks{background:linear-gradient(135deg,#ff9c9c,#f15a7d 52%,#bd3f76)!important}
+.story-card::before{content:"";position:absolute;left:18px;top:50%;width:116px;height:116px;transform:translateY(-50%);border-radius:50%;background:rgba(255,255,255,.36);filter:blur(1px);box-shadow:0 0 38px rgba(255,255,255,.32);z-index:0}
+.story-card img{z-index:1}.story-card>div{position:relative;z-index:2}
+.signal-item.insight-wallet .signal-ic{background:linear-gradient(135deg,#a487ff,#6559e8)}
+.signal-item.insight-clients .signal-ic{background:linear-gradient(135deg,#63efb9,#1dad95)}
+.signal-item.insight-coffee .signal-ic{background:linear-gradient(135deg,#edc690,#aa6845)}
+.signal-item.insight-electricity .signal-ic{background:linear-gradient(135deg,#70e4f5,#2e84ec)}
+.signal-item.insight-calendar .signal-ic{background:linear-gradient(135deg,#ffd267,#f27658)}
+.signal-item.insight-stocks .signal-ic{background:linear-gradient(135deg,#ff979d,#c43d7c)}
+#holdingsBody td:nth-child(8),#holdingsBody td:nth-child(11){grid-column:1/-1}
+#holdingsBody td:nth-child(9),#holdingsBody td:nth-child(10){padding:10px;border-radius:13px;background:var(--surface2);font-weight:900;overflow-wrap:anywhere}
+#holdingsBody td:nth-child(10).negative{color:var(--red)!important}#holdingsBody td:nth-child(10).positive{color:var(--green)!important}
+@media (max-width:680px){.prospect-snapshot-value{font-size:clamp(25px,7.7vw,35px)!important;letter-spacing:-.07em}.story-card::before{left:10px;width:94px;height:94px}}

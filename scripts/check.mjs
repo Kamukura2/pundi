@@ -90,6 +90,9 @@ assert.doesNotMatch(migration008,/drop\s+table|truncate\s+|delete\s+from/i);
 const migration009 = read("supabase/migrations/009_entrusted_funds.sql");
 for (const marker of ["entrusted_funds","deduction_source","is_settled","sort_order","enable row level security"]) assert.match(migration009,new RegExp(marker));
 assert.doesNotMatch(migration009,/drop\s+table|truncate\s+|delete\s+from/i);
+const migration010 = read("supabase/migrations/010_monthly_budget_sort_order.sql");
+for (const marker of ["monthly_budgets","sort_order","monthly_budgets_user_order_idx"]) assert.match(migration010,new RegExp(marker));
+assert.doesNotMatch(migration010,/drop\s+table|truncate\s+|delete\s+from/i);
 
 const { normalizeStockMapping, quantityForDisplay, quantityForStorage } = await import("../src/stocks/holding.js");
 const idxHolding = {ticker:"BMRI",market:"IDX",provider:"finnhub",providerSymbol:"BMRI",currency:"IDR",quantity:10000};

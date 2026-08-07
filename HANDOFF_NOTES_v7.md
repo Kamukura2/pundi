@@ -1,6 +1,6 @@
 # CVFinance v7 handoff
 
-Baseline: v6.3.1. v7.5.1 keeps all eight modules, renames Cashflow to History in the UI, and uses a month-aware projection engine for Accumulation and Prospect.
+Baseline: v6.3.1. v7.5.2 keeps all eight modules, renames Cashflow to History in the UI, and uses a month-aware projection engine for Accumulation and Prospect.
 
 Implemented:
 
@@ -20,5 +20,7 @@ Implemented:
 - Mobile switches every financial module to contained cards or internally scrollable tables, prevents page-level overflow, and scrolls to the top when changing sections.
 - v7.4.0 adds migration `007`, monthly budget progress, recurring/ending client drag sorting, dynamic projection years, OLED surfaces, bilingual US/ID UI, and illustrated data-driven Insights.
 - v7.5.1 adds migration `009`, non-recurring Entrusted Funds deducted once from Cash or Stocks, and dynamic History tags tied directly to Monthly Budget meters.
+- v7.5.2 adds migration `010`, persisted Monthly Budget sorting, fluid pointer-based sorting, richer projection/stock charts, distinct Insight palettes, and tighter mobile Prospect values.
+- Separate Supabase Auth users have isolated empty datasets through per-table RLS. The Telegram bot remains intentionally assigned to the single `CVFINANCE_OWNER_USER_ID` configured in Vercel.
 
 Not performed inside this package: creating third-party accounts/bots, entering private API keys, applying SQL to the user's Supabase project, pushing to the user's GitHub, registering the Telegram webhook, or deploying to the user's Vercel. Follow `docs/TELEGRAM_SETUP.md` for those credentialed steps.

@@ -289,14 +289,17 @@ function renderExpenses(){
  annualEventsExpense.textContent=fmt(annual.events);
  qa("[data-expense-view]").forEach(button=>button.classList.toggle("active",button.dataset.expenseView===state.expenseView));
  qa("[data-expense-panel]").forEach(panel=>panel.classList.toggle("active",panel.dataset.expensePanel===state.expenseView));
- budgetRows.innerHTML=state.budgets.map((b,i)=>{
+ const orderedBudgets=[...state.budgets].sort((a,b)=>Number(a.sortOrder||0)-Number(b.sortOrder||0));
+ budgetRows.innerHTML=orderedBudgets.map(b=>{
+  const i=state.budgets.indexOf(b);
   const progress=getBudgetProgress(b,state.transactions,new Date());
   const pct=b.monthly?progress.paid/b.monthly*100:0, cls=pct>=100?"done":pct>80?"warn":"";
   const status=progress.status==="done"?"DONE THIS MONTH":progress.status==="partial"?"PARTIAL":"AUTO FROM HISTORY";
-  return `<div class="progress-row budget-progress ${cls}"><div class="progress-top"><b class="budget-category-tag">${b.category}</b><span class="budget-status ${progress.status}">${status}</span></div><div class="progress ${cls}"><span style="width:${Math.min(100,pct)}%"></span></div><div class="budget-numbers private"><small>Paid ${fmt(progress.paid)}</small><b>Remaining ${fmt(progress.remaining)}</b><small>Default ${fmt(b.monthly)}</small></div><div class="tile-actions"><button class="icon-mini" data-edit-budget="${i}" title="Edit">✎</button><button class="icon-mini" data-remove-budget="${i}" title="Remove">🗑</button></div></div>`;
+  return `<div class="progress-row budget-progress ${cls}" data-budget-id="${b.id}" title="Drag card to reorder"><div class="progress-top"><b class="budget-category-tag">${b.category}</b><span class="budget-status ${progress.status}">${status}</span></div><div class="progress ${cls}"><span style="width:${Math.min(100,pct)}%"></span></div><div class="budget-numbers private"><small>Paid ${fmt(progress.paid)}</small><b>Remaining ${fmt(progress.remaining)}</b><small>Default ${fmt(b.monthly)}</small></div><div class="tile-actions"><button class="icon-mini" data-edit-budget="${i}" title="Edit">✎</button><button class="icon-mini" data-remove-budget="${i}" title="Remove">🗑</button></div></div>`;
  }).join("");
  qa("[data-edit-budget]").forEach(b=>b.onclick=()=>editMonthly(Number(b.dataset.editBudget)));
  qa("[data-remove-budget]").forEach(b=>b.onclick=()=>{state.budgets.splice(Number(b.dataset.removeBudget),1); save(); renderAll();});
+ enableBudgetDrag();
  const budgetEntries=state.budgets.map(b=>[b.category,Number(b.monthly)]).sort((a,b)=>b[1]-a[1]);
  expenseDonut.innerHTML=donut(budgetEntries,fmt(monthlyBudget(),true));
  expenseLegend.innerHTML=legend(budgetEntries);
@@ -336,31 +339,50 @@ function emptyLane(label){
 
 function bindPointerSort(cardSelector,laneSelector,onCommit){
  qa(cardSelector).forEach(card=>{
+  card.draggable=false;
   card.onpointerdown=event=>{
-   if(event.pointerType==="mouse"||event.button!==0||event.target.closest("button,input,select,a,label,summary"))return;
-   const start={x:event.clientX,y:event.clientY};let active=false;
-   const timer=setTimeout(()=>{active=true;card.classList.add("is-dragging");navigator.vibrate?.(18);},180);
+   if(event.button!==0||event.target.closest("button,input,select,a,label,summary"))return;
+   const start={x:event.clientX,y:event.clientY};
+   const rect=card.getBoundingClientRect();
+   const offset={x:event.clientX-rect.left,y:event.clientY-rect.top};
+   const placeholder=document.createElement("div");
+   placeholder.className="sort-placeholder";
+   placeholder.style.height=`${rect.height}px`;
+   let active=false,lastLane=card.closest(laneSelector),scrollFrame=0;
+   const activate=()=>{
+    if(active)return;active=true;navigator.vibrate?.(12);
+    card.after(placeholder);card.classList.add("is-dragging","is-floating");
+    Object.assign(card.style,{position:"fixed",left:`${rect.left}px`,top:`${rect.top}px`,width:`${rect.width}px`,height:`${rect.height}px`,zIndex:"140",pointerEvents:"none",margin:"0"});
+    document.body.classList.add("sorting-active");
+   };
+   const timer=setTimeout(activate,event.pointerType==="mouse"?80:170);
    const move=e=>{
-    if(!active){if(Math.hypot(e.clientX-start.x,e.clientY-start.y)>9)clearTimeout(timer);return;}
+    const distance=Math.hypot(e.clientX-start.x,e.clientY-start.y);
+    if(!active){
+     if(event.pointerType==="mouse"&&distance>4)activate();
+     else if(distance>12){clearTimeout(timer);cleanup(false);}
+     if(!active)return;
+    }
     e.preventDefault();
-    card.style.pointerEvents="none";
+    card.style.left=`${e.clientX-offset.x}px`;card.style.top=`${e.clientY-offset.y}px`;
     const under=document.elementFromPoint(e.clientX,e.clientY);
-    card.style.pointerEvents="";
-    const lane=under?.closest(laneSelector);
-    if(!lane)return;
-    const target=under?.closest(cardSelector);
-    if(target&&target!==card){
-     const box=target.getBoundingClientRect();
-     lane.insertBefore(card,e.clientY<box.top+box.height/2?target:target.nextSibling);
-    }else if(!target)lane.append(card);
+    const lane=under?.closest(laneSelector)||lastLane;if(!lane)return;lastLane=lane;
+    const targets=[...lane.querySelectorAll(cardSelector)].filter(node=>node!==card);
+    const target=targets.find(node=>{const box=node.getBoundingClientRect();return e.clientY<box.top+box.height/2;});
+    lane.insertBefore(placeholder,target||null);
+    cancelAnimationFrame(scrollFrame);
+    scrollFrame=requestAnimationFrame(()=>{
+     const edge=80,speed=e.clientY<edge?-14:e.clientY>innerHeight-edge?14:0;
+     if(speed)window.scrollBy({top:speed,behavior:"auto"});
+    });
    };
-   const end=()=>{
-    clearTimeout(timer);
-    card.classList.remove("is-dragging");card.style.pointerEvents="";
-    document.removeEventListener("pointermove",move,true);document.removeEventListener("pointerup",end,true);document.removeEventListener("pointercancel",end,true);
-    if(active)onCommit();
+   const cleanup=commit=>{
+    clearTimeout(timer);cancelAnimationFrame(scrollFrame);
+    document.removeEventListener("pointermove",move,true);document.removeEventListener("pointerup",end,true);document.removeEventListener("pointercancel",cancel,true);
+    if(active){placeholder.replaceWith(card);card.classList.remove("is-dragging","is-floating");card.removeAttribute("style");document.body.classList.remove("sorting-active");if(commit)onCommit();}
    };
-   document.addEventListener("pointermove",move,{capture:true,passive:false});document.addEventListener("pointerup",end,true);document.addEventListener("pointercancel",end,true);
+   const end=()=>cleanup(true),cancel=()=>cleanup(false);
+   document.addEventListener("pointermove",move,{capture:true,passive:false});document.addEventListener("pointerup",end,true);document.addEventListener("pointercancel",cancel,true);
   };
  });
 }
@@ -384,7 +406,15 @@ function enableYearlyDrag(){
   });
   save();renderAll();toastMsg("Order saved");
  };
- bindPointerSort(".yearly-tile","#yearlyExpenseGrid",commit);bindNativeSort(".yearly-tile","#yearlyExpenseGrid",commit);
+ bindPointerSort(".yearly-tile","#yearlyExpenseGrid",commit);
+}
+
+function enableBudgetDrag(){
+ const commit=()=>{
+  [...budgetRows.querySelectorAll("[data-budget-id]")].forEach((node,index)=>{const item=state.budgets.find(row=>row.id===node.dataset.budgetId);if(item)item.sortOrder=index;});
+  save();renderAll();toastMsg("Budget order saved");
+ };
+ bindPointerSort(".budget-progress","#budgetRows",commit);
 }
 
 function enableEventDrag(){
@@ -392,7 +422,7 @@ function enableEventDrag(){
   [...eventGrid.querySelectorAll("[data-event-id]")].forEach((card,index)=>{const item=state.events.find(row=>row.id===card.dataset.eventId);if(item)item.sortOrder=index;});
   save();renderAll();toastMsg("Event order saved");
  };
- bindPointerSort(".event-tile","#eventGrid",commit);bindNativeSort(".event-tile","#eventGrid",commit);
+ bindPointerSort(".event-tile","#eventGrid",commit);
 }
 
 function renderCredit(){
@@ -408,9 +438,9 @@ function renderCredit(){
  qa("[data-edit-credit]").forEach(c=>c.onclick=()=>editCredit(c.dataset.editCredit));
  qa("[data-del-credit]").forEach(c=>c.onclick=()=>{state.credit=state.credit.filter(x=>x.id!==c.dataset.delCredit); save(); renderAll();});
  const commit=()=>{[...creditItems.querySelectorAll("[data-credit-id]")].forEach((node,index)=>{const item=state.credit.find(row=>row.id===node.dataset.creditId);if(item)item.sortOrder=index;});save();renderAll();toastMsg("Credit order saved");};
- bindPointerSort(".credit-row","#creditItems",commit);bindNativeSort(".credit-row","#creditItems",commit);
+ bindPointerSort(".credit-row","#creditItems",commit);
  const commitArchive=()=>{[...creditArchive.querySelectorAll("[data-credit-id]")].forEach((node,index)=>{const item=state.credit.find(row=>row.id===node.dataset.creditId);if(item)item.sortOrder=index;});save();renderAll();toastMsg("Archive order saved");};
- bindPointerSort(".credit-archive-row","#creditArchive",commitArchive);bindNativeSort(".credit-archive-row","#creditArchive",commitArchive);
+ bindPointerSort(".credit-archive-row","#creditArchive",commitArchive);
  renderEntrusted();
 }
 
@@ -423,7 +453,7 @@ function renderEntrusted(){
  qa("[data-edit-entrusted]").forEach(button=>button.onclick=()=>editEntrusted(button.dataset.editEntrusted));
  qa("[data-delete-entrusted]").forEach(button=>button.onclick=()=>{const item=state.entrustedFunds.find(row=>row.id===button.dataset.deleteEntrusted);if(!item||!confirm(`Delete ${item.name}?`))return;state.entrustedFunds=state.entrustedFunds.filter(row=>row.id!==item.id);save();renderAll();});
  const commit=()=>{[...entrustedItems.querySelectorAll("[data-entrusted-id]")].forEach((node,index)=>{const item=state.entrustedFunds.find(row=>row.id===node.dataset.entrustedId);if(item)item.sortOrder=index;});save();renderAll();toastMsg("Entrusted funds order saved");};
- bindPointerSort(".entrusted-row","#entrustedItems",commit);bindNativeSort(".entrusted-row","#entrustedItems",commit);
+ bindPointerSort(".entrusted-row","#entrustedItems",commit);
 }
 
 function renderClients(){
@@ -455,7 +485,7 @@ function renderClients(){
   });
   save();renderAll();toastMsg("Client moved");
  };
- bindPointerSort(".client-card",".client-grid",commitClients);bindNativeSort(".client-card",".client-grid",commitClients);
+ bindPointerSort(".client-card",".client-grid",commitClients);
 }
 
 function renderStocks(){
@@ -467,12 +497,13 @@ function renderStocks(){
  const entries=state.stocks.map(s=>[s.ticker,stockValue(s)]);
  stockDonut.innerHTML=donut(entries,fmt(gross,true));
  stockLegend.innerHTML=legend(entries);
+ stockValueTrend.innerHTML=line(YEARS.map(year=>netPortfolio(year,"base")),YEARS.map(year=>String(year)),true);
  holdingsBody.innerHTML=state.stocks.map((s,i)=>{
   const stale=isPriceStale(s), status=s.priceStatus||"manual", stamp=s.priceAsOf?new Date(s.priceAsOf).toLocaleString("en-GB",{dateStyle:"medium",timeStyle:"short"}):"Never";
   const statusLabel=status==="manual"?"MANUAL FALLBACK":status;
   const qty=quantityForDisplay(s), unit=quantityUnit(s.market);
   const pl=stockValue(s)-invested(s);
-  return `<tr><td data-label="Ticker"><input data-stock="${i}" data-field="ticker" value="${s.ticker}"></td><td data-label="Market"><select data-stock="${i}" data-field="market"><option ${s.market==="IDX"?"selected":""}>IDX</option><option ${s.market==="NASDAQ"?"selected":""}>NASDAQ</option><option ${s.market==="NYSE"?"selected":""}>NYSE</option></select></td><td data-label="Provider"><input value="${s.provider==="yahoo"?"Yahoo (Delayed)":"Finnhub"}" title="Selected automatically from market" disabled></td><td data-label="Provider Symbol"><input data-stock="${i}" data-field="providerSymbol" value="${s.providerSymbol||s.ticker}"></td><td data-label="Currency"><input value="${s.currency}" title="Selected automatically from market" disabled></td><td data-label="Quantity"><div class="quantity-field"><input data-stock="${i}" data-field="quantity" type="number" min="0" step=".000001" value="${qty}"><small>${unit}</small></div></td><td data-label="Average / Share"><input data-stock="${i}" data-field="avg" type="number" step=".01" value="${s.avg}"></td><td data-label="Current / Fallback"><input data-stock="${i}" data-field="current" type="number" step=".01" value="${s.current}" title="Latest price. Edit only to set a manual fallback."></td><td data-label="Price State"><span class="price-state ${stale?'stale':''}">${stale?'STALE · ':''}${statusLabel}</span><small class="price-time">${stamp}</small></td><td data-label="Value" class="private">${fmt(stockValue(s))}</td><td data-label="Profit / Loss" class="private ${pl<0?"negative":pl>0?"positive":""}">${fmt(pl)}</td><td class="stock-remove"><button class="icon-mini" data-del-stock="${i}" title="Remove" aria-label="Remove ${s.ticker}">🗑</button></td></tr>`;
+  return `<tr><td data-label="Ticker"><input data-stock="${i}" data-field="ticker" value="${s.ticker}"></td><td data-label="Market"><select data-stock="${i}" data-field="market"><option ${s.market==="IDX"?"selected":""}>IDX</option><option ${s.market==="NASDAQ"?"selected":""}>NASDAQ</option><option ${s.market==="NYSE"?"selected":""}>NYSE</option></select></td><td data-label="Provider Symbol"><input data-stock="${i}" data-field="providerSymbol" value="${s.providerSymbol||s.ticker}"></td><td data-label="Currency"><input value="${s.currency}" title="Selected automatically from market" disabled></td><td data-label="Quantity"><div class="quantity-field"><input data-stock="${i}" data-field="quantity" type="number" min="0" step=".000001" value="${qty}"><small>${unit}</small></div></td><td data-label="Average / Share"><input data-stock="${i}" data-field="avg" type="number" step=".01" value="${s.avg}"></td><td data-label="Current / Fallback"><input data-stock="${i}" data-field="current" type="number" step=".01" value="${s.current}" title="Latest price. Edit only to set a manual fallback."></td><td data-label="Price State"><span class="price-state ${stale?'stale':''}">${stale?'STALE · ':''}${statusLabel}</span><small class="price-time">${stamp}</small></td><td data-label="Value" class="private">${fmt(stockValue(s))}</td><td data-label="Profit / Loss" class="private ${pl<0?"negative":pl>0?"positive":""}">${fmt(pl)}</td><td class="stock-remove"><button class="icon-mini" data-del-stock="${i}" title="Remove" aria-label="Remove ${s.ticker}">🗑</button></td></tr>`;
  }).join("");
  qa("[data-stock]").forEach(el=>el.onchange=()=>{
   const i=Number(el.dataset.stock),f=el.dataset.field,s=state.stocks[i];
@@ -579,10 +610,13 @@ function renderInsights(){
  cashRunway.textContent=`${runway.toFixed(1)} months`;
  largestExpense.textContent=biggestBudget?.category||"—";
  largestHolding.textContent=biggestHold?`${biggestHold.ticker} ${(stockValue(biggestHold)/Math.max(1,portfolio())*100).toFixed(0)}%`:"—";
+ const baseProjection=projection("base"),optimisticProjection=projection("optimistic"),baseLast=baseProjection.at(-1),optimisticLast=optimisticProjection.at(-1);
  scenarioCompare.innerHTML=lineMulti([
-  {name:"Base",vals:projection("base").map(x=>x.nw),color:COLORS[0]},
-  {name:"Optimistic",vals:projection("optimistic").map(x=>x.nw),color:COLORS[2]}
- ],projection("base").map(x=>String(x.year)));
+  {name:"Base",vals:baseProjection.map(x=>x.nw),color:COLORS[0]},
+  {name:"Optimistic",vals:optimisticProjection.map(x=>x.nw),color:COLORS[2]}
+ ],baseProjection.map(x=>String(x.year)));
+ const scenarioGap=optimisticLast.nw-baseLast.nw,baseGrowthPct=currentNW()?((baseLast.nw/currentNW()-1)*100):0;
+ scenarioKpis.innerHTML=`<article><small>2036 Scenario Gap</small><strong class="private ${moneyClass(scenarioGap)}">${scenarioGap>=0?"+":""}${fmt(scenarioGap)}</strong></article><article><small>Base Growth</small><strong>${baseGrowthPct>=0?"+":""}${baseGrowthPct.toFixed(1)}%</strong></article><article><small>2036 Closing Cash</small><strong class="private ${moneyClass(baseLast.closing)}">${fmt(baseLast.closing)}</strong></article><article><small>2036 Stock Assets</small><strong class="private ${moneyClass(baseLast.portfolio)}">${fmt(baseLast.portfolio)}</strong></article>`;
  const now=new Date(),prev=new Date(now.getFullYear(),now.getMonth()-1,1);
  const expenseIn=(date)=>state.transactions.filter(row=>row.type==="expense"&&String(row.date).startsWith(`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}`)).reduce((sum,row)=>sum+Number(row.amount),0);
  const thisExpense=expenseIn(now),previousExpense=expenseIn(prev),expenseDelta=previousExpense?((thisExpense-previousExpense)/previousExpense*100):0;
@@ -598,8 +632,8 @@ function renderInsights(){
   {asset:"calendar",tone:expenseDelta>5?"red":expenseDelta<-5?"green":"orange",eyebrow:"History trend",title:previousExpense?`Recorded expense ${expenseDelta>=0?"rose":"fell"} ${Math.abs(expenseDelta).toFixed(0)}%`:"Expense baseline is building",text:`History recorded ${fmt(thisExpense)} this month. It updates pacing only and is not deducted twice.`},
   {asset:"stocks",tone:pl<0?"red":"green",eyebrow:"Portfolio P/L",title:`${pl<0?"Down":"Up"} ${fmt(Math.abs(pl))}`,text:`Current portfolio is ${fmt(portfolio())} against ${fmt(state.stocks.reduce((sum,row)=>sum+invested(row),0))} invested.`}
  ];
- insightCards.innerHTML=insightData.map(x=>`<article class="story-card ${x.tone}"><img src="/assets/insights/${x.asset}.png" alt="" loading="lazy"><div><small>${x.eyebrow}</small><h3>${x.title}</h3><p>${x.text}</p></div></article>`).join("");
- insightLong.innerHTML=insightData.map(x=>`<div class="signal-item ${x.tone}"><div class="signal-ic"><img src="/assets/insights/${x.asset}.png" alt=""></div><div><b>${x.title}</b><p>${x.text}</p></div></div>`).join("");
+ insightCards.innerHTML=insightData.map(x=>`<article class="story-card ${x.tone} insight-${x.asset}"><img src="/assets/insights/${x.asset}.png" alt="" loading="lazy"><div><small>${x.eyebrow}</small><h3>${x.title}</h3><p>${x.text}</p></div></article>`).join("");
+ insightLong.innerHTML=insightData.map(x=>`<div class="signal-item ${x.tone} insight-${x.asset}"><div class="signal-ic"><img src="/assets/insights/${x.asset}.png" alt=""></div><div><b>${x.title}</b><p>${x.text}</p></div></div>`).join("");
 }
 
 function renderAll(){
@@ -834,7 +868,7 @@ addMonthlyBtn.onclick=()=>openSimple("Add Monthly Budget",[
  {key:"monthly",label:"Monthly Budget",type:"number"},
  {key:"paymentStatus",label:"This Month Status",options:["auto","partial","done"],value:"auto"},
  {key:"paidAmount",label:"Paid Amount (used for partial)",type:"number",value:0}
-],o=>state.budgets.push({id:createId(),...o,trackingMonth:monthKey(new Date())}));
+],o=>state.budgets.push({id:createId(),...o,trackingMonth:monthKey(new Date()),sortOrder:state.budgets.length}));
 addYearlyBtn.onclick=()=>openSimple("Add Yearly Expense",[
  {key:"name",label:"Name"},
  {key:"amount",label:"Amount",type:"number"},

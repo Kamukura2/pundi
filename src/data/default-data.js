@@ -75,14 +75,14 @@ export function createMvpSeed() {
       {id:createId(),type:"income",amount:500000,description:"Bonus sales",category:"Others",channel:"Transfer",date:"2026-08-05"}
     ],
     budgets: [
-      {id:createId(),category:"Food",monthly:3000000,paymentStatus:"auto",paidAmount:0,trackingMonth:null},
-      {id:createId(),category:"Coffee",monthly:800000,paymentStatus:"auto",paidAmount:0,trackingMonth:null},
-      {id:createId(),category:"Electricity",monthly:2000000,paymentStatus:"auto",paidAmount:0,trackingMonth:null},
-      {id:createId(),category:"IPL",monthly:227500,paymentStatus:"auto",paidAmount:0,trackingMonth:null},
-      {id:createId(),category:"Internet",monthly:296667,paymentStatus:"auto",paidAmount:0,trackingMonth:null},
-      {id:createId(),category:"Needs",monthly:1800000,paymentStatus:"auto",paidAmount:0,trackingMonth:null},
-      {id:createId(),category:"Subscriptions",monthly:260000,paymentStatus:"auto",paidAmount:0,trackingMonth:null},
-      {id:createId(),category:"Others",monthly:1000000,paymentStatus:"auto",paidAmount:0,trackingMonth:null}
+      {id:createId(),category:"Food",monthly:3000000,paymentStatus:"auto",paidAmount:0,trackingMonth:null,sortOrder:0},
+      {id:createId(),category:"Coffee",monthly:800000,paymentStatus:"auto",paidAmount:0,trackingMonth:null,sortOrder:1},
+      {id:createId(),category:"Electricity",monthly:2000000,paymentStatus:"auto",paidAmount:0,trackingMonth:null,sortOrder:2},
+      {id:createId(),category:"IPL",monthly:227500,paymentStatus:"auto",paidAmount:0,trackingMonth:null,sortOrder:3},
+      {id:createId(),category:"Internet",monthly:296667,paymentStatus:"auto",paidAmount:0,trackingMonth:null,sortOrder:4},
+      {id:createId(),category:"Needs",monthly:1800000,paymentStatus:"auto",paidAmount:0,trackingMonth:null,sortOrder:5},
+      {id:createId(),category:"Subscriptions",monthly:260000,paymentStatus:"auto",paidAmount:0,trackingMonth:null,sortOrder:6},
+      {id:createId(),category:"Others",monthly:1000000,paymentStatus:"auto",paidAmount:0,trackingMonth:null,sortOrder:7}
     ],
     yearly: [
       {id:createId(),name:"Annual Insurance",amount:6000000,month:"December",category:"Insurance",lastPaidYear:null,sortOrder:0},
@@ -139,7 +139,7 @@ export function readLegacyLocalStorage() {
     baseGrowth: Number(settings.baseGrowth ?? 8), optimisticGrowth: Number(settings.optimisticGrowth ?? 14),
     usdIdr: Number(settings.usdIdr ?? 16250), rateKwh: Number(settings.rateKwh ?? 1740),
     accounts: withIds(read("v6-accounts")), clients: withIds(read("v6-clients")).map((client,index)=>({...client,status:client.status==="freeze"?"pending":client.status,clientType:"recurring",endingPaid:false,sortOrder:index,trackingMonth:ACTIVE_MONTH})),
-    transactions: withIds(read("v6-tx")), budgets: withIds(read("v6-budgets")).map(item=>({...item,paymentStatus:"auto",paidAmount:0,trackingMonth:null})),
+    transactions: withIds(read("v6-tx")), budgets: withIds(read("v6-budgets")).map((item,index)=>({...item,paymentStatus:"auto",paidAmount:0,trackingMonth:null,sortOrder:index})),
     yearly: withIds(read("v6-yearly")).map((item,index)=>({...item,lastPaidYear:null,sortOrder:index})), events: withIds(read("v6-events")).map((item,index)=>({...item,sortOrder:index})),
     creditFacilities: createMvpSeed().creditFacilities,
     credit: withIds(read("v6-credit")).map((item,index)=>({...item,sortOrder:index})), stocks, electricity: withIds(read("v6-electric"))

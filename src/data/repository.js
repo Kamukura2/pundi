@@ -24,7 +24,7 @@ function rowsToState(rows) {
   const state = createEmptyState();
   state.accounts = rows.accounts.map(row => ({id:row.id,name:row.name,type:row.account_type,balance:Number(row.balance),...meta(row)}));
   state.transactions = rows.transactions.map(row => ({id:row.id,type:row.transaction_type,amount:Number(row.amount),description:row.description,category:row.category,channel:row.channel,date:row.transaction_date,...meta(row)}));
-  state.budgets = rows.monthly_budgets.map(row => ({id:row.id,category:row.category,monthly:Number(row.monthly_amount),paymentStatus:row.payment_status||"auto",paidAmount:Number(row.paid_amount||0),trackingMonth:row.tracking_month||null,...meta(row)}));
+  state.budgets = rows.monthly_budgets.map((row,index) => ({id:row.id,category:row.category,monthly:Number(row.monthly_amount),paymentStatus:row.payment_status||"auto",paidAmount:Number(row.paid_amount||0),trackingMonth:row.tracking_month||null,sortOrder:Number(row.sort_order??index),...meta(row)}));
   state.yearly = rows.yearly_expenses.map((row,index) => ({id:row.id,name:row.name,amount:Number(row.amount),month:row.payment_month,category:row.category,lastPaidYear:row.last_paid_year == null ? null : Number(row.last_paid_year),sortOrder:Number(row.sort_order??index),...meta(row)}));
   state.events = rows.planned_events.map((row,index) => ({id:row.id,name:row.name,amount:Number(row.amount),date:row.event_date,category:row.category,sortOrder:Number(row.sort_order??index),...meta(row)}));
   state.creditFacilities = rows.credit_facilities.map(row => ({id:row.id,source:row.source,limit:Number(row.limit_amount),...meta(row)}));
@@ -87,7 +87,7 @@ function stateToRows(state, userId) {
   return {
     accounts: state.accounts.map(row => owned({id:row.id,name:row.name,account_type:row.type,balance:Number(row.balance),...stamp(row)})),
     transactions: state.transactions.map(row => owned({id:row.id,transaction_type:row.type,amount:Number(row.amount),description:row.description,category:row.category,channel:row.channel,transaction_date:row.date,...stamp(row)})),
-    monthly_budgets: state.budgets.map(row => owned({id:row.id,category:row.category,monthly_amount:Number(row.monthly),payment_status:row.paymentStatus||"auto",paid_amount:Number(row.paidAmount||0),tracking_month:row.trackingMonth||null,...stamp(row)})),
+    monthly_budgets: state.budgets.map((row,index) => owned({id:row.id,category:row.category,monthly_amount:Number(row.monthly),payment_status:row.paymentStatus||"auto",paid_amount:Number(row.paidAmount||0),tracking_month:row.trackingMonth||null,sort_order:Number(row.sortOrder??index),...stamp(row)})),
     yearly_expenses: state.yearly.map((row,index) => owned({id:row.id,name:row.name,amount:Number(row.amount),payment_month:row.month,category:row.category,last_paid_year:row.lastPaidYear ?? null,sort_order:Number(row.sortOrder??index),...stamp(row)})),
     planned_events: state.events.map((row,index) => owned({id:row.id,name:row.name,amount:Number(row.amount),event_date:row.date,category:row.category,sort_order:Number(row.sortOrder??index),...stamp(row)})),
     credit_facilities: state.creditFacilities.map(row => owned({id:row.id,source:row.source,limit_amount:Number(row.limit),...stamp(row)})),
