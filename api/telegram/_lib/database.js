@@ -6,6 +6,7 @@ import { normalizeSearch } from "./parser.js";
 const STATE_TTL_MINUTES = 20;
 const MONTH_INDEX={january:1,jan:1,januari:1,february:2,feb:2,februari:2,march:3,mar:3,maret:3,april:4,apr:4,may:5,mei:5,june:6,jun:6,juni:6,july:7,jul:7,juli:7,august:8,aug:8,agustus:8,september:9,sep:9,october:10,oct:10,oktober:10,november:11,nov:11,december:12,dec:12,desember:12};
 const paymentMonth=value=>MONTH_INDEX[String(value||"").trim().toLowerCase()]||MONTH_INDEX[String(value||"").trim().toLowerCase().slice(0,3)]||1;
+const activeMonthKey=()=>{const now=jakartaParts();return `${now.year}-${String(now.month).padStart(2,"0")}`;};
 
 function dbError(error, code = "database_error", table = null) {
   return Object.assign(new Error(error?.message || "Database operation failed."), { code, status:500, database:true, table });
@@ -113,10 +114,11 @@ export class CVFinanceDatabase {
 
   async listClients() {
     const { data, error } = await this.client.from("clients")
-      .select("id,name,monthly_retainer,paid_this_month,previous_outstanding,status,client_type,ending_paid")
+      .select("id,name,monthly_retainer,paid_this_month,previous_outstanding,status,client_type,ending_paid,tracking_month")
       .eq("user_id", this.ownerUserId).order("name");
     if (error) throw dbError(error, "clients_read_failed");
-    return data || [];
+    const activeMonth=activeMonthKey();
+    return (data || []).map(row=>row.client_type==="ending"||row.tracking_month===activeMonth?row:{...row,paid_this_month:0,status:"pending"});
   }
 
   async getClient(name) {
@@ -138,9 +140,9 @@ export class CVFinanceDatabase {
     if (action === "recurring") { clientType = "recurring"; endingPaid = false; status = paid >= totalDue ? "paid" : "pending"; }
     if (client.client_type !== "ending" && action === "paid") { paid = totalDue; status = "paid"; }
     if (client.client_type !== "ending" && action === "amount") { paid = Number(amount); status = paid >= totalDue ? "paid" : "pending"; }
-    const { data, error } = await this.client.from("clients").update({paid_this_month:paid,status,client_type:clientType,ending_paid:endingPaid})
+    const { data, error } = await this.client.from("clients").update({paid_this_month:paid,status,client_type:clientType,ending_paid:endingPaid,tracking_month:activeMonthKey()})
       .eq("id", client.id).eq("user_id", this.ownerUserId)
-      .select("id,name,monthly_retainer,paid_this_month,previous_outstanding,status,client_type,ending_paid").single();
+      .select("id,name,monthly_retainer,paid_this_month,previous_outstanding,status,client_type,ending_paid,tracking_month").single();
     if (error) throw dbError(error, "client_write_failed", "clients");
     logEvent("info","supabase_write",{table:"clients",success:true});
     return data;

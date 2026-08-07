@@ -195,9 +195,9 @@
       </div>
 
       <article class="annual-expense-summary">
-        <div><small>Estimated Expense This Year</small><strong id="annualExpenseGrandTotal" class="private">Rp0</strong><p>Planning indicator only. History expenses are never deducted twice.</p></div>
+        <div><small>Remaining Expense This Year</small><strong id="annualExpenseGrandTotal" class="private">Rp0</strong><p>Dynamic estimate from this month through December. History expenses are never deducted twice.</p></div>
         <div class="annual-expense-parts">
-          <span><small>Recurring × 12</small><b id="annualRecurringExpense" class="private">Rp0</b></span>
+          <span><small>Monthly Remaining</small><b id="annualRecurringExpense" class="private">Rp0</b></span>
           <span><small>Yearly</small><b id="annualYearlyExpense" class="private">Rp0</b></span>
           <span><small>Events + Credit</small><b id="annualEventsExpense" class="private">Rp0</b></span>
         </div>
@@ -267,6 +267,14 @@
         <article class="metric-card tint-orange"><small>Outstanding</small><strong id="clientOutstandingTotal" class="private">Rp0</strong></article>
         <article class="metric-card tint-blue"><small>Fixed Monthly</small><strong id="fixedIncomeTotal" class="private">Rp0</strong></article>
       </div>
+
+      <article class="client-income-summary">
+        <div><small>Estimated Income This Year</small><strong id="clientIncomeGrandTotal" class="private">Rp0</strong><p>Remaining client income from this month through December.</p></div>
+        <div class="client-income-parts">
+          <span><small>Outstanding Now</small><b id="clientIncomeOutstanding" class="private">Rp0</b></span>
+          <span><small id="clientIncomeRemainingMonths">0 remaining months</small><b id="clientIncomeRecurring" class="private">Rp0</b></span>
+        </div>
+      </article>
 
       <div class="client-lanes">
         <article class="panel client-lane recurring-lane">
@@ -382,11 +390,18 @@
       <div class="hero-grid">
         <article class="hero-card hero-prospect">
           <div class="hero-chip" id="prospectBadge">BASE</div>
-          <small id="prospectHorizonLabel">Projected Net Worth in 2036</small>
-          <div id="prospectValue" class="hero-value private">Rp0</div>
-          <div class="hero-inline">
-            <span id="prospectGrowth">0%</span>
-            <span id="prospectDesc">Uses base stock targets</span>
+          <div class="prospect-snapshot current-year">
+            <small id="prospectCurrentHorizonLabel">Projected Net Worth in 2026</small>
+            <div id="prospectCurrentValue" class="prospect-snapshot-value private">Rp0</div>
+            <span>Closing cash + current-year stock value</span>
+          </div>
+          <div class="prospect-snapshot future-year">
+            <small id="prospectHorizonLabel">Projected Net Worth in 2036</small>
+            <div id="prospectValue" class="prospect-snapshot-value private">Rp0</div>
+            <div class="hero-inline">
+              <span id="prospectGrowth">0%</span>
+              <span id="prospectDesc">Uses base stock targets</span>
+            </div>
           </div>
           <div id="prospectChart" class="chart chart-hero"></div>
         </article>

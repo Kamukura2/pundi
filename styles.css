@@ -287,6 +287,43 @@ select,input,.search{width:100%;min-width:0;height:46px;padding:0 12px;border-ra
 #holdingsBody{min-width:0}.table-wrap:has(#holdingsBody){overflow:visible}.table-wrap:has(#holdingsBody) table{min-width:0;width:100%}.table-wrap:has(#holdingsBody) thead{display:none}.table-wrap:has(#holdingsBody)::after{display:none}
 }
 
+/* v7.5 remaining-year model, direct card sorting, archives and chart inspection */
+.yearly-tile,.event-tile,.client-card,.credit-row,.credit-archive-row{cursor:grab;touch-action:pan-y;user-select:none}
+.yearly-tile:active,.event-tile:active,.client-card:active,.credit-row:active,.credit-archive-row:active{cursor:grabbing}
+.drag-handle{display:none!important}
+.payment-badge b,.event-year b,.credit-due b{font-size:1.12em;letter-spacing:.09em;color:inherit}
+.event-tile.event-outside{background:linear-gradient(145deg,#d9dde5,#aeb6c5)!important;border-color:rgba(90,103,128,.22);color:#334056}
+.event-tile.event-this-year{background:linear-gradient(145deg,#ffd28a,#ff955f)!important;border-color:rgba(221,116,48,.34);color:#4f240d}
+.event-tile.event-current{background:linear-gradient(145deg,#df795f,#b95142)!important;border-color:rgba(139,54,41,.38);color:#fff;box-shadow:0 18px 38px rgba(172,72,54,.22)}
+.event-tile.event-outside small{color:#606b7d}.event-tile.event-this-year small{color:#75431f}.event-tile.event-current small{color:rgba(255,255,255,.78)}
+.event-tile .event-year{background:rgba(255,255,255,.45);color:inherit;border:1px solid rgba(255,255,255,.34)}
+[data-theme=dark] .event-tile.event-outside{background:linear-gradient(145deg,#3f424a,#272a31)!important;color:#d9dde6}
+[data-theme=dark] .event-tile.event-this-year{background:linear-gradient(145deg,#b85d20,#7b3519)!important;color:#fff}
+[data-theme=dark] .event-tile.event-current{background:linear-gradient(145deg,#bd5a45,#732d28)!important}
+[data-theme=dark] .event-tile.event-outside small,[data-theme=dark] .event-tile.event-this-year small{color:rgba(255,255,255,.68)}
+.credit-due{display:inline-flex;gap:4px;padding:3px 7px;border-radius:999px;background:rgba(255,157,84,.16);color:#b85a14;font-weight:800}
+[data-theme=dark] .credit-due{background:rgba(255,151,73,.18);color:#ffb174}
+
+.client-card.outstanding{background:linear-gradient(135deg,#ffbf67,#f17d54 58%,#dc654e)!important;border-color:rgba(222,109,67,.34)!important;color:#fff;box-shadow:0 18px 42px rgba(223,109,66,.20)!important}
+.client-card.ending{background:linear-gradient(135deg,#c4cad5,#8d96a9 58%,#697286)!important;border-color:rgba(101,112,134,.30)!important;color:#fff;box-shadow:0 16px 34px rgba(62,72,94,.16)!important}
+.client-card.outstanding small,.client-card.ending small{color:rgba(255,255,255,.78)}
+[data-theme=dark] .client-card.outstanding{background:linear-gradient(135deg,#b75b1d,#763519 60%,#4f241a)!important}
+[data-theme=dark] .client-card.ending{background:linear-gradient(135deg,#424650,#282c35 60%,#171a20)!important}
+
+.client-income-summary{margin:4px 0 20px;padding:22px 24px;border:1px solid rgba(255,255,255,.3);border-radius:26px;background:linear-gradient(135deg,#00b985,#12b8bd 50%,#388cff);color:#fff;display:grid;grid-template-columns:minmax(240px,.9fr) 1.2fr;gap:24px;align-items:center;box-shadow:0 20px 44px rgba(20,157,158,.22)}
+.client-income-summary>div>small{font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.08em;opacity:.82}.client-income-summary>div>strong{display:block;margin-top:7px;font-size:clamp(28px,3.2vw,44px);letter-spacing:-.05em}.client-income-summary p{margin:7px 0 0;font-size:11px;opacity:.78}
+.client-income-parts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.client-income-parts span{min-width:0;padding:15px;border:1px solid rgba(255,255,255,.22);border-radius:18px;background:rgba(255,255,255,.14)}.client-income-parts small{display:block;font-size:10px;opacity:.82}.client-income-parts b{display:block;margin-top:6px;font-size:17px;overflow-wrap:anywhere}
+
+.tx-archive{margin-bottom:14px;border:1px solid var(--line);border-radius:22px;background:var(--surface2);overflow:hidden}.tx-archive summary{list-style:none;display:flex;justify-content:space-between;align-items:center;gap:18px;padding:15px 17px;cursor:pointer;background:linear-gradient(135deg,rgba(127,102,255,.09),rgba(57,195,255,.07))}.tx-archive summary::-webkit-details-marker{display:none}.tx-archive summary>span:first-child{display:grid;gap:3px}.tx-archive summary b{font-size:17px}.tx-archive summary small{font-size:9px;color:var(--muted);font-weight:800;letter-spacing:.08em}.archive-totals{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}.archive-totals em{font-style:normal;font-size:11px;font-weight:900}.tx-archive-list{padding:12px}.tx-archive-list .tx-row:last-child{margin-bottom:0}.tx-row{grid-template-columns:48px minmax(0,1.2fr) minmax(0,1fr) auto 38px 38px}
+.chart-point,.chart-bar,[data-tip]{cursor:crosshair;outline:none}.chart-point:hover,.chart-point:focus{stroke:#fff;stroke-width:3;filter:drop-shadow(0 0 8px rgba(68,190,255,.8))}.chart-bar:hover,.chart-bar:focus{filter:brightness(1.18) drop-shadow(0 8px 10px rgba(79,112,255,.28))}
+
+.prospect-snapshot{padding:14px 0}.prospect-snapshot.current-year{margin-top:10px;padding-right:110px;border-bottom:1px solid rgba(255,255,255,.24)}.prospect-snapshot.future-year{padding-top:18px}.prospect-snapshot-value{font-size:clamp(34px,4.8vw,64px);line-height:.96;font-weight:900;letter-spacing:-.065em;margin:8px 0;overflow-wrap:anywhere}.prospect-snapshot>span{font-size:12px;color:rgba(255,255,255,.76)}
+
+.insight-card.big{align-items:center}.insight-card.big .ic{align-self:center;justify-self:center}.signal-item{align-items:center}.signal-ic{align-self:center}.story-card{padding-left:148px}.story-card img{left:10px;top:50%;bottom:auto;transform:translateY(-50%);width:128px;height:128px}.story-card>div{min-width:0}
+
+@media (max-width:1024px){.client-income-summary{grid-template-columns:1fr}.tx-row{grid-template-columns:42px minmax(0,1fr) auto 36px 36px;grid-template-areas:"badge main amount edit delete" "meta meta meta meta meta"}.tx-badge{grid-area:badge}.tx-main{grid-area:main}.tx-meta{grid-area:meta}.tx-amt{grid-area:amount}.tx-edit{grid-area:edit}.tx-delete{grid-area:delete}}
+@media (max-width:680px){.client-income-summary{padding:17px;border-radius:21px;gap:15px}.client-income-summary>div>strong{font-size:29px}.client-income-parts{grid-template-columns:1fr}.client-income-parts span{padding:11px 13px}.tx-archive summary{align-items:flex-start}.archive-totals{display:grid;gap:3px;text-align:right}.tx-row{grid-template-columns:38px minmax(0,1fr) 34px 34px;grid-template-areas:"badge main edit delete" "meta meta meta meta" "amount amount amount amount";gap:8px;padding:11px}.tx-badge{width:38px;height:38px;border-radius:13px}.tx-amt{text-align:left}.prospect-snapshot.current-year{padding-right:70px}.prospect-snapshot-value{font-size:clamp(29px,9vw,40px)}.story-card{padding-left:116px}.story-card img{left:5px;width:105px;height:105px}}
+
 @media (max-width:390px){
 .title-wrap h1{font-size:25px}.top-actions{gap:4px}.icon-btn,.avatar{width:35px;min-width:35px;height:35px;min-height:35px}
 .hero-value{font-size:30px}.panel{padding:13px}.hero-card{padding:16px}.hero-chip{top:13px;right:13px}
@@ -486,3 +523,11 @@ select,input,.search{width:100%;min-width:0;height:46px;padding:0 12px;border-ra
 @media (max-width:680px){
 #cashflow>.panel{margin-top:18px}#cashflow .grid-2{margin-top:18px;margin-bottom:18px}#cashflow .grid-3{margin-bottom:18px}.annual-expense-summary{padding:17px;border-radius:21px;gap:15px}.annual-expense-summary>div>strong{font-size:29px}.annual-expense-parts{grid-template-columns:1fr}.annual-expense-parts span{padding:11px 13px}.budget-numbers{grid-template-columns:1fr}.budget-numbers b,.budget-numbers small:last-child{text-align:left}.client-lane .client-grid{grid-template-columns:1fr}.client-card{min-height:0}.client-card .drag-handle{right:56px;top:12px}.year-card{min-height:235px}.signal-grid{grid-template-columns:1fr}.story-card{min-height:145px;padding:15px 14px 15px 119px;border-radius:20px}.story-card img{width:112px;height:112px;left:3px}.story-card h3{font-size:18px}.story-card p{font-size:11px}.language-btn{order:5;grid-column:auto}.topbar{display:flex;flex-direction:column-reverse;align-items:stretch;gap:9px}.top-actions{flex-wrap:nowrap;justify-content:flex-end}.title-wrap{min-width:0}.title-wrap h1{white-space:normal;overflow:visible;text-overflow:clip}.title-wrap p{max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 }
+
+/* v7.5 final cascade: keep generated Insight assets optically centered. */
+.insight-card.big{align-items:center}
+.insight-card.big .ic,.signal-ic{align-self:center;justify-self:center}
+.signal-item{align-items:center}
+.story-card{padding-left:148px}
+.story-card img{left:10px;top:50%;bottom:auto;transform:translateY(-50%);width:128px;height:128px}
+@media (max-width:680px){.story-card{padding-left:116px}.story-card img{left:5px;top:50%;bottom:auto;transform:translateY(-50%);width:105px;height:105px}}

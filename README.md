@@ -1,6 +1,6 @@
-# CVFinance v7.4.0
+# CVFinance v7.5.0
 
-v7.4.0 rebuilds Accumulation and Prospect around a month-aware cash projection. The current month uses liquid balances, unpaid client receivables, additional History income, remaining monthly budgets, yearly dues, events, credit due dates, and current stocks. Later months and years carry closing cash forward without double-counting History expenses. It also adds monthly budget progress modes, sortable yearly costs, draggable recurring/ending clients, a single credit section under Events, a yearly expense recap, OLED black mode, red/green signed values, US/ID translation, and data-triggered illustrated Insights.
+v7.5.0 makes the active-year model fully remaining-month aware. The current month uses liquid balances, unpaid client receivables, additional History income, remaining monthly budgets, yearly dues, events, credit due dates, and current stocks; only the full months after it use recurring income and default monthly expense. It adds persistent direct-card sorting for yearly costs, Events, credit and clients, monthly/yearly History archives with delete controls, automatic monthly client payment reset, hover/touch values on every chart, color-coded Events and client states, a remaining-year client income banner, a split current-year/2036 Prospect hero, and refined Insight alignment.
 
 v7.3.0 adds theme-aware vibrant surfaces and corrects the finance model requested after mobile testing. Accumulation now represents current liquid balances plus current stock value; future plans do not reduce it. Clients are separated into recurring, ending, and frozen lanes; only active recurring clients enter Prospect. Events reduce only their matching projection year, yearly costs track `DONE THIS YEAR`, credit items are editable with provider-specific SVG icons, and the mobile navigation now includes Clients and Electricity.
 
@@ -49,6 +49,7 @@ For local full-stack testing, use `vercel dev`; plain `npm run dev` does not emu
 - [Mobile v7.2.0 patch](docs/PATCH_v7_2_0_MOBILE.md)
 - [Finance and UI v7.3.0 patch](docs/PATCH_v7_3_0_FINANCE_UI.md)
 - [Projection and Insight v7.4.0 patch](docs/PATCH_v7_4_0_PROJECTION_INSIGHTS.md)
+- [Remaining Year and Sorting v7.5.0 patch](docs/PATCH_v7_5_0_REMAINING_YEAR_SORTING.md)
 - [Manual actions](docs/MANUAL_ACTIONS.md)
 - [Test checklist](docs/TEST_CHECKLIST.md)
 - [Rollback](docs/ROLLBACK.md)

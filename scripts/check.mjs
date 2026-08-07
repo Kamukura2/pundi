@@ -42,7 +42,7 @@ assert.equal(seed.stocks.find(row => row.ticker === "WDC").quantity, 2.8033875);
 assert.equal(seed.rateKwh, 1740);
 assert.ok(seed.budgets.some(row => row.category === "Food") && seed.budgets.some(row => row.category === "Coffee"));
 
-const { buildMonthlyTimeline, buildProjection, getBudgetProgress, getCurrentNetWorth, getFixedIncome, getTotalOutstanding } = await import("../src/data/finance-model.js");
+const { buildMonthlyTimeline, buildProjection, getBudgetProgress, getClientPaidThisMonth, getCurrentNetWorth, getFixedIncome, getTotalOutstanding, remainingYearExpenseBreakdown, remainingYearIncomeBreakdown } = await import("../src/data/finance-model.js");
 const modelClients = [
   {monthly:1000000,paid:300000,carry:0,status:"pending",clientType:"recurring"},
   {monthly:2000000,paid:0,carry:0,status:"pending",clientType:"ending",endingPaid:false},
@@ -52,12 +52,17 @@ assert.equal(getFixedIncome(modelClients),1000000,"Ending clients must not enter
 assert.equal(getTotalOutstanding(modelClients),2700000,"Unpaid ending balances remain receivables");
 assert.equal(getCurrentNetWorth(10000000,5000000),15000000,"Accumulation is current liquid plus stocks only");
 const referenceDate=new Date("2026-08-07T12:00:00+07:00");
+const rolledClient={monthly:1000000,paid:1000000,carry:0,status:"paid",clientType:"recurring",trackingMonth:"2026-07"};
+assert.equal(getClientPaidThisMonth(rolledClient,referenceDate),0,"Recurring client paid state must reset automatically in a new month");
+assert.equal(getTotalOutstanding([rolledClient],referenceDate),1000000,"A new month must restore the recurring invoice without deleting history");
 const modelBudgets=[{category:"Food",monthly:1000000,paymentStatus:"partial",paidAmount:400000,trackingMonth:"2026-08"}];
 const modelYearly=[{amount:1000000,month:"August",lastPaidYear:null},{amount:2000000,month:"October",lastPaidYear:null},{amount:3000000,month:"June",lastPaidYear:2026}];
 const modelEvents=[{date:"2026-08-20",amount:500000},{date:"2028-07-01",amount:5000000}];
 const modelCredit=[{due:"2026-08-26",amount:100000,paid:false},{due:"2026-09-26",amount:200000,paid:false},{due:"2027-04-26",amount:300000,paid:false}];
 const modelTransactions=[{type:"income",amount:400000,date:"2026-08-05"},{type:"expense",amount:900000,date:"2026-08-05",category:"Food"}];
 assert.deepEqual(getBudgetProgress(modelBudgets[0],modelTransactions,referenceDate),{status:"partial",paid:400000,remaining:600000,autoPaid:900000,trackingMonth:"2026-08"},"Manual partial progress must override History without changing the default budget");
+assert.deepEqual(remainingYearExpenseBreakdown({referenceDate,budgets:modelBudgets,yearly:modelYearly,events:modelEvents,credit:modelCredit,transactions:modelTransactions}),{recurring:4600000,yearly:3000000,events:800000,eventOnly:500000,credit:300000,total:8400000},"Remaining-year expense must use current remaining budget plus four full Sep-Dec budgets");
+assert.deepEqual(remainingYearIncomeBreakdown({referenceDate,clients:modelClients,transactions:modelTransactions}),{outstanding:2700000,recurring:4000000,additional:400000,total:7100000},"Remaining-year income must use current receivables plus four future recurring months");
 const monthly=buildMonthlyTimeline({referenceDate,accountTotal:10000000,clients:modelClients,budgets:modelBudgets,yearly:modelYearly,events:modelEvents,credit:modelCredit,transactions:modelTransactions,portfolioForYear:()=>0});
 assert.deepEqual(monthly.map(row=>row.cash),[10900000,10700000,8700000,8700000,8700000],"Current month uses outstanding and remaining obligations; future months use recurring income and dated expenses");
 const modelProjection = buildProjection({
@@ -65,6 +70,9 @@ const modelProjection = buildProjection({
   yearly:modelYearly,events:modelEvents,credit:modelCredit,transactions:modelTransactions,portfolioForYear:()=>0
 });
 assert.deepEqual(modelProjection.map(row=>row.closing),[8700000,2400000,-8600000],"Projection must carry closing cash forward and deduct obligations only in their matching year");
+assert.equal(modelProjection[0].expenses.currentMonth,600000,"Current-month remaining budget must be disclosed separately");
+assert.equal(modelProjection[0].expenses.recurring,4000000,"August projection must show exactly four full recurring expense months after August");
+assert.equal(modelProjection[0].incomeBreakdown.recurring,4000000,"August projection must show exactly four full recurring income months after August");
 
 const migration006 = read("supabase/migrations/006_client_types_yearly_status.sql");
 for (const marker of ["client_type","ending_paid","last_paid_year"]) assert.match(migration006,new RegExp(marker));
@@ -72,6 +80,9 @@ assert.doesNotMatch(migration006,/drop\s+table|truncate\s+|delete\s+from/i);
 const migration007 = read("supabase/migrations/007_projection_budget_sort_language.sql");
 for (const marker of ["payment_status","paid_amount","tracking_month","sort_order","language"]) assert.match(migration007,new RegExp(marker));
 assert.doesNotMatch(migration007,/drop\s+table|truncate\s+|delete\s+from/i);
+const migration008 = read("supabase/migrations/008_event_credit_sort_order.sql");
+for (const marker of ["planned_events","credit_items","sort_order","tracking_month"]) assert.match(migration008,new RegExp(marker));
+assert.doesNotMatch(migration008,/drop\s+table|truncate\s+|delete\s+from/i);
 
 const { normalizeStockMapping, quantityForDisplay, quantityForStorage } = await import("../src/stocks/holding.js");
 const idxHolding = {ticker:"BMRI",market:"IDX",provider:"finnhub",providerSymbol:"BMRI",currency:"IDR",quantity:10000};
@@ -117,4 +128,4 @@ await repository.queueOperation({table:"accounts",action:"delete",id,previousUpd
 queued = await mutationList();
 assert.equal(queued.length, 0);
 
-console.log("CVFinance checks passed: schema, RLS markers, PWA, 8 tabs, v7.4 monthly/projection/client/event/yearly invariants, stock provider abstraction, offline queue coalescing, environment template, and JavaScript syntax.");
+console.log("CVFinance checks passed: schema, RLS markers, PWA, 8 tabs, v7.5 remaining-year projection, archives, sorting invariants, stock provider abstraction, offline queue coalescing, environment template, and JavaScript syntax.");
