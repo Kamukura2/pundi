@@ -7,7 +7,9 @@ import { getSupabase } from "./src/lib/supabase.js";
 
 const COLORS=["#7F66FF","#39C3FF","#FF8F63","#36D695","#F4C24F","#FF6EA8","#62C8FF","#8D7AFF"];
 const COMPANY_EXPENSE_TAG="Expense Perusahaan";
-const VERIFIED_GOOGLE_FX_FALLBACK=17810;
+const DEFAULT_USD_IDR=17810;
+const MIN_USD_IDR=10000;
+const MAX_USD_IDR=25000;
 const CHANNEL_PRESETS=["Offline","Shopee","GrabFood","GoFood","Transfer","Tokopedia"];
 const todayISO=()=>{
  const d=new Date(), pad=n=>String(n).padStart(2,"0");
@@ -21,7 +23,14 @@ let syncManager;
 let stockRefreshStarted=false;
 let fxRefreshTimer=null;
 let fxRefreshPromise=null;
+let transactionTagFilter=null;
 const currentYear=()=>new Date().getFullYear();
+const escapeHtml=value=>String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));
+const validUsdIdr=value=>Number.isFinite(Number(value))&&Number(value)>=MIN_USD_IDR&&Number(value)<=MAX_USD_IDR;
+const monthIndexFromName=value=>{
+ const parsed=new Date(`${String(value||"").trim()} 1, 2000`).getMonth();
+ return Number.isFinite(parsed)?parsed:-1;
+};
 
 const fmt=(n,compact=false)=>{
  if(state.privacy) return "Rp••••••";
@@ -274,9 +283,14 @@ function renderCashflow(){
  let list=[...state.transactions];
  const search=(txSearch.value||"").toLowerCase();
  list=list.filter(t=>state.filter==="all"||t.type===state.filter).filter(t=>(`${t.description} ${t.category} ${t.channel}`).toLowerCase().includes(search));
+ if(transactionTagFilter)list=list.filter(t=>String(t[transactionTagFilter.kind]||"")===transactionTagFilter.value);
  const groups=new Map();
  list.forEach(t=>{const key=String(t.date).slice(0,7)||"unknown";if(!groups.has(key))groups.set(key,[]);groups.get(key).push(t);});
- const row=t=>`<div class="tx-row"><div class="tx-badge ${t.type}"><span>${t.type==="income" ? "+" : "−"}</span></div><div class="tx-main"><b>${t.description}</b></div><div class="tx-meta">${t.category} · ${t.channel} · ${t.date}</div><div class="tx-amt ${t.type==="income"?"positive":"negative"} private">${t.type==="income"?"+":"−"}${fmt(t.amount)}</div><button class="icon-mini tx-edit" data-id="${t.id}" title="Edit">✎</button><button class="icon-mini tx-delete" data-delete-tx="${t.id}" title="Delete">🗑</button></div>`;
+ const tagChip=(kind,value)=>{
+  const active=transactionTagFilter?.kind===kind&&transactionTagFilter.value===String(value||"");
+  return `<button type="button" class="tx-filter-chip ${kind} ${active?"active":""}" data-tx-tag-kind="${kind}" data-tx-tag-value="${encodeURIComponent(String(value||""))}">${escapeHtml(value||"—")}</button>`;
+ };
+ const row=t=>`<div class="tx-row"><div class="tx-badge ${t.type}"><span>${t.type==="income" ? "+" : "−"}</span></div><div class="tx-main"><b>${escapeHtml(t.description)}</b></div><div class="tx-meta">${tagChip("category",t.category)}${tagChip("channel",t.channel)}<span class="tx-date">${escapeHtml(t.date)}</span></div><div class="tx-amt ${t.type==="income"?"positive":"negative"} private">${t.type==="income"?"+":"−"}${fmt(t.amount)}</div><button class="icon-mini tx-edit" data-id="${t.id}" title="Edit">✎</button><button class="icon-mini tx-delete" data-delete-tx="${t.id}" title="Delete">🗑</button></div>`;
  const keys=[...groups.keys()].sort((a,b)=>b.localeCompare(a));
  txList.innerHTML=keys.map((key,index)=>{
   const rows=groups.get(key);
@@ -287,6 +301,11 @@ function renderCashflow(){
   const income=rows.filter(t=>t.type==="income").reduce((sum,t)=>sum+Number(t.amount),0),expense=rows.filter(t=>t.type==="expense").reduce((sum,t)=>sum+Number(t.amount),0);
   return `<details class="tx-archive" ${index===0?"open":""}><summary><span><small>MONTHLY ARCHIVE</small><b>${label}</b></span><span class="archive-totals private"><em class="positive">+${fmt(income)}</em><em class="negative">−${fmt(expense)}</em><small>${rows.length} transactions</small></span></summary><div class="tx-archive-list">${rows.map(row).join("")}</div></details>`;
  }).join("") || `<div class="list-row"><div class="list-ic">ℹ</div><div class="list-meta"><b>No transactions</b><small>Add a transaction to get started</small></div></div>`;
+ qa("[data-tx-tag-kind]").forEach(button=>button.onclick=()=>{
+  const next={kind:button.dataset.txTagKind,value:decodeURIComponent(button.dataset.txTagValue||"")};
+  transactionTagFilter=transactionTagFilter?.kind===next.kind&&transactionTagFilter.value===next.value?null:next;
+  renderCashflow();
+ });
  qa(".tx-edit").forEach(b=>b.onclick=()=>openTxEditor(b.dataset.id));
  qa("[data-delete-tx]").forEach(b=>b.onclick=()=>{const item=state.transactions.find(t=>t.id===b.dataset.deleteTx);if(!item||!confirm(`Delete ${item.description}?`))return;state.transactions=state.transactions.filter(t=>t.id!==item.id);save();renderAll();toastMsg("Transaction deleted");});
 }
@@ -329,10 +348,11 @@ function renderExpenses(){
   return Number(doneA)-Number(doneB)||Number(a.sortOrder||0)-Number(b.sortOrder||0);
  });
  yearlyExpenseGrid.innerHTML=orderedYearly.map(y=>{
-  const i=state.yearly.indexOf(y);
-  const done=Number(y.lastPaidYear)===currentYear();
+ const i=state.yearly.indexOf(y);
+ const done=Number(y.lastPaidYear)===currentYear();
+  const dueCurrent=!done&&monthIndexFromName(y.month)===new Date().getMonth();
   const dueMonth=String(y.month||"—").slice(0,3).toUpperCase();
-  return `<div class="tile yearly-tile ${done?"done":"due"}" data-yearly-id="${y.id}" title="Drag card to reorder"><span class="payment-badge ${done?"done":"due"}">${done?`DONE ${currentYear()}`:`DUE ${currentYear()}`} · <b>${dueMonth}</b></span><h4>${y.name}</h4><small>${y.category}</small><strong class="private">${fmt(y.amount)}</strong><div class="tile-actions"><button class="year-paid-toggle ${done?"done":""}" data-paid-yearly="${i}">${done?"Undo done":"Done this year"}</button><button class="icon-mini" data-edit-yearly="${i}" title="Edit">✎</button><button class="icon-mini" data-remove-yearly="${i}" title="Remove">🗑</button></div></div>`;
+  return `<div class="tile yearly-tile ${done?"done":dueCurrent?"due due-current":"due"}" data-yearly-id="${y.id}" title="Drag card to reorder"><span class="payment-badge ${done?"done":"due"}">${done?`DONE ${currentYear()}`:`DUE ${currentYear()}`} · <b>${dueMonth}</b></span><h4>${escapeHtml(y.name)}</h4><small>${escapeHtml(y.category)}</small><strong class="private">${fmt(y.amount)}</strong><div class="tile-actions"><button class="year-paid-toggle ${done?"done":""}" data-paid-yearly="${i}">${done?"Undo done":"Done this year"}</button><button class="icon-mini" data-edit-yearly="${i}" title="Edit">✎</button><button class="icon-mini" data-remove-yearly="${i}" title="Remove">🗑</button></div></div>`;
  }).join("") || `<div class="list-row"><div class="list-ic">ℹ</div><div class="list-meta"><b>No yearly expenses</b></div></div>`;
  const now=new Date(),orderedEvents=[...state.events].sort((a,b)=>Number(a.sortOrder||0)-Number(b.sortOrder||0));
  eventGrid.innerHTML=orderedEvents.map(e=>{const i=state.events.indexOf(e),date=new Date(`${e.date}T00:00:00`),tone=date.getFullYear()!==now.getFullYear()?"outside":date.getMonth()===now.getMonth()?"current":"this-year",month=new Intl.DateTimeFormat(state.language==="id"?"id-ID":"en-US",{month:"short"}).format(date).toUpperCase();return `<div class="tile event-tile event-${tone}" data-event-id="${e.id}" title="Drag card to reorder"><span class="event-year">DUE ${date.getFullYear()} · <b>${month}</b></span><h4>${e.name}</h4><small>${e.date} · ${e.category}</small><strong class="private">${fmt(e.amount)}</strong><div class="tile-actions"><button class="icon-mini" data-edit-event="${i}" title="Edit">✎</button><button class="icon-mini" data-remove-event="${i}" title="Remove">🗑</button></div></div>`;}).join("") || `<div class="list-row"><div class="list-ic">ℹ</div><div class="list-meta"><b>No events</b></div></div>`;
@@ -533,7 +553,7 @@ function renderStocks(){
  stockWalletValue.textContent=fmt(Number(state.stockExtras?.walletUsd||0)*Number(state.usdIdr||0));
  if(typeof usdIdrRate!=="undefined"){
   const meta=state.usdIdrMeta;
-  const providerLabel=meta?.provider==="google-finance"?"GOOGLE FINANCE":meta?.provider==="manual-google"?"MANUAL GOOGLE":meta?.error?"GOOGLE UNAVAILABLE":"SAVED RATE · REFRESH GOOGLE";
+  const providerLabel=meta?.provider==="yahoo"?"YAHOO FINANCE":meta?.provider==="manual"?"MANUAL":meta?.error?"SAVED RATE · YAHOO UNAVAILABLE":"SAVED RATE · REFRESH YAHOO";
   usdIdrRate.textContent=`1 USD = ${new Intl.NumberFormat("id-ID",{maximumFractionDigits:2}).format(Number(state.usdIdr||0))} IDR · ${providerLabel}`;
   usdIdrRate.title=meta?.asOf?`${providerLabel} · updated ${new Date(meta.asOf).toLocaleString("en-GB",{dateStyle:"medium",timeStyle:"short"})}`:"Last saved exchange rate";
  }
@@ -883,7 +903,9 @@ async function refreshExchangeRate({silent=false,force=false}={}){
   if(typeof refreshFxBtn!=="undefined"){refreshFxBtn.disabled=true;refreshFxBtn.classList.add("is-loading");}
   const quote=await fetchUsdIdrRate({force});
   const rate=Number(quote.rate);
-  if(!Number.isFinite(rate)||rate<=0)throw new Error("Invalid USD/IDR rate.");
+  if(!validUsdIdr(rate))throw new Error(`Rejected implausible USD/IDR rate: ${rate||"missing"}.`);
+  const previous=Number(state.usdIdr||0);
+  if(validUsdIdr(previous)&&Math.abs(rate-previous)/previous>.15)throw new Error(`Rejected sudden USD/IDR jump from ${previous} to ${rate}.`);
   const changed=Number(state.usdIdr)!==rate;
   state.usdIdr=rate;
   state.usdIdrMeta={provider:quote.provider,status:quote.status,asOf:quote.asOf};
@@ -893,12 +915,12 @@ async function refreshExchangeRate({silent=false,force=false}={}){
   return true;
  }catch(error){
   const previous=Number(state.usdIdr||0);
-  state.usdIdr=VERIFIED_GOOGLE_FX_FALLBACK;
-  state.usdIdrMeta={provider:"manual-google",status:"verified fallback",asOf:new Date().toISOString(),error:error.message};
+  state.usdIdr=validUsdIdr(previous)?previous:DEFAULT_USD_IDR;
+  state.usdIdrMeta={provider:validUsdIdr(previous)?"saved":"manual",status:"saved fallback",asOf:new Date().toISOString(),error:error.message};
   if(previous!==state.usdIdr)saveSettings();
   if(!hasActiveEditor()){renderStocks();renderAccumulation();renderProspect();renderInsights();attachTips();applyLanguage();}
-  if(typeof usdIdrRate!=="undefined"){usdIdrRate.textContent=`1 USD = ${new Intl.NumberFormat("id-ID",{maximumFractionDigits:2}).format(state.usdIdr)} IDR · MANUAL GOOGLE`;usdIdrRate.title=`Google refresh blocked · verified fallback retained · ${error.message}`;}
-  if(!silent)toastMsg("Google refresh blocked · using verified Rp17.810 rate");
+  if(typeof usdIdrRate!=="undefined"){usdIdrRate.textContent=`1 USD = ${new Intl.NumberFormat("id-ID",{maximumFractionDigits:2}).format(state.usdIdr)} IDR · SAVED RATE`;usdIdrRate.title=`Yahoo refresh unavailable · last valid rate retained · ${error.message}`;}
+  if(!silent)toastMsg("Yahoo refresh unavailable · last valid rate retained");
   return false;
  }finally{
   if(typeof refreshFxBtn!=="undefined"){refreshFxBtn.disabled=false;refreshFxBtn.classList.remove("is-loading");}
@@ -1071,6 +1093,11 @@ async function showSignedIn(user){
  authGate.hidden=true;document.body.classList.remove("auth-locked");
  accountEmail.textContent=user.email||"Private account";
  legacyImportBtn.hidden=!readLegacyLocalStorage();
+ if(!validUsdIdr(state.usdIdr)){
+  state.usdIdr=DEFAULT_USD_IDR;
+  state.usdIdrMeta={provider:"manual",status:"sanitized fallback",asOf:new Date().toISOString(),error:"Previously saved rate was outside the safe range."};
+  await saveSettings();
+ }
  if(normalizeStockMappings())await save();
  if(!stockRefreshStarted){
   stockRefreshStarted=true;
@@ -1123,12 +1150,12 @@ seedDataBtn.onclick=async()=>{
 logoutBtn.onclick=()=>{if(fxRefreshTimer)clearInterval(fxRefreshTimer);syncManager.signOut();};
 refreshStocksBtn.onclick=()=>refreshMarkets();
 refreshFxBtn.onclick=()=>refreshExchangeRate({force:true});
-editFxBtn.onclick=()=>openSimple("Set Google USD/IDR",[
- {key:"rate",label:"1 USD in IDR",type:"number",step:".01",value:Number(state.usdIdr||VERIFIED_GOOGLE_FX_FALLBACK)}
+editFxBtn.onclick=()=>openSimple("Set USD/IDR manually",[
+ {key:"rate",label:"1 USD in IDR",type:"number",step:".01",value:Number(state.usdIdr||DEFAULT_USD_IDR)}
 ],o=>{
  const rate=Number(o.rate);
- if(!Number.isFinite(rate)||rate<10000||rate>50000){alert("Enter a valid USD/IDR rate between 10,000 and 50,000.");return false;}
- state.usdIdr=rate;state.usdIdrMeta={provider:"manual-google",status:"manual",asOf:new Date().toISOString()};
+ if(!validUsdIdr(rate)){alert("Enter a valid USD/IDR rate between 10,000 and 25,000.");return false;}
+ state.usdIdr=rate;state.usdIdrMeta={provider:"manual",status:"manual",asOf:new Date().toISOString()};
 });
 validateSymbolsBtn.onclick=()=>validateStockSymbols();
 

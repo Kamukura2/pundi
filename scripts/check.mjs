@@ -135,25 +135,24 @@ assert.equal(idxQuote.price, 4220);
 assert.equal(idxQuote.provider, "yahoo");
 assert.equal(idxQuote.status, "delayed");
 globalThis.fetch = async url => {
-  assert.match(String(url), /google\.com\/finance\/(?:beta\/)?quote\/USD-IDR/);
-  return new Response('<main data-last-price="17810.25" data-last-normal-market-timestamp="1786134000"><div class="YMlKec fxKbKc">17,810.25</div></main>', {status:200,headers:{"content-type":"text/html"}});
+  assert.match(String(url), /query1\.finance\.yahoo\.com\/v8\/finance\/chart\/IDR%3DX/);
+  return new Response(JSON.stringify({chart:{result:[{meta:{regularMarketPrice:17810.25,regularMarketTime:1786134000},timestamp:[1786134000],indicators:{quote:[{close:[17810.25]}]}}],error:null}}), {status:200,headers:{"content-type":"application/json"}});
 };
 const fxQuote = await fetchUsdIdrQuote();
 assert.equal(fxQuote.rate, 17810.25);
-assert.equal(fxQuote.provider, "google-finance");
+assert.equal(fxQuote.provider, "yahoo");
+let fxHostCalls=0;
 globalThis.fetch = async url => {
-  assert.match(String(url), /google\.com\/(?:finance\/|search\?)/, "USD/IDR must never fall through to Yahoo or Finnhub");
-  if (String(url).includes("hl=id")) return new Response('<div class="YMlKec fxKbKc">17.810,2500</div>', {status:200,headers:{"content-type":"text/html"}});
-  return new Response("blocked", {status:503,headers:{"content-type":"text/plain"}});
+  fxHostCalls+=1;
+  if(String(url).includes("query1.finance.yahoo.com"))return new Response(JSON.stringify({chart:{result:[{meta:{regularMarketPrice:34468}}],error:null}}), {status:200,headers:{"content-type":"application/json"}});
+  assert.match(String(url), /query2\.finance\.yahoo\.com\/v8\/finance\/chart\/IDR%3DX/);
+  return new Response(JSON.stringify({chart:{result:[{meta:{regularMarketPrice:17811,regularMarketTime:1786134060},timestamp:[1786134060],indicators:{quote:[{close:[17811]}]}}],error:null}}), {status:200,headers:{"content-type":"application/json"}});
 };
-const localizedFxQuote = await fetchUsdIdrQuote();
-assert.equal(localizedFxQuote.rate, 17810.25);
-assert.equal(localizedFxQuote.provider, "google-finance");
-globalThis.fetch = async url => {
-  assert.match(String(url), /google\.com\/(?:finance\/|search\?)/, "A failed Google refresh must not substitute another provider");
-  return new Response("blocked", {status:503,headers:{"content-type":"text/plain"}});
-};
-await assert.rejects(fetchUsdIdrQuote(), /Google Finance USD\/IDR unavailable/);
+const fallbackFxQuote = await fetchUsdIdrQuote();
+assert.equal(fxHostCalls,2,"An absurd query1 quote must be rejected before query2 is used");
+assert.equal(fallbackFxQuote.rate,17811);
+globalThis.fetch = async () => new Response(JSON.stringify({chart:{result:[{meta:{regularMarketPrice:4000}}],error:null}}), {status:200,headers:{"content-type":"application/json"}});
+await assert.rejects(fetchUsdIdrQuote(), /Yahoo Finance USD\/IDR unavailable/);
 globalThis.fetch = realFetch;
 
 await import("fake-indexeddb/auto");
@@ -182,8 +181,10 @@ assert.match(appSource, /Number\(s\.quantity\)\*stockPrice[\s\S]*s\.currency===\
 assert.match(appSource, /COMPANY_EXPENSE_TAG="Expense Perusahaan"/, "Expense Perusahaan must remain a fixed History-only tag");
 assert.match(appSource, /transactions:\[\]/, "Projection calls must explicitly exclude History transactions");
 assert.match(appSource, /CHANNEL_PRESETS=\["Offline","Shopee","GrabFood"/, "History editor must expose reusable channel tags");
-assert.match(appSource, /VERIFIED_GOOGLE_FX_FALLBACK=17810/, "Blocked Google refresh must correct the stale rate to Rp17,810");
+assert.match(appSource, /DEFAULT_USD_IDR=17810/, "A safe default must repair previously corrupted FX values");
 assert.match(appSource, /fixedYearlyIncomeTotal\.textContent=fmt\(fixedIncome\(\)\*12\)/, "Fixed Yearly must equal Fixed Monthly times twelve");
-assert.doesNotMatch(appSource, /providerLabel=\{"google-finance":"GOOGLE FINANCE",yahoo:/, "The FX badge must not advertise a non-Google substitution");
+assert.match(appSource, /meta\?\.provider==="yahoo"\?"YAHOO FINANCE"/, "The FX badge must identify Yahoo Finance honestly");
+assert.match(appSource, /due due-current/, "Yearly expenses due this month must receive the luminous current-month class");
+assert.match(appSource, /data-tx-tag-kind/, "Transaction category and channel chips must act as tag filters");
 
-console.log("CVFinance checks passed: schema, RLS markers, PWA, 8 tabs, v7.7.1 ledger-only History, dynamic Budget meters, channel tags, corrected Google FX fallback, safe dialog dismissal, client status palette, auditable projections, one-time dated credit, optional stock cash assets, sorting invariants, stock provider abstraction, offline queue coalescing, and JavaScript syntax.");
+console.log("CVFinance checks passed: schema, RLS markers, PWA, 8 tabs, v7.7.2 Yahoo FX validation, ledger-only History, dynamic Budget meters, toggleable Transaction tags, current-month Yearly styling, safe dialog dismissal, client status palette, auditable projections, one-time dated credit, optional stock cash assets, sorting invariants, stock provider abstraction, offline queue coalescing, and JavaScript syntax.");

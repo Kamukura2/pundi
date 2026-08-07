@@ -1,6 +1,8 @@
-# CVFinance v7.7.1
+# CVFinance v7.7.2
 
-v7.7.1 makes History a strict ledger: neither recorded income nor expense changes Balance, Net Worth, or Prospect, while expense tags still fill the matching Budget meter. Budget Pace is fully dynamic, channels use reusable/custom tags, Yearly due cards use the dark-blue white-text palette, and blocked Google refreshes now fall back to the user-verified Rp17,810 rate with a manual correction control.
+v7.7.2 removes fragile Google HTML scraping and reads the `IDR=X` quote from Yahoo Finance JSON with two-host fallback, safe-rate validation, and last-valid/manual fallback. It also highlights Yearly costs due this month, enlarges the Expense Perusahaan dashboard, brightens Fixed Monthly, and turns Transaction Budget/Channel tags into rounded toggle filters.
+
+v7.7.1 makes History a strict ledger: neither recorded income nor expense changes Balance, Net Worth, or Prospect, while expense tags still fill the matching Budget meter. Budget Pace is fully dynamic, channels use reusable/custom tags, and Yearly due cards use the dark-blue white-text palette.
 
 v7.6.0 makes every Prospect headline auditable as `Opening Cash + Stocks + Income − Expenses`, separates one-time dated Credit from Events, adds optional IDR Netcash and USD Wallet assets, improves two-dimensional drag sorting, and refreshes yearly/Insight contrast.
 
@@ -26,7 +28,7 @@ Deployment-ready continuation of CVFinance v6.3.1. The existing eight-tab UI and
 - JSON export/import and v6.3.1 `localStorage` migration
 - Installable PWA with offline application shell
 - Vercel server routes for Finnhub US quotes and Yahoo Finance delayed IDX quotes
-- Strict Google Finance USD/IDR market rate with a dedicated cache-bypassing refresh button; a failed Google request keeps the last saved rate and never substitutes Yahoo or Finnhub
+- Yahoo Finance `IDR=X` USD/IDR market quote with cache-bypassing refresh, dual-host retry, plausible-range validation, sudden-jump protection, and last-valid/manual fallback
 - Provider mapping, validation, cache, timeout, quota fallback, stale status, manual override, and optional daily cron refresh
 - Isolated `/api/telegram/cvfinance-webhook` route with deterministic Indonesian money/date parsing
 - Telegram quick transactions, balances, clients, credit, electricity, stocks, targets, and summary commands

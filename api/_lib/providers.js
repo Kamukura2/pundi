@@ -1,4 +1,4 @@
-import { fetchJson, fetchText } from "./http.js";
+import { fetchJson } from "./http.js";
 
 const symbolPattern = /^[A-Z0-9.:-]{1,24}$/i;
 
@@ -87,76 +87,56 @@ export async function fetchQuote(mapping) {
   return yahoo(mapping);
 }
 
-function validUsdIdr(value) {
-  const raw = String(value ?? "").replace(/[\s\u00a0]/g, "").replace(/[^0-9.,-]/g, "");
-  if (!raw) return null;
-  const comma = raw.lastIndexOf(",");
-  const dot = raw.lastIndexOf(".");
-  let normalized = raw;
-  if (comma >= 0 && dot >= 0) {
-    const decimal = comma > dot ? "," : ".";
-    const thousands = decimal === "," ? /\./g : /,/g;
-    normalized = raw.replace(thousands, "").replace(decimal, ".");
-  } else if (comma >= 0 || dot >= 0) {
-    const separator = comma >= 0 ? "," : ".";
-    const [left, right = ""] = raw.split(separator);
-    normalized = right.length === 3 && left.length <= 3 ? `${left}${right}` : `${left}.${right}`;
-  }
-  const rate = Number(normalized);
-  return Number.isFinite(rate) && rate >= 10000 && rate <= 50000 ? rate : null;
-}
-
-async function googleFinanceUsdIdr() {
-  const urls = [
-    "https://www.google.com/finance/beta/quote/USD-IDR?hl=id&gl=ID",
-    "https://www.google.com/finance/beta/quote/USD-IDR?hl=en&gl=US",
-    "https://www.google.com/finance/quote/USD-IDR?hl=en&gl=US",
-    "https://www.google.com/search?q=1%20USD%20to%20IDR&hl=en&gl=US"
-  ];
+async function yahooUsdIdr() {
+  const hosts = ["https://query1.finance.yahoo.com", "https://query2.finance.yahoo.com"];
   const failures = [];
-  for (const target of urls) {
+  for (const host of hosts) {
     try {
-      const html = await fetchText(new URL(target), {
-        redirect:"follow",
+      const url = new URL(`/v8/finance/chart/${encodeURIComponent("IDR=X")}`, host);
+      url.searchParams.set("interval", "1m");
+      url.searchParams.set("range", "1d");
+      url.searchParams.set("includePrePost", "true");
+      const data = await fetchJson(url, {
         headers:{
-          Accept:"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-          "Accept-Language":target.includes("hl=id")?"id-ID,id;q=0.9,en;q=0.8":"en-US,en;q=0.9",
-          "Cache-Control":"no-cache",
-          Pragma:"no-cache",
-          Cookie:"CONSENT=YES+cb.20220419-08-p0.en+FX+410; SOCS=CAESHAgBEhIaAB",
-          "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+          Accept:"application/json,text/plain,*/*",
+          "User-Agent":"Mozilla/5.0 (compatible; CVFinance/7.7.2; personal-use FX lookup)"
         }
-      }, 9000);
-      const candidates = [
-        ...[...html.matchAll(/data-last-price=["']([^"']+)["']/gi)].map(match => match[1]),
-        ...[...html.matchAll(/data-value=["']([^"']+)["']/gi)].map(match => match[1]),
-        ...[...html.matchAll(/class=["'][^"']*(?:YMlKec|fxKbKc)[^"']*["'][^>]*>([\s\S]{0,160}?)<\/[^>]+>/gi)].map(match => match[1].replace(/<[^>]+>/g, "")),
-        ...[...html.matchAll(/(?:USD\s*\/\s*IDR|USD\s*-\s*IDR|United States Dollar)[\s\S]{0,900}?([0-9]{1,3}(?:[.,][0-9]{3})+(?:[.,][0-9]{1,4})?)/gi)].map(match => match[1]),
-        ...[...html.matchAll(/\b(?:1[0-9]|2[0-9]|3[0-9]|4[0-9])(?:[.,][0-9]{3})(?:[.,][0-9]{1,4})?\b/g)].map(match => match[0])
-      ];
-      const rate = candidates.map(validUsdIdr).find(Boolean);
-      if (!rate) throw new Error("price marker missing");
-      const timestampMatch = html.match(/data-last-normal-market-timestamp=["'](\d+)["']/i);
-      const timestamp = Number(timestampMatch?.[1] || 0);
+      });
+      const chart = data?.chart;
+      if (chart?.error) throw new Error(chart.error.description || "Yahoo Finance returned an error.");
+      const result = chart?.result?.[0];
+      if (!result) throw new Error("Yahoo Finance returned no USD/IDR data.");
+      const meta = result.meta || {};
+      const closes = result.indicators?.quote?.[0]?.close || [];
+      const timestamps = result.timestamp || [];
+      let rate = Number(meta.regularMarketPrice);
+      let timestamp = Number(meta.regularMarketTime || 0);
+      if (!Number.isFinite(rate) || rate <= 0) {
+        for (let index = closes.length - 1; index >= 0; index -= 1) {
+          const candidate = Number(closes[index]);
+          if (Number.isFinite(candidate) && candidate > 0) {
+            rate = candidate;
+            timestamp = Number(timestamps[index] || timestamp);
+            break;
+          }
+        }
+      }
+      if (!Number.isFinite(rate) || rate < 10000 || rate > 25000) throw new Error(`Rejected implausible USD/IDR quote: ${rate || "missing"}.`);
       return {
         rate,
         asOf:timestamp ? new Date(timestamp * 1000).toISOString() : new Date().toISOString(),
-        status:"live",
-        provider:"google-finance"
+        status:"market quote",
+        provider:"yahoo"
       };
     } catch (error) {
-      failures.push(`${new URL(target).pathname}: ${error.message}`);
+      failures.push(`${new URL(host).hostname}: ${error.message}`);
     }
   }
-  throw new Error(`Google Finance USD/IDR unavailable. ${failures.join(" | ")}`);
+  throw Object.assign(new Error(`Yahoo Finance USD/IDR unavailable. ${failures.join(" | ")}`), { code:"yahoo_fx_unavailable", status:502 });
 }
 
 export async function fetchUsdIdrQuote() {
-  try {
-    return await googleFinanceUsdIdr();
-  } catch (error) {
-    throw Object.assign(new Error(error.message), { code:"google_fx_unavailable", status:502 });
-  }
+  return yahooUsdIdr();
 }
 
 export function validateMapping(mapping) {

@@ -717,3 +717,25 @@ select,input,.search{width:100%;min-width:0;height:46px;padding:0 12px;border-ra
 [data-theme=dark] .yearly-tile.due .payment-badge{color:#fff!important;background:rgba(183,222,255,.27)!important}
 .channel-tags{padding-top:2px}.channel-tags .category-tag{background:linear-gradient(135deg,rgba(55,184,238,.12),rgba(101,91,235,.12))}.channel-tags .category-tag.active{background:linear-gradient(135deg,#2dbbe8,#5266e8);color:#fff}.channel-tags .add-channel-tag{border-style:dashed;background:var(--surface2);color:var(--muted)}
 #budgetPace{display:grid;gap:14px}.fx-rate{max-width:100%;white-space:normal;text-align:center}
+
+/* v7.7.2 current dues, expanded company dashboard, safer FX and tag filters */
+.yearly-tile.due.due-current,.yearly-tile.due.due-current[data-yearly-id]{background:linear-gradient(145deg,#67e0ee,#38abea 52%,#467cf2)!important;border-color:rgba(63,170,235,.48)!important;color:#fff!important;box-shadow:0 20px 46px rgba(47,144,224,.30)!important}
+.yearly-tile.due.due-current h4,.yearly-tile.due.due-current strong,.yearly-tile.due.due-current small{color:#fff!important}.yearly-tile.due.due-current .payment-badge{background:rgba(224,248,255,.34)!important;color:#fff!important;border-color:rgba(255,255,255,.30)!important}
+[data-theme=dark] .yearly-tile.due.due-current,[data-theme=dark] .yearly-tile.due.due-current[data-yearly-id]{background:linear-gradient(145deg,#42cde4,#237fc7 58%,#264cb0)!important;color:#fff!important;box-shadow:0 20px 46px rgba(37,128,213,.24)!important}
+
+.company-expense-dashboard{min-height:520px;display:grid;grid-template-rows:auto auto minmax(210px,1fr) auto}
+.company-expense-hero{padding:28px 28px 22px}.company-expense-hero h3{font-size:30px}.company-expense-hero p{font-size:13px;max-width:560px}.company-expense-hero strong{font-size:clamp(30px,3vw,44px)}
+.company-expense-kpis{padding:0 28px 22px;gap:14px}.company-expense-kpis span{padding:17px 18px}.company-expense-kpis b{font-size:20px}
+.company-expense-bars{height:auto;min-height:210px;padding:18px 28px 22px}.company-expense-bars span{height:165px}.company-expense-bars i{width:min(22px,78%)}
+.company-expense-empty{padding:24px 28px}.company-expense-recent>span{padding:15px 28px}
+
+.client-fixed-monthly{background:linear-gradient(135deg,#c4cbd7,#a4afc0 58%,#929eb2)!important;color:#111b31!important;border-color:rgba(69,80,104,.16)!important}
+[data-theme=dark] .client-fixed-monthly{background:linear-gradient(135deg,#667184,#4f596b 58%,#414a5b)!important;color:#f4f7fc!important}
+
+.tx-meta{display:flex;align-items:center;flex-wrap:wrap;gap:7px}
+.tx-filter-chip{min-height:30px;padding:0 11px;border:1px solid rgba(78,102,173,.16);border-radius:999px;color:var(--text);font:inherit;font-size:11px;font-weight:800;cursor:pointer;transition:transform .15s,box-shadow .15s,filter .15s}
+.tx-filter-chip.category{background:linear-gradient(135deg,rgba(127,102,255,.16),rgba(90,139,244,.14))}.tx-filter-chip.channel{background:linear-gradient(135deg,rgba(45,187,232,.17),rgba(58,211,167,.14))}
+.tx-filter-chip:hover{transform:translateY(-1px);filter:saturate(1.2)}.tx-filter-chip.active{border-color:transparent;background:linear-gradient(135deg,#7159f1,#279ddb)!important;color:#fff;box-shadow:0 8px 20px rgba(66,91,211,.28)}
+.tx-date{color:var(--muted);font-size:11px;padding-left:2px}
+[data-theme=dark] .tx-filter-chip{border-color:rgba(154,172,234,.18)}
+@media (max-width:680px){.company-expense-dashboard{min-height:440px}.company-expense-hero{padding:20px}.company-expense-hero h3{font-size:25px}.company-expense-kpis{padding:0 20px 16px}.company-expense-bars{min-height:175px;padding:14px 14px 18px}.company-expense-bars span{height:130px}.tx-filter-chip{min-height:28px;padding:0 9px;font-size:10px}}

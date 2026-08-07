@@ -1,4 +1,4 @@
-const SHELL_CACHE = "cvfinance-shell-v7.7.1-ledger-only-history";
+const SHELL_CACHE = "cvfinance-shell-v7.7.2-yahoo-fx-tag-filter";
 const SHELL = ["/", "/index.html", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", event => {
