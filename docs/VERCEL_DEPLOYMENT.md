@@ -6,9 +6,8 @@
    - `SUPABASE_URL`
    - `SUPABASE_ANON_KEY`
    - `FINNHUB_API_KEY`
-   - `TWELVE_DATA_API_KEY`
 4. For the optional scheduled stock refresh, also add server-only `SUPABASE_SERVICE_ROLE_KEY` and `CRON_SECRET`. Never prefix or expose the service-role value to the frontend.
-5. Set `STOCK_SYMBOL_ALLOWLIST` to the provider symbols you use, separated by commas. Add new holdings here before testing them.
+5. Leave `STOCK_SYMBOL_ALLOWLIST` unset when tickers should be added dynamically inside the authenticated app. A fixed deployment may optionally set a comma-separated hard allowlist.
 6. Deploy. Use the generated `*.vercel.app` URL; no desktop PC needs to stay on.
 7. Add that production URL to Supabase Auth URL Configuration, then redeploy once.
 8. On Android Chrome, open the Vercel URL, sign in, and choose **Install app** from CVFinance or **Add to Home screen** from Chrome.

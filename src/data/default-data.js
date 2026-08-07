@@ -34,7 +34,7 @@ export function createEmptyState() {
 export function createMvpSeed() {
   const stocks = [
     {
-      id: createId(), ticker: "BMRI", displaySymbol: "BMRI", market: "IDX", provider: "twelvedata",
+      id: createId(), ticker: "BMRI", displaySymbol: "BMRI", market: "IDX", provider: "yahoo",
       providerSymbol: "BMRI", currency: "IDR", quantity: 10000, avg: 4200, current: 6200,
       manualCurrent: 6200, priceSource: "manual", priceStatus: "manual", priceAsOf: null,
       base: {2027:5750,2028:6250,2029:6500,2030:6750,2031:7000,2032:7250,2033:7500,2034:7750,2035:8000,2036:8250},
@@ -114,7 +114,7 @@ export function readLegacyLocalStorage() {
     ...stock,
     ticker: String(stock.ticker || "").toUpperCase(),
     displaySymbol: String(stock.ticker || "").toUpperCase(),
-    provider: stock.market === "IDX" ? "twelvedata" : "finnhub",
+    provider: stock.market === "IDX" ? "yahoo" : "finnhub",
     providerSymbol: String(stock.ticker || "").toUpperCase(),
     manualCurrent: Number(stock.current || 0),
     priceSource: "manual",

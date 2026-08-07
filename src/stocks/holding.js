@@ -18,7 +18,7 @@ export function normalizeStockMapping(stock, { resetProviderSymbol = false } = {
   const idx = isIdxMarket(stock.market);
   const ticker = String(stock.ticker || stock.displaySymbol || "").trim().toUpperCase();
   const expected = {
-    provider: idx ? "twelvedata" : "finnhub",
+    provider: idx ? "yahoo" : "finnhub",
     currency: idx ? "IDR" : "USD",
     providerSymbol: resetProviderSymbol
       ? ticker

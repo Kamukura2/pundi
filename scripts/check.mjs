@@ -23,7 +23,7 @@ assert.match(sql, /enable row level security/);
 assert.match(sql, /auth\.uid\(\)/);
 
 const env = read(".env.example");
-for (const key of ["FINNHUB_API_KEY","TWELVE_DATA_API_KEY","SUPABASE_URL","SUPABASE_ANON_KEY"]) assert.match(env, new RegExp(`^${key}=`, "m"));
+for (const key of ["FINNHUB_API_KEY","SUPABASE_URL","SUPABASE_ANON_KEY"]) assert.match(env, new RegExp(`^${key}=`, "m"));
 const serviceWorker = read("public/sw.js");
 assert.match(serviceWorker, /pathname\.startsWith\("\/api\/"\)/);
 
@@ -47,19 +47,27 @@ const idxHolding = {ticker:"BMRI",market:"IDX",provider:"finnhub",providerSymbol
 assert.equal(quantityForDisplay(idxHolding), 100);
 assert.equal(quantityForStorage("IDX", 100), 10000);
 assert.equal(normalizeStockMapping(idxHolding), true);
-assert.equal(idxHolding.provider, "twelvedata");
+assert.equal(idxHolding.provider, "yahoo");
 assert.equal(quantityForStorage("NASDAQ", 2.8033875), 2.8033875);
 
 process.env.FINNHUB_API_KEY = "test";
-process.env.TWELVE_DATA_API_KEY = "test";
 process.env.STOCK_SYMBOL_ALLOWLIST = "WDC,BMRI:IDX";
 const realFetch = globalThis.fetch;
 const { fetchQuote, validateMapping } = await import("../api/_lib/providers.js");
 validateMapping({provider:"finnhub",provider_symbol:"WDC",market:"NASDAQ"});
+validateMapping({provider:"yahoo",provider_symbol:"BMRI",market:"IDX"});
 globalThis.fetch = async () => new Response(JSON.stringify({c:123.45,t:Math.floor(Date.now()/1000)}), {status:200,headers:{"content-type":"application/json"}});
 const quote = await fetchQuote({provider:"finnhub",provider_symbol:"WDC",market:"NASDAQ"});
 assert.equal(quote.price, 123.45);
 assert.equal(quote.provider, "finnhub");
+globalThis.fetch = async url => {
+  assert.match(String(url), /\/BMRI\.JK\?/);
+  return new Response(JSON.stringify({chart:{result:[{meta:{regularMarketPrice:4220,regularMarketTime:Math.floor(Date.now()/1000)},timestamp:[Math.floor(Date.now()/1000)],indicators:{quote:[{close:[4220]}]}}],error:null}}), {status:200,headers:{"content-type":"application/json"}});
+};
+const idxQuote = await fetchQuote({provider:"yahoo",provider_symbol:"BMRI",market:"IDX"});
+assert.equal(idxQuote.price, 4220);
+assert.equal(idxQuote.provider, "yahoo");
+assert.equal(idxQuote.status, "delayed");
 globalThis.fetch = realFetch;
 
 await import("fake-indexeddb/auto");

@@ -10,7 +10,8 @@
 - [ ] Client payment/status updates outstanding income and Prospect; Freeze stays excluded.
 - [ ] Fractional US quantities remain exact.
 - [ ] Stock price refresh updates portfolio/Prospect without changing Base/Optimistic targets.
-- [ ] Twelve Data denial leaves the previous/manual IDX price visible with the plan warning.
+- [ ] An IDX ticker such as BMRI resolves to its `.JK` Yahoo symbol and displays `delayed`.
+- [ ] A Yahoo outage leaves the previous/manual IDX price visible with an explicit API error.
 - [ ] Electricity readings update interval, daily usage, and cost at Rp1,740/kWh.
 - [ ] Saving, saved, offline, unsynced, error, and last-synced states appear correctly.
 - [ ] Offline changes remain visible, queue locally, and sync after reconnecting.

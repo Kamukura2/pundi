@@ -3,7 +3,7 @@ import { fetchJson } from "./http.js";
 const symbolPattern = /^[A-Z0-9.:-]{1,24}$/i;
 
 function assertMapping(mapping) {
-  if (!mapping || !["finnhub","twelvedata"].includes(mapping.provider)) throw Object.assign(new Error("Unsupported stock provider."), { code:"unsupported_provider", status:400 });
+  if (!mapping || !["finnhub","yahoo"].includes(mapping.provider)) throw Object.assign(new Error("Unsupported stock provider."), { code:"unsupported_provider", status:400 });
   if (!symbolPattern.test(mapping.provider_symbol || "")) throw Object.assign(new Error("Invalid provider symbol."), { code:"invalid_symbol", status:400 });
   const configured = new Set(String(process.env.STOCK_SYMBOL_ALLOWLIST || "").split(",").map(value => value.trim().toUpperCase()).filter(Boolean));
   const symbol = String(mapping.provider_symbol).toUpperCase();
@@ -26,32 +26,70 @@ async function finnhub(mapping) {
   return { price:Number(data.c), asOf:data.t ? new Date(Number(data.t) * 1000).toISOString() : new Date().toISOString(), status:classify(data.t, "real-time"), provider:"finnhub" };
 }
 
-async function twelveData(mapping) {
-  if (!process.env.TWELVE_DATA_API_KEY) throw Object.assign(new Error("Twelve Data is not configured."), { code:"provider_not_configured", status:503 });
-  const url = new URL("https://api.twelvedata.com/quote");
-  url.searchParams.set("symbol", mapping.provider_symbol);
-  if (mapping.market === "IDX") url.searchParams.set("exchange", "IDX");
-  url.searchParams.set("apikey", process.env.TWELVE_DATA_API_KEY);
-  const data = await fetchJson(url);
-  if (data.status === "error" || data.code) {
-    const planIssue = /plan|credits|access|not available|permission/i.test(data.message || "");
-    throw Object.assign(new Error(planIssue ? "API unavailable for current plan" : (data.message || "Twelve Data symbol unavailable.")), { code:planIssue ? "provider_plan_unavailable" : "symbol_unavailable", status:422 });
+function yahooSymbol(mapping) {
+  const symbol = String(mapping.provider_symbol || "").trim().toUpperCase();
+  return symbol.endsWith(".JK") ? symbol : `${symbol}.JK`;
+}
+
+async function yahoo(mapping) {
+  const symbol = yahooSymbol(mapping);
+  const hosts = ["https://query1.finance.yahoo.com", "https://query2.finance.yahoo.com"];
+  const failures = [];
+  for (const host of hosts) {
+    try {
+      const url = new URL(`/v8/finance/chart/${encodeURIComponent(symbol)}`, host);
+      url.searchParams.set("interval", "1d");
+      url.searchParams.set("range", "5d");
+      url.searchParams.set("includePrePost", "false");
+      url.searchParams.set("events", "div,splits");
+      const data = await fetchJson(url, {
+        headers:{
+          Accept:"application/json,text/plain,*/*",
+          "User-Agent":"Mozilla/5.0 (compatible; CVFinance/7.0; personal-use quote lookup)"
+        }
+      });
+      const chart = data?.chart;
+      if (chart?.error) throw new Error(chart.error.description || "Yahoo Finance returned an error.");
+      const result = chart?.result?.[0];
+      if (!result) throw new Error(`No delayed market data returned for ${symbol}.`);
+      const meta = result.meta || {};
+      const closes = result.indicators?.quote?.[0]?.close || [];
+      const timestamps = result.timestamp || [];
+      let price = Number(meta.regularMarketPrice);
+      let timestamp = Number(meta.regularMarketTime || 0);
+      if (!Number.isFinite(price) || price <= 0) {
+        for (let index = closes.length - 1; index >= 0; index -= 1) {
+          const candidate = Number(closes[index]);
+          if (Number.isFinite(candidate) && candidate > 0) {
+            price = candidate;
+            timestamp = Number(timestamps[index] || timestamp);
+            break;
+          }
+        }
+      }
+      if (!Number.isFinite(price) || price <= 0) throw new Error(`Yahoo Finance returned no price for ${symbol}.`);
+      return {
+        price,
+        asOf:timestamp ? new Date(timestamp * 1000).toISOString() : new Date().toISOString(),
+        status:"delayed",
+        provider:"yahoo"
+      };
+    } catch (error) {
+      failures.push(`${new URL(host).hostname}: ${error.message}`);
+    }
   }
-  const price = Number(data.close || data.price);
-  if (!price) throw Object.assign(new Error("Twelve Data returned no price for this symbol."), { code:"symbol_unavailable", status:422 });
-  const timestamp = Number(data.timestamp || data.last_quote_at || 0);
-  const status = data.is_market_open ? classify(timestamp, "delayed") : "end-of-day";
-  return { price, asOf:timestamp ? new Date(timestamp * 1000).toISOString() : new Date().toISOString(), status, provider:"twelvedata" };
+  throw Object.assign(new Error(`Yahoo Finance delayed quote unavailable for ${symbol}. ${failures.join(" | ")}`), { code:"provider_error", status:502 });
 }
 
 export async function fetchQuote(mapping) {
   assertMapping(mapping);
-  return mapping.provider === "finnhub" ? finnhub(mapping) : twelveData(mapping);
+  if (mapping.provider === "finnhub") return finnhub(mapping);
+  return yahoo(mapping);
 }
 
 export function validateMapping(mapping) {
   assertMapping(mapping);
-  if (mapping.market === "IDX" && mapping.provider !== "twelvedata") throw Object.assign(new Error("IDX holdings must use the configured IDX provider."), { code:"invalid_mapping", status:400 });
+  if (mapping.market === "IDX" && mapping.provider !== "yahoo") throw Object.assign(new Error("IDX holdings must use Yahoo Finance delayed quotes in this release."), { code:"invalid_mapping", status:400 });
   if (mapping.market !== "IDX" && mapping.provider !== "finnhub") throw Object.assign(new Error("US holdings must use Finnhub in this release."), { code:"invalid_mapping", status:400 });
   return true;
 }
