@@ -1,4 +1,5 @@
 const number = value => Number(value || 0);
+const expense = value => Math.abs(number(value));
 const pad = value => String(value).padStart(2, "0");
 const typeOf = client => client.clientType || "recurring";
 
@@ -67,11 +68,11 @@ export function getBudgetProgress(item, transactions, referenceDate = new Date()
   const trackingThisMonth = item.trackingMonth === activeKey;
   const status = trackingThisMonth ? (item.paymentStatus || "auto") : "auto";
   const autoPaid = recordedExpenseForBudget(item, transactions, referenceDate);
-  const paid = status === "done" ? number(item.monthly)
+  const paid = status === "done" ? expense(item.monthly)
     : status === "partial" ? number(item.paidAmount)
     : autoPaid;
-  const remaining = Math.max(0, number(item.monthly) - paid);
-  return {status, paid:Math.min(number(item.monthly), paid), remaining, autoPaid, trackingMonth:activeKey};
+  const remaining = Math.max(0, expense(item.monthly) - paid);
+  return {status, paid:Math.min(expense(item.monthly), paid), remaining, autoPaid, trackingMonth:activeKey};
 }
 
 export function monthlyBudgetRemaining(items, transactions, referenceDate = new Date()) {
@@ -80,7 +81,7 @@ export function monthlyBudgetRemaining(items, transactions, referenceDate = new 
 
 export function getYearlyProjectionTotal(items, year, activeYear) {
   return items.filter(item => !(year === activeYear && number(item.lastPaidYear) === year))
-    .reduce((sum, item) => sum + number(item.amount), 0);
+    .reduce((sum, item) => sum + expense(item.amount), 0);
 }
 
 function dueYearly(items, year, month, activeYear, currentMonth) {
@@ -88,14 +89,14 @@ function dueYearly(items, year, month, activeYear, currentMonth) {
     if (year === activeYear && number(item.lastPaidYear) === year) return false;
     const due = monthIndex(item.month);
     return year === activeYear && month === currentMonth ? due <= currentMonth : due === month;
-  }).reduce((sum, item) => sum + number(item.amount), 0);
+  }).reduce((sum, item) => sum + expense(item.amount), 0);
 }
 
 function dueEvents(items, year, month) {
   return items.filter(item => {
     const date = new Date(`${item.date}T00:00:00`);
     return date.getFullYear() === year && date.getMonth() === month;
-  }).reduce((sum, item) => sum + number(item.amount), 0);
+  }).reduce((sum, item) => sum + expense(item.amount), 0);
 }
 
 function dueCredit(items, year, month, activeYear, currentMonth) {
@@ -103,23 +104,23 @@ function dueCredit(items, year, month, activeYear, currentMonth) {
     const date = new Date(`${item.due}T00:00:00`);
     if (date.getFullYear() !== year) return false;
     return year === activeYear && month === currentMonth ? date.getMonth() <= currentMonth : date.getMonth() === month;
-  }).reduce((sum, item) => sum + number(item.amount), 0);
+  }).reduce((sum, item) => sum + expense(item.amount), 0);
 }
 
 export function annualExpenseBreakdown({year, budgets, yearly, events, credit, activeYear}) {
-  const recurring = budgets.reduce((sum, item) => sum + number(item.monthly), 0) * 12;
+  const recurring = budgets.reduce((sum, item) => sum + expense(item.monthly), 0) * 12;
   const annual = getYearlyProjectionTotal(yearly, year, activeYear);
   const eventOnly = events.filter(item => new Date(`${item.date}T00:00:00`).getFullYear() === year)
-    .reduce((sum, item) => sum + number(item.amount), 0);
+    .reduce((sum, item) => sum + expense(item.amount), 0);
   const creditDue = credit.filter(item => !item.paid && new Date(`${item.due}T00:00:00`).getFullYear() === year)
-    .reduce((sum, item) => sum + number(item.amount), 0);
-  return {recurring, yearly:annual, events:eventOnly + creditDue, eventOnly, credit:creditDue, total:recurring + annual + eventOnly + creditDue};
+    .reduce((sum, item) => sum + expense(item.amount), 0);
+  return {recurring, yearly:annual, events:eventOnly, eventOnly, credit:creditDue, total:recurring + annual + eventOnly + creditDue};
 }
 
 export function remainingYearExpenseBreakdown({referenceDate = new Date(), budgets = [], yearly = [], events = [], credit = [], transactions = []}) {
   const year = referenceDate.getFullYear();
   const currentMonth = referenceDate.getMonth();
-  const monthlyDefault = budgets.reduce((sum, item) => sum + number(item.monthly), 0);
+  const monthlyDefault = budgets.reduce((sum, item) => sum + expense(item.monthly), 0);
   const recurring = monthlyBudgetRemaining(budgets, transactions, referenceDate) + monthlyDefault * (11 - currentMonth);
   let annual = 0;
   let eventOnly = 0;
@@ -129,7 +130,7 @@ export function remainingYearExpenseBreakdown({referenceDate = new Date(), budge
     eventOnly += dueEvents(events, year, month);
     creditDue += dueCredit(credit, year, month, year, currentMonth);
   }
-  return {recurring, yearly:annual, events:eventOnly + creditDue, eventOnly, credit:creditDue, total:recurring + annual + eventOnly + creditDue};
+  return {recurring, yearly:annual, events:eventOnly, eventOnly, credit:creditDue, total:recurring + annual + eventOnly + creditDue};
 }
 
 export function remainingYearIncomeBreakdown({referenceDate = new Date(), clients = [], transactions = []}) {
@@ -145,7 +146,7 @@ export function remainingYearIncomeBreakdown({referenceDate = new Date(), client
 export function buildMonthlyTimeline({referenceDate = new Date(), accountTotal, clients, budgets, yearly, events, credit, transactions, portfolioForYear}) {
   const year = referenceDate.getFullYear();
   const currentMonth = referenceDate.getMonth();
-  const monthlyBudget = budgets.reduce((sum, item) => sum + number(item.monthly), 0);
+  const monthlyBudget = budgets.reduce((sum, item) => sum + expense(item.monthly), 0);
   const fixedIncome = getFixedIncome(clients);
   let cash = number(accountTotal);
   const rows = [];
@@ -174,6 +175,7 @@ export function buildProjection({years, referenceDate = new Date(), accountTotal
   return years.map(year => {
     const breakdown = annualExpenseBreakdown({year,budgets,yearly,events,credit,activeYear});
     if (year === activeYear) {
+      const opening = number(accountTotal);
       const currentRows = monthly;
       const income = currentRows.reduce((sum, row) => sum + row.income + row.extraIncome, 0);
       const expense = currentRows.reduce((sum, row) => sum + row.expenses, 0);
@@ -181,20 +183,22 @@ export function buildProjection({years, referenceDate = new Date(), accountTotal
         currentMonth:currentRows[0]?.recurringExpense || 0,
         recurring:currentRows.slice(1).reduce((sum,row)=>sum+row.recurringExpense,0),
         yearly:currentRows.reduce((sum,row)=>sum+row.yearlyExpense,0),
-        events:currentRows.reduce((sum,row)=>sum+row.eventExpense+row.creditExpense,0)
+        events:currentRows.reduce((sum,row)=>sum+row.eventExpense,0),
+        credit:currentRows.reduce((sum,row)=>sum+row.creditExpense,0)
       };
-      remainingBreakdown.total=remainingBreakdown.currentMonth+remainingBreakdown.recurring+remainingBreakdown.yearly+remainingBreakdown.events;
+      remainingBreakdown.total=remainingBreakdown.currentMonth+remainingBreakdown.recurring+remainingBreakdown.yearly+remainingBreakdown.events+remainingBreakdown.credit;
       const portfolio = number(portfolioForYear(year));
       const incomeBreakdown = remainingYearIncomeBreakdown({referenceDate,clients,transactions});
-      return {year,income, incomeBreakdown, expense,expenses:remainingBreakdown,eventExpense:remainingBreakdown.events,portfolio,closing:currentClosing,nw:currentClosing + portfolio};
+      return {year,opening,income,incomeBreakdown,expense,expenses:remainingBreakdown,eventExpense:remainingBreakdown.events,creditExpense:remainingBreakdown.credit,portfolio,closing:currentClosing,nw:opening + portfolio + incomeBreakdown.total - remainingBreakdown.total};
     }
+    const opening = cash;
     const annualIncome = getFixedIncome(clients) * 12 + transactions
       .filter(row => row.type === "income" && new Date(`${row.date}T00:00:00`).getFullYear() === year)
       .reduce((sum, row) => sum + number(row.amount), 0);
     cash += annualIncome - breakdown.total;
     const portfolio = number(portfolioForYear(year));
     const incomeBreakdown = {outstanding:0,recurring:getFixedIncome(clients)*12,additional:annualIncome-getFixedIncome(clients)*12,total:annualIncome};
-    return {year,income:annualIncome,incomeBreakdown,expense:breakdown.total,expenses:breakdown,eventExpense:breakdown.events,portfolio,closing:cash,nw:cash + portfolio};
+    return {year,opening,income:annualIncome,incomeBreakdown,expense:breakdown.total,expenses:breakdown,eventExpense:breakdown.events,creditExpense:breakdown.credit,portfolio,closing:cash,nw:opening + portfolio + incomeBreakdown.total - breakdown.total};
   });
 }
 

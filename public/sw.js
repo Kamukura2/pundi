@@ -1,4 +1,4 @@
-const SHELL_CACHE = "cvfinance-shell-v7.5.1-entrusted-funds-tags";
+const SHELL_CACHE = "cvfinance-shell-v7.6.0-auditable-projection";
 const SHELL = ["/", "/index.html", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", event => {

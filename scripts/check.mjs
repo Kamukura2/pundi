@@ -65,7 +65,7 @@ const modelEvents=[{date:"2026-08-20",amount:500000},{date:"2028-07-01",amount:5
 const modelCredit=[{due:"2026-08-26",amount:100000,paid:false},{due:"2026-09-26",amount:200000,paid:false},{due:"2027-04-26",amount:300000,paid:false}];
 const modelTransactions=[{type:"income",amount:400000,date:"2026-08-05"},{type:"expense",amount:900000,date:"2026-08-05",category:"Food"}];
 assert.deepEqual(getBudgetProgress(modelBudgets[0],modelTransactions,referenceDate),{status:"partial",paid:400000,remaining:600000,autoPaid:900000,trackingMonth:"2026-08"},"Manual partial progress must override History without changing the default budget");
-assert.deepEqual(remainingYearExpenseBreakdown({referenceDate,budgets:modelBudgets,yearly:modelYearly,events:modelEvents,credit:modelCredit,transactions:modelTransactions}),{recurring:4600000,yearly:3000000,events:800000,eventOnly:500000,credit:300000,total:8400000},"Remaining-year expense must use current remaining budget plus four full Sep-Dec budgets");
+assert.deepEqual(remainingYearExpenseBreakdown({referenceDate,budgets:modelBudgets,yearly:modelYearly,events:modelEvents,credit:modelCredit,transactions:modelTransactions}),{recurring:4600000,yearly:3000000,events:500000,eventOnly:500000,credit:300000,total:8400000},"Remaining-year expense must separate one-time events and dated credit");
 assert.deepEqual(remainingYearIncomeBreakdown({referenceDate,clients:modelClients,transactions:modelTransactions}),{outstanding:2700000,recurring:4000000,additional:400000,total:7100000},"Remaining-year income must use current receivables plus four future recurring months");
 const monthly=buildMonthlyTimeline({referenceDate,accountTotal:10000000,clients:modelClients,budgets:modelBudgets,yearly:modelYearly,events:modelEvents,credit:modelCredit,transactions:modelTransactions,portfolioForYear:()=>0});
 assert.deepEqual(monthly.map(row=>row.cash),[10900000,10700000,8700000,8700000,8700000],"Current month uses outstanding and remaining obligations; future months use recurring income and dated expenses");
@@ -77,6 +77,12 @@ assert.deepEqual(modelProjection.map(row=>row.closing),[8700000,2400000,-8600000
 assert.equal(modelProjection[0].expenses.currentMonth,600000,"Current-month remaining budget must be disclosed separately");
 assert.equal(modelProjection[0].expenses.recurring,4000000,"August projection must show exactly four full recurring expense months after August");
 assert.equal(modelProjection[0].incomeBreakdown.recurring,4000000,"August projection must show exactly four full recurring income months after August");
+for (const row of modelProjection) assert.equal(row.nw,row.opening+row.portfolio+row.incomeBreakdown.total-row.expenses.total,`Headline ${row.year} must equal its visible equation`);
+assert.equal(modelProjection[0].expenses.credit,300000,"Only unpaid credit due in the current year belongs in 2026");
+assert.equal(modelProjection[1].expenses.credit,300000,"Credit due in 2027 appears once in 2027");
+assert.equal(modelProjection[2].expenses.credit,0,"Credit must not recur after its due year");
+const signedEventProjection=buildProjection({years:[2026,2027,2028],referenceDate,accountTotal:0,clients:[],budgets:[],yearly:[],events:[{date:"2028-06-01",amount:50000000},{date:"2028-07-01",amount:-5500000}],credit:[],transactions:[],portfolioForYear:()=>0});
+assert.equal(signedEventProjection[2].expenses.events,55500000,"Expense entries use absolute obligations and can never cancel another event");
 
 const migration006 = read("supabase/migrations/006_client_types_yearly_status.sql");
 for (const marker of ["client_type","ending_paid","last_paid_year"]) assert.match(migration006,new RegExp(marker));
@@ -93,6 +99,9 @@ assert.doesNotMatch(migration009,/drop\s+table|truncate\s+|delete\s+from/i);
 const migration010 = read("supabase/migrations/010_monthly_budget_sort_order.sql");
 for (const marker of ["monthly_budgets","sort_order","monthly_budgets_user_order_idx"]) assert.match(migration010,new RegExp(marker));
 assert.doesNotMatch(migration010,/drop\s+table|truncate\s+|delete\s+from/i);
+const migration011 = read("supabase/migrations/011_stock_cash_wallet.sql");
+for (const marker of ["stock_netcash_idr","stock_wallet_usd","app_settings"]) assert.match(migration011,new RegExp(marker));
+assert.doesNotMatch(migration011,/drop\s+table|truncate\s+|delete\s+from/i);
 
 const { normalizeStockMapping, quantityForDisplay, quantityForStorage } = await import("../src/stocks/holding.js");
 const idxHolding = {ticker:"BMRI",market:"IDX",provider:"finnhub",providerSymbol:"BMRI",currency:"IDR",quantity:10000};
@@ -138,4 +147,4 @@ await repository.queueOperation({table:"accounts",action:"delete",id,previousUpd
 queued = await mutationList();
 assert.equal(queued.length, 0);
 
-console.log("CVFinance checks passed: schema, RLS markers, PWA, 8 tabs, v7.5.1 entrusted-fund deductions, dynamic budget tags, remaining-year projection, archives, sorting invariants, stock provider abstraction, offline queue coalescing, environment template, and JavaScript syntax.");
+console.log("CVFinance checks passed: schema, RLS markers, PWA, 8 tabs, v7.6 auditable projection equations, one-time dated credit, optional stock cash assets, dynamic budget tags, archives, sorting invariants, stock provider abstraction, offline queue coalescing, environment template, and JavaScript syntax.");

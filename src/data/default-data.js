@@ -31,6 +31,7 @@ export function createEmptyState() {
     creditFacilities: [],
     credit: [],
     entrustedFunds: [],
+    stockExtras: { netcashIdr: 0, walletUsd: 0 },
     stocks: [],
     electricity: []
   };
@@ -104,6 +105,7 @@ export function createMvpSeed() {
       {id:createId(),source:"ShopeePayLater",description:"Household item",amount:680000,due:"2026-09-25",paid:false,sortOrder:2}
     ],
     entrustedFunds: [],
+    stockExtras: { netcashIdr: 0, walletUsd: 0 },
     stocks,
     electricity: [
       {id:createId(),date:"2026-08-06",time:"19:00",remaining:500},

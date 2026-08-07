@@ -206,7 +206,7 @@
       <div class="grid-2 gap-lg expense-view active" data-expense-panel="monthly">
         <article class="panel">
           <div class="panel-head">
-            <div><p>Monthly</p><h3>Editable Budgets</h3></div>
+            <div><p>Monthly</p><h3>Budget</h3></div>
             <button class="ghost-btn" id="addMonthlyBtn" title="Add">＋</button>
           </div>
           <div id="budgetRows"></div>
@@ -318,6 +318,27 @@
           </div>
         </article>
       </div>
+
+      <article class="panel stock-cash-panel">
+        <div class="panel-head">
+          <div><p>Optional liquid assets</p><h3>Netcash & USD Wallet</h3></div>
+          <span class="pill">Included in total assets</span>
+        </div>
+        <div class="stock-cash-grid">
+          <label class="stock-cash-card netcash-card">
+            <span class="stock-cash-icon">Rp</span>
+            <span><small>NETCASH INDONESIA</small><b>IDR</b></span>
+            <input id="stockNetcashIdr" type="number" min="0" step="1000" placeholder="Optional · 0">
+            <em id="stockNetcashValue" class="private">Rp0</em>
+          </label>
+          <label class="stock-cash-card wallet-card">
+            <span class="stock-cash-icon">$</span>
+            <span><small>USD WALLET</small><b>USD</b></span>
+            <input id="stockWalletUsd" type="number" min="0" step=".01" placeholder="Optional · 0">
+            <em id="stockWalletValue" class="private">Rp0</em>
+          </label>
+        </div>
+      </article>
 
       <article class="panel">
         <div class="panel-head">

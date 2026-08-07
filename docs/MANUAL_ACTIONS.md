@@ -2,7 +2,7 @@
 
 1. Create accounts: **GitHub**, **Vercel**, **Supabase**, and **Finnhub**.
 2. Create one Supabase project.
-3. For a new deployment, run all SQL migration files in numeric order. For the v7.5.1 → v7.5.2 update, run only `010_monthly_budget_sort_order.sql` before uploading the new source.
+3. For a new deployment, run all SQL migration files in numeric order. For the v7.5.2 → v7.6.0 update, run only `011_stock_cash_wallet.sql` before uploading the new source.
 4. Disable public sign-ups and manually create one confirmed Auth user.
 5. Create a private GitHub repository and push this project.
 6. Import that repository into Vercel.

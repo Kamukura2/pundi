@@ -61,6 +61,7 @@ function rowsToState(rows) {
     state.optimisticGrowth = Number(settings.optimistic_growth);
     state.usdIdr = Number(settings.usd_idr);
     state.rateKwh = Number(settings.rate_kwh);
+    state.stockExtras = {netcashIdr:Number(settings.stock_netcash_idr||0),walletUsd:Number(settings.stock_wallet_usd||0)};
     state.settingsUpdatedAt = settings.updated_at;
   }
   return state;
@@ -106,7 +107,7 @@ function stateToRows(state, userId) {
     app_settings: [owned({
       id:state.settingsId,theme:state.theme,language:state.language||"en",base_mode:state.baseMode,optimistic_mode:state.optimisticMode,
       base_growth:Number(state.baseGrowth),optimistic_growth:Number(state.optimisticGrowth),usd_idr:Number(state.usdIdr),
-      rate_kwh:Number(state.rateKwh),legacy_import_completed:true,updated_at:state.settingsUpdatedAt
+      rate_kwh:Number(state.rateKwh),stock_netcash_idr:Number(state.stockExtras?.netcashIdr||0),stock_wallet_usd:Number(state.stockExtras?.walletUsd||0),legacy_import_completed:true,updated_at:state.settingsUpdatedAt
     })]
   };
 }

@@ -641,3 +641,25 @@ select,input,.search{width:100%;min-width:0;height:46px;padding:0 12px;border-ra
 #holdingsBody td:nth-child(9),#holdingsBody td:nth-child(10){padding:10px;border-radius:13px;background:var(--surface2);font-weight:900;overflow-wrap:anywhere}
 #holdingsBody td:nth-child(10).negative{color:var(--red)!important}#holdingsBody td:nth-child(10).positive{color:var(--green)!important}
 @media (max-width:680px){.prospect-snapshot-value{font-size:clamp(25px,7.7vw,35px)!important;letter-spacing:-.07em}.story-card::before{left:10px;width:94px;height:94px}}
+
+/* v7.6.0 auditable projections, 2D sorting and optional portfolio cash */
+.stock-cash-panel{margin-top:20px}
+.stock-cash-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.stock-cash-card{display:grid;grid-template-columns:52px minmax(130px,.7fr) minmax(130px,1fr) minmax(120px,.65fr);gap:14px;align-items:center;padding:17px;border:1px solid var(--line);border-radius:20px;cursor:text;overflow:hidden}
+.stock-cash-card.netcash-card{background:linear-gradient(135deg,rgba(31,205,145,.17),rgba(47,181,224,.10))}
+.stock-cash-card.wallet-card{background:linear-gradient(135deg,rgba(121,91,255,.18),rgba(48,170,237,.11))}
+.stock-cash-icon{width:48px;height:48px;display:grid;place-items:center;border-radius:15px;color:#fff;font-weight:950;background:linear-gradient(135deg,#20c58d,#168aac);box-shadow:0 10px 24px rgba(25,156,133,.24)}
+.wallet-card .stock-cash-icon{background:linear-gradient(135deg,#7f61ff,#2f9ee9);box-shadow:0 10px 24px rgba(76,91,220,.26)}
+.stock-cash-card small{display:block;color:var(--muted);font-size:9px;font-weight:900;letter-spacing:.08em}.stock-cash-card b{display:block;margin-top:4px}.stock-cash-card input{width:100%;min-width:0}.stock-cash-card em{text-align:right;font-style:normal;font-weight:900;overflow-wrap:anywhere}
+.year-equation{display:block;margin:-4px 0 7px;color:var(--muted);font-size:9px;font-weight:800;letter-spacing:.02em}
+.year-card{min-height:285px}.year-split span:first-child{font-weight:800}
+.yearly-tile.due{background:linear-gradient(145deg,#d7efff,#adcdf7 56%,#9fb7ed)!important;border-color:rgba(49,112,195,.25)!important;color:#102343;box-shadow:0 15px 34px rgba(50,103,178,.13)}
+.yearly-tile.due small{color:#526987}.yearly-tile.done{background:linear-gradient(145deg,#f1f3f7,#dfe3eb)!important;color:#646d7c;filter:saturate(.5);opacity:.72}
+[data-theme=dark] .yearly-tile.due{background:linear-gradient(145deg,#194f82,#102f5b 60%,#0a2347)!important;color:#fff;border-color:rgba(87,162,239,.28)!important}
+[data-theme=dark] .yearly-tile.due small{color:rgba(255,255,255,.72)}[data-theme=dark] .yearly-tile.done{background:linear-gradient(145deg,#17191d,#0c0d10)!important;color:#8e96a6}
+.story-card{color:#fff!important;text-shadow:0 1px 1px rgba(10,20,45,.08)}.story-card small,.story-card p{color:rgba(255,255,255,.86)!important;opacity:1}.story-card h3{color:#fff}
+.story-card.insight-wallet{background:linear-gradient(135deg,#7048e8,#414ad1 52%,#177cc4)!important}.story-card.insight-clients{background:linear-gradient(135deg,#179f72,#07867c 52%,#08758e)!important}.story-card.insight-coffee{background:linear-gradient(135deg,#b8793f,#87502d 52%,#63341f)!important}.story-card.insight-electricity{background:linear-gradient(135deg,#168eb3,#1675b6 52%,#2f54c4)!important}.story-card.insight-calendar{background:linear-gradient(135deg,#db8a27,#d15c36 52%,#bd3f43)!important}.story-card.insight-stocks{background:linear-gradient(135deg,#d95769,#c2316c 52%,#8f2c70)!important}
+.client-card.ending .status-icon{background:rgba(255,255,255,.18)!important;color:#fff!important;font-size:20px}
+.sort-placeholder{min-width:0;border:2px dashed rgba(92,106,255,.56);border-radius:20px;background:linear-gradient(135deg,rgba(113,89,255,.13),rgba(46,184,237,.11));box-shadow:inset 0 0 0 5px rgba(255,255,255,.22)}
+@media (max-width:900px){.stock-cash-grid{grid-template-columns:1fr}.stock-cash-card{grid-template-columns:48px minmax(110px,.7fr) minmax(120px,1fr) minmax(110px,.7fr)}}
+@media (max-width:680px){.stock-cash-card{grid-template-columns:44px minmax(0,1fr);padding:13px}.stock-cash-icon{width:42px;height:42px}.stock-cash-card input,.stock-cash-card em{grid-column:1/-1}.stock-cash-card em{text-align:left}.year-card{min-height:275px}}
