@@ -1,6 +1,7 @@
 import { createEmptyState, createId, createMvpSeed, readLegacyLocalStorage, YEARS } from "./src/data/default-data.js";
 import { SyncManager } from "./src/sync/sync-manager.js";
 import { fetchHoldingQuote, isPriceStale, validateHoldingSymbol } from "./src/stocks/client.js";
+import { normalizeStockMapping, quantityForDisplay, quantityForStorage, quantityUnit } from "./src/stocks/holding.js";
 import { getSupabase } from "./src/lib/supabase.js";
 
 const COLORS=["#7F66FF","#39C3FF","#FF8F63","#36D695","#F4C24F","#FF6EA8","#62C8FF","#8D7AFF"];
@@ -67,6 +68,12 @@ const currentNW=()=>accountTotal()+portfolio();
 const AGE_BASE=[33,30,0];
 const ageTriplet=(year)=>AGE_BASE.map(v=>v+(year-2026));
 const moneyClass=(n)=>Number(n)<0?"negative":"";
+
+function normalizeStockMappings() {
+ let changed=false;
+ state.stocks.forEach(stock=>{if(normalizeStockMapping(stock))changed=true;});
+ return changed;
+}
 
 function projection(mode="base"){
  let cash=accountTotal();
@@ -247,14 +254,17 @@ function renderStocks(){
  stockLegend.innerHTML=legend(entries);
  holdingsBody.innerHTML=state.stocks.map((s,i)=>{
   const stale=isPriceStale(s), status=s.priceStatus||"manual", stamp=s.priceAsOf?new Date(s.priceAsOf).toLocaleString("en-GB",{dateStyle:"medium",timeStyle:"short"}):"Never";
-  return `<tr><td><input data-stock="${i}" data-field="ticker" value="${s.ticker}"></td><td><select data-stock="${i}" data-field="market"><option ${s.market==="IDX"?"selected":""}>IDX</option><option ${s.market==="NASDAQ"?"selected":""}>NASDAQ</option><option ${s.market==="NYSE"?"selected":""}>NYSE</option></select></td><td><select data-stock="${i}" data-field="provider"><option value="finnhub" ${s.provider==="finnhub"?"selected":""}>Finnhub</option><option value="twelvedata" ${s.provider==="twelvedata"?"selected":""}>Twelve Data</option></select></td><td><input data-stock="${i}" data-field="providerSymbol" value="${s.providerSymbol||s.ticker}"></td><td><select data-stock="${i}" data-field="currency"><option ${s.currency==="IDR"?"selected":""}>IDR</option><option ${s.currency==="USD"?"selected":""}>USD</option></select></td><td><input data-stock="${i}" data-field="quantity" type="number" step=".000001" value="${s.quantity}"></td><td><input data-stock="${i}" data-field="avg" type="number" step=".01" value="${s.avg}"></td><td><input data-stock="${i}" data-field="current" type="number" step=".01" value="${s.current}" title="Edit for manual override"></td><td><span class="price-state ${stale?'stale':''}">${stale?'STALE · ':''}${status}</span><small class="price-time">${stamp}</small></td><td class="private">${fmt(stockValue(s))}</td><td class="private">${fmt(stockValue(s)-invested(s))}</td><td><button class="icon-mini" data-del-stock="${i}" title="Remove">🗑</button></td></tr>`;
+  const statusLabel=status==="manual"?"MANUAL FALLBACK":status;
+  const qty=quantityForDisplay(s), unit=quantityUnit(s.market);
+  return `<tr><td><input data-stock="${i}" data-field="ticker" value="${s.ticker}"></td><td><select data-stock="${i}" data-field="market"><option ${s.market==="IDX"?"selected":""}>IDX</option><option ${s.market==="NASDAQ"?"selected":""}>NASDAQ</option><option ${s.market==="NYSE"?"selected":""}>NYSE</option></select></td><td><input value="${s.provider==="twelvedata"?"Twelve Data":"Finnhub"}" title="Selected automatically from market" disabled></td><td><input data-stock="${i}" data-field="providerSymbol" value="${s.providerSymbol||s.ticker}"></td><td><input value="${s.currency}" title="Selected automatically from market" disabled></td><td><div class="quantity-field"><input data-stock="${i}" data-field="quantity" type="number" min="0" step=".000001" value="${qty}"><small>${unit}</small></div></td><td><input data-stock="${i}" data-field="avg" type="number" step=".01" value="${s.avg}"></td><td><input data-stock="${i}" data-field="current" type="number" step=".01" value="${s.current}" title="Latest price. Edit only to set a manual fallback."></td><td><span class="price-state ${stale?'stale':''}">${stale?'STALE · ':''}${statusLabel}</span><small class="price-time">${stamp}</small></td><td class="private">${fmt(stockValue(s))}</td><td class="private">${fmt(stockValue(s)-invested(s))}</td><td><button class="icon-mini" data-del-stock="${i}" title="Remove">🗑</button></td></tr>`;
  }).join("");
  qa("[data-stock]").forEach(el=>el.onchange=()=>{
   const i=Number(el.dataset.stock),f=el.dataset.field,s=state.stocks[i];
-  s[f]=["quantity","avg","current"].includes(f)?Number(el.value):el.value;
+  if(f==="quantity")s.quantity=quantityForStorage(s.market,el.value);
+  else s[f]=["avg","current"].includes(f)?Number(el.value):el.value;
   if(f==="ticker"){s.ticker=String(el.value).toUpperCase();s.displaySymbol=s.ticker;}
   if(f==="providerSymbol")s.providerSymbol=String(el.value).toUpperCase();
-  if(f==="market"){s.provider=s.market==="IDX"?"twelvedata":"finnhub";s.currency=s.market==="IDX"?"IDR":"USD";}
+  if(f==="market")normalizeStockMapping(s,{resetProviderSymbol:true});
   if(f==="current"){s.manualCurrent=Number(el.value);s.priceSource="manual";s.priceStatus="manual";s.priceAsOf=new Date().toISOString();}
   save();renderAll();
  });
@@ -470,6 +480,7 @@ function autoDueDate(source){
 async function refreshStockPrices({silent=false}={}){
  if(!navigator.onLine||!state.stocks.length)return;
  if(typeof refreshStocksBtn!=="undefined")refreshStocksBtn.disabled=true;
+ if(normalizeStockMappings())await save();
  let updated=0,failed=0;
  for(const stock of state.stocks){
   try{
@@ -577,13 +588,11 @@ addClientBtn.onclick=()=>openSimple("Add Client",[
 addTickerBtn.onclick=()=>openSimple("Add Ticker",[
  {key:"ticker",label:"Ticker"},
  {key:"market",label:"Market",options:["IDX","NASDAQ","NYSE"],value:"NASDAQ"},
- {key:"provider",label:"Provider",options:["finnhub","twelvedata"],value:"finnhub"},
- {key:"providerSymbol",label:"Provider Symbol"},
- {key:"currency",label:"Currency",options:["IDR","USD"],value:"USD"},
- {key:"quantity",label:"Quantity",type:"number",step:".000001"},
- {key:"avg",label:"Average Price",type:"number",step:".01"},
- {key:"current",label:"Current Price",type:"number",step:".01"}
-],o=>{o.id=createId();o.ticker=o.ticker.toUpperCase();o.displaySymbol=o.ticker;o.providerSymbol=(o.providerSymbol||o.ticker).toUpperCase();o.manualCurrent=o.current;o.priceSource="manual";o.priceStatus="manual";o.priceAsOf=null;o.base={};o.optimistic={};YEARS.slice(1).forEach(y=>{o.base[y]=o.current;o.optimistic[y]=o.current});state.stocks.push(o);});
+ {key:"providerSymbol",label:"Provider Symbol (leave blank to use ticker)"},
+ {key:"quantity",label:"Quantity (IDX = lots · US = shares)",type:"number",step:".000001"},
+ {key:"avg",label:"Average Price / Share",type:"number",step:".01"},
+ {key:"current",label:"Manual Fallback Price / Share",type:"number",step:".01",value:0}
+],o=>{o.id=createId();o.ticker=o.ticker.toUpperCase();o.displaySymbol=o.ticker;o.quantity=quantityForStorage(o.market,o.quantity);normalizeStockMapping(o);o.manualCurrent=o.current;o.priceSource="manual";o.priceStatus="manual";o.priceAsOf=null;o.base={};o.optimistic={};YEARS.slice(1).forEach(y=>{o.base[y]=o.current;o.optimistic[y]=o.current});state.stocks.push(o);});
 addElectricityBtn.onclick=()=>openSimple("Add Meter Reading",[
  {key:"date",label:"Date",type:"date",value:todayISO()},
  {key:"time",label:"Time",type:"time",value:"19:00"},
@@ -620,6 +629,7 @@ async function showSignedIn(user){
  authGate.hidden=true;document.body.classList.remove("auth-locked");
  accountEmail.textContent=user.email||"Private account";
  legacyImportBtn.hidden=!readLegacyLocalStorage();
+ if(normalizeStockMappings())await save();
  if(!stockRefreshStarted){stockRefreshStarted=true;setTimeout(()=>refreshStockPrices({silent:true}),500);}
 }
 

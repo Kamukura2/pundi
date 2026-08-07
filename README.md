@@ -1,4 +1,6 @@
-# CVFinance v7.0
+# CVFinance v7.0.1
+
+v7.0.1 adds market-aware stock quantities and automatic provider mapping: IDX quantities are entered as lots (1 lot = 100 shares), while US quantities remain shares and support fractions. The database continues storing the underlying share count, so existing portfolio values remain compatible.
 
 Deployment-ready continuation of CVFinance v6.3.1. The existing eight-tab UI and calculations are preserved while Supabase replaces browser `localStorage` as the authoritative database.
 

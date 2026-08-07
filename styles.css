@@ -238,3 +238,4 @@ main{margin-left:0;padding:22px 14px calc(108px + env(safe-area-inset-bottom))}
 .tx-badge.income{background:linear-gradient(145deg,#a9ffd6,#34d68f 62%,#14b56e);color:#063b22;text-shadow:0 1px 0 rgba(255,255,255,.35)}
 .tx-badge.expense{background:linear-gradient(145deg,#ffc0c8,#ff7b8f 62%,#f14c67);color:#4a0b16;text-shadow:0 1px 0 rgba(255,255,255,.3)}
 .tx-badge span{transform:translateY(-1px);display:block;font-size:28px;font-weight:900}
+.quantity-field{display:flex;align-items:center;gap:8px;min-width:150px}.quantity-field input{min-width:105px}.quantity-field small{color:var(--muted);font-size:11px;text-transform:uppercase;white-space:nowrap}
