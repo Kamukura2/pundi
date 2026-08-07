@@ -1,0 +1,202 @@
+[
+  {
+    "name": "phone-360",
+    "width": 360,
+    "height": 800,
+    "page": "clients",
+    "theme": "light",
+    "overflow": 0,
+    "navCount": 7,
+    "file": "phone-360-clients-light.png"
+  },
+  {
+    "name": "phone-360",
+    "width": 360,
+    "height": 800,
+    "page": "electricity",
+    "theme": "light",
+    "overflow": 0,
+    "navCount": 7,
+    "file": "phone-360-electricity-light.png"
+  },
+  {
+    "name": "phone-360",
+    "width": 360,
+    "height": 800,
+    "page": "stocks",
+    "theme": "light",
+    "overflow": 0,
+    "navCount": 7,
+    "file": "phone-360-stocks-light.png"
+  },
+  {
+    "name": "phone-360",
+    "width": 360,
+    "height": 800,
+    "page": "expenses",
+    "theme": "light",
+    "overflow": 0,
+    "navCount": 7,
+    "file": "phone-360-expenses-light.png"
+  },
+  {
+    "name": "phone-360",
+    "width": 360,
+    "height": 800,
+    "page": "prospect",
+    "theme": "light",
+    "overflow": 0,
+    "navCount": 7,
+    "file": "phone-360-prospect-light.png"
+  },
+  {
+    "name": "phone-412",
+    "width": 412,
+    "height": 915,
+    "page": "clients",
+    "theme": "light",
+    "overflow": 0,
+    "navCount": 7,
+    "file": "phone-412-clients-light.png"
+  },
+  {
+    "name": "phone-412",
+    "width": 412,
+    "height": 915,
+    "page": "electricity",
+    "theme": "light",
+    "overflow": 0,
+    "navCount": 7,
+    "file": "phone-412-electricity-light.png"
+  },
+  {
+    "name": "phone-412",
+    "width": 412,
+    "height": 915,
+    "page": "stocks",
+    "theme": "light",
+    "overflow": 0,
+    "navCount": 7,
+    "file": "phone-412-stocks-light.png"
+  },
+  {
+    "name": "phone-412",
+    "width": 412,
+    "height": 915,
+    "page": "expenses",
+    "theme": "light",
+    "overflow": 0,
+    "navCount": 7,
+    "file": "phone-412-expenses-light.png"
+  },
+  {
+    "name": "phone-412",
+    "width": 412,
+    "height": 915,
+    "page": "prospect",
+    "theme": "light",
+    "overflow": 0,
+    "navCount": 7,
+    "file": "phone-412-prospect-light.png"
+  },
+  {
+    "name": "tablet-768",
+    "width": 768,
+    "height": 1024,
+    "page": "clients",
+    "theme": "light",
+    "overflow": 0,
+    "navCount": 7,
+    "file": "tablet-768-clients-light.png"
+  },
+  {
+    "name": "tablet-768",
+    "width": 768,
+    "height": 1024,
+    "page": "electricity",
+    "theme": "light",
+    "overflow": 0,
+    "navCount": 7,
+    "file": "tablet-768-electricity-light.png"
+  },
+  {
+    "name": "tablet-768",
+    "width": 768,
+    "height": 1024,
+    "page": "stocks",
+    "theme": "light",
+    "overflow": 0,
+    "navCount": 7,
+    "file": "tablet-768-stocks-light.png"
+  },
+  {
+    "name": "tablet-768",
+    "width": 768,
+    "height": 1024,
+    "page": "expenses",
+    "theme": "light",
+    "overflow": 0,
+    "navCount": 7,
+    "file": "tablet-768-expenses-light.png"
+  },
+  {
+    "name": "tablet-768",
+    "width": 768,
+    "height": 1024,
+    "page": "prospect",
+    "theme": "light",
+    "overflow": 0,
+    "navCount": 7,
+    "file": "tablet-768-prospect-light.png"
+  },
+  {
+    "name": "desktop-1440",
+    "width": 1440,
+    "height": 950,
+    "page": "clients",
+    "theme": "light",
+    "overflow": 0,
+    "navCount": 7,
+    "file": "desktop-1440-clients-light.png"
+  },
+  {
+    "name": "desktop-1440",
+    "width": 1440,
+    "height": 950,
+    "page": "electricity",
+    "theme": "light",
+    "overflow": 0,
+    "navCount": 7,
+    "file": "desktop-1440-electricity-light.png"
+  },
+  {
+    "name": "desktop-1440",
+    "width": 1440,
+    "height": 950,
+    "page": "stocks",
+    "theme": "light",
+    "overflow": 0,
+    "navCount": 7,
+    "file": "desktop-1440-stocks-light.png"
+  },
+  {
+    "name": "desktop-1440",
+    "width": 1440,
+    "height": 950,
+    "page": "expenses",
+    "theme": "light",
+    "overflow": 0,
+    "navCount": 7,
+    "file": "desktop-1440-expenses-light.png"
+  },
+  {
+    "name": "desktop-1440",
+    "width": 1440,
+    "height": 950,
+    "page": "prospect",
+    "theme": "light",
+    "overflow": 0,
+    "navCount": 7,
+    "file": "desktop-1440-prospect-light.png"
+  }
+]

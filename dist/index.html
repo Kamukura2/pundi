@@ -1,0 +1,589 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <title>CVFinance</title>
+  <meta name="theme-color" content="#0b1120">
+  <meta name="description" content="Private synchronized personal finance dashboard">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="CVFinance">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <script type="module" crossorigin src="/assets/index-yEcpeToT.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-CHo0gywh.css">
+</head>
+<body class="auth-locked">
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">C</div>
+      <div><b>CVFinance</b><small>Personal Finance OS</small></div>
+    </div>
+
+    <nav class="nav-list">
+      <button class="nav active" data-page="accumulation"><span class="nav-ic i-money">💰</span><span>Accumulation</span></button>
+      <button class="nav" data-page="cashflow"><span class="nav-ic i-chart">📊</span><span>History</span></button>
+      <button class="nav" data-page="expenses"><span class="nav-ic i-bill">🧾</span><span>Expenses</span></button>
+      <button class="nav" data-page="clients"><span class="nav-ic i-client">🤝</span><span>Clients</span></button>
+      <button class="nav" data-page="stocks"><span class="nav-ic i-stock">📈</span><span>Stocks</span></button>
+      <button class="nav" data-page="electricity"><span class="nav-ic i-electric">⚡</span><span>Electricity</span></button>
+      <button class="nav" data-page="prospect"><span class="nav-ic i-rocket">🚀</span><span>Prospect</span></button>
+      <button class="nav" data-page="insights"><span class="nav-ic i-insight">✨</span><span>Insights</span></button>
+    </nav>
+
+    <div class="side-projection">
+      <div class="side-projection-now">
+        <small id="sideCurrentLabel">Projected 2026</small>
+        <strong id="sideCurrentProjection">Rp0</strong>
+        <span>Current net worth</span>
+      </div>
+      <div class="side-projection-future">
+        <small id="sideFutureLabel">Projected 2036</small>
+        <strong id="sideProjection">Rp0</strong>
+        <span id="sideScenario">Base</span>
+      </div>
+    </div>
+  </aside>
+
+  <main>
+    <header class="topbar">
+      <div class="title-wrap">
+        <p id="kicker">FINANCIAL COMMAND CENTER</p>
+        <h1 id="title">Accumulation</h1>
+      </div>
+      <div class="top-actions">
+        <button id="syncStatus" class="sync-status loading" type="button" title="Synchronization status">
+          <span class="sync-dot"></span><span><b id="syncStatusText">Loading…</b><small id="lastSynced">Not synced</small></span><em id="unsyncedCount"></em>
+        </button>
+        <button id="privacyBtn" class="icon-btn" title="Hide values">👁</button>
+        <button id="themeBtn" class="icon-btn" title="Toggle theme">☾</button>
+        <button id="dataBtn" class="avatar" title="Data & account">DA</button>
+        <button id="languageBtn" class="language-btn" title="Switch language"><span>US</span><span>ID</span></button>
+      </div>
+    </header>
+
+    <section id="accumulation" class="page active">
+      <div class="hero-grid">
+        <article class="hero-card hero-main">
+          <div class="hero-chip">LIVE MODEL</div>
+          <small>Total Net Worth This Month</small>
+          <div id="projectedCash" class="hero-value private">Rp0</div>
+          <div class="hero-inline">
+            <span id="cashHealth">Healthy buffer</span>
+            <span>Balance + receivables + extra income − remaining obligations + stocks</span>
+          </div>
+          <div id="accChart" class="chart chart-hero"></div>
+        </article>
+
+        <div class="hero-stack">
+          <article class="metric-card tint-blue">
+            <small>Available Balance</small>
+            <strong id="availableBalance" class="private">Rp0</strong>
+          </article>
+          <article class="metric-card tint-teal">
+            <small>Outstanding Client Income</small>
+            <strong id="outstandingIncome" class="private">Rp0</strong>
+          </article>
+        </div>
+      </div>
+
+      <div class="grid-3 gap-lg">
+        <article class="panel">
+          <div class="panel-head">
+            <div><p>Balances</p><h3>Cash, Bank & Wallets</h3></div>
+            <div class="head-actions">
+              <button class="ghost-btn" id="manageAccountsBtn" title="Manage">⚙</button>
+              <button class="ghost-btn" id="addAccountBtn" title="Add">＋</button>
+            </div>
+          </div>
+          <div id="accountList" class="list"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head">
+            <div><p>Clients</p><h3>Payment Status</h3></div>
+            <button class="ghost-btn" data-go="clients" title="Open">↗</button>
+          </div>
+          <div id="paymentSummary" class="list"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head">
+            <div><p>Upcoming</p><h3>Pending Expenses</h3></div>
+            <button class="ghost-btn" id="addEventBtnTop" title="Add">＋</button>
+          </div>
+          <div id="pendingSummary" class="list"></div>
+        </article>
+
+        <article class="panel span-2">
+          <div class="panel-head">
+            <div><p>Distribution</p><h3>Where the Money Sits</h3></div>
+          </div>
+          <div class="donut-layout">
+            <div id="balanceDonut"></div>
+            <div id="balanceLegend" class="legend"></div>
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head">
+            <div><p>Month View</p><h3>Planned vs Actual</h3></div>
+          </div>
+          <div id="monthModel" class="list"></div>
+        </article>
+      </div>
+    </section>
+
+    <section id="cashflow" class="page">
+      <div class="toolbar">
+        <div class="segmented" id="cashFilter">
+          <button class="active" data-filter="all">All</button>
+          <button data-filter="expense">Expense</button>
+          <button data-filter="income">Income</button>
+        </div>
+        <div class="toolbar-actions">
+          <select id="cashSort">
+            <option value="date">Newest</option>
+            <option value="category">Category</option>
+            <option value="amount">Amount</option>
+          </select>
+          <button class="primary-btn" data-open-tx>＋ Transaction</button>
+        </div>
+      </div>
+
+      <div class="grid-3 compact">
+        <article class="metric-card tint-green"><small>Recorded Income</small><strong id="cashIncome" class="private">Rp0</strong></article>
+        <article class="metric-card tint-red"><small>Recorded Expense</small><strong id="cashExpense" class="private">Rp0</strong></article>
+        <article class="metric-card tint-purple"><small>Recorded Net</small><strong id="cashNet" class="private">Rp0</strong></article>
+      </div>
+
+      <div class="grid-2 gap-lg">
+        <article class="panel">
+          <div class="panel-head"><div><p>Mix</p><h3>Expense Categories</h3></div></div>
+          <div class="donut-layout vertical">
+            <div id="cashDonut"></div>
+            <div id="cashLegend" class="legend"></div>
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head">
+            <div><p>Budget Pace</p><h3>Food, Essentials & Others</h3></div>
+            <button class="ghost-btn" data-go="expenses" title="Open">↗</button>
+          </div>
+          <div id="budgetPace"></div>
+        </article>
+      </div>
+
+      <article class="panel">
+        <div class="panel-head wrap">
+          <div><p>Ledger</p><h3>Transactions</h3></div>
+          <input id="txSearch" class="search" placeholder="Search...">
+        </div>
+        <div id="txList"></div>
+      </article>
+    </section>
+
+    <section id="expenses" class="page">
+      <div class="expense-tabs" id="expenseTabs" aria-label="Expense sections">
+        <button class="expense-tab monthly active" type="button" data-expense-view="monthly"><small>Monthly Budget</small><strong id="monthlyExpenseTotal" class="private">Rp0</strong></button>
+        <button class="expense-tab yearly" type="button" data-expense-view="yearly"><small>Yearly Expense</small><strong id="yearlyExpenseTotal" class="private">Rp0</strong></button>
+        <button class="expense-tab events" type="button" data-expense-view="events"><small>Events</small><strong id="eventExpenseTotal" class="private">Rp0</strong></button>
+      </div>
+
+      <article class="annual-expense-summary">
+        <div><small>Remaining Expense This Year</small><strong id="annualExpenseGrandTotal" class="private">Rp0</strong><p>Dynamic estimate from this month through December. History expenses are never deducted twice.</p></div>
+        <div class="annual-expense-parts">
+          <span><small>Monthly Remaining</small><b id="annualRecurringExpense" class="private">Rp0</b></span>
+          <span><small>Yearly</small><b id="annualYearlyExpense" class="private">Rp0</b></span>
+          <span><small>Events + Credit</small><b id="annualEventsExpense" class="private">Rp0</b></span>
+        </div>
+      </article>
+
+      <div class="grid-2 gap-lg expense-view active" data-expense-panel="monthly">
+        <article class="panel">
+          <div class="panel-head">
+            <div><p>Monthly</p><h3>Editable Budgets</h3></div>
+            <button class="ghost-btn" id="addMonthlyBtn" title="Add">＋</button>
+          </div>
+          <div id="budgetRows"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head"><div><p>Mix</p><h3>Category Breakdown</h3></div></div>
+          <div class="donut-layout vertical">
+            <div id="expenseDonut"></div>
+            <div id="expenseLegend" class="legend"></div>
+          </div>
+        </article>
+      </div>
+
+      <div class="expense-view" data-expense-panel="yearly">
+        <article class="panel expense-feature-panel">
+          <div class="panel-head">
+            <div><p>Yearly</p><h3>Yearly Expense</h3></div>
+            <button class="ghost-btn" id="addYearlyBtn" title="Add">＋</button>
+          </div>
+          <div id="yearlyExpenseGrid" class="tile-grid"></div>
+        </article>
+
+      </div>
+
+      <div class="expense-view" data-expense-panel="events">
+        <article class="panel expense-feature-panel">
+          <div class="panel-head">
+            <div><p>Future spending</p><h3>Events</h3></div>
+            <button class="ghost-btn" id="addEventBtn" title="Add">＋</button>
+          </div>
+          <p class="section-note">Events and unpaid credit reduce only the month and year in which they are due.</p>
+          <div id="eventGrid" class="tile-grid"></div>
+        </article>
+        <article class="panel credit-events-panel">
+          <div class="panel-head">
+            <div><p>Credit</p><h3>Credit Card & PayLater</h3></div>
+            <button class="ghost-btn" id="addCreditBtn" title="Add">＋</button>
+          </div>
+          <div id="creditSummary" class="grid-3 compact"></div>
+          <div id="creditItems" class="credit-list"></div>
+          <div class="entrusted-box">
+            <div class="panel-head">
+              <div><p>Non-recurring liability</p><h3>Entrusted Funds</h3></div>
+              <button class="ghost-btn" id="addEntrustedBtn" title="Add">＋</button>
+            </div>
+            <p class="section-note">Active entries reduce either Cash Balance or Stocks once. They never enter recurring expenses or History.</p>
+            <div id="entrustedSummary" class="entrusted-summary"></div>
+            <div id="entrustedItems" class="entrusted-list"></div>
+          </div>
+          <div class="archive-box">
+            <div class="panel-head"><div><p>Archive</p><h3>Paid Items</h3></div></div>
+            <div id="creditArchive"></div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="clients" class="page">
+      <div class="toolbar">
+        <span class="pill">Drag clients between recurring and ending sections</span>
+        <button class="primary-btn" id="addClientBtn">＋ Client</button>
+      </div>
+
+      <div class="grid-3 compact">
+        <article class="metric-card tint-green"><small>Paid This Month</small><strong id="clientPaidTotal" class="private">Rp0</strong></article>
+        <article class="metric-card tint-orange"><small>Outstanding</small><strong id="clientOutstandingTotal" class="private">Rp0</strong></article>
+        <article class="metric-card tint-blue"><small>Fixed Monthly</small><strong id="fixedIncomeTotal" class="private">Rp0</strong></article>
+      </div>
+
+      <article class="client-income-summary">
+        <div><small>Estimated Income This Year</small><strong id="clientIncomeGrandTotal" class="private">Rp0</strong><p>Remaining client income from this month through December.</p></div>
+        <div class="client-income-parts">
+          <span><small>Outstanding Now</small><b id="clientIncomeOutstanding" class="private">Rp0</b></span>
+          <span><small id="clientIncomeRemainingMonths">0 remaining months</small><b id="clientIncomeRecurring" class="private">Rp0</b></span>
+        </div>
+      </article>
+
+      <div class="client-lanes">
+        <article class="panel client-lane recurring-lane">
+          <div class="panel-head"><div><p>Projected income</p><h3>Recurring Clients</h3></div><span id="recurringClientCount" class="lane-count">0</span></div>
+          <div id="recurringClientGrid" class="client-grid" data-client-type="recurring"></div>
+        </article>
+        <article class="panel client-lane ending-lane">
+          <div class="panel-head"><div><p>Final payment only</p><h3>Ending Clients</h3></div><span id="endingClientCount" class="lane-count">0</span></div>
+          <div id="endingClientGrid" class="client-grid" data-client-type="ending"></div>
+        </article>
+      </div>
+    </section>
+
+    <section id="stocks" class="page">
+      <div class="hero-grid">
+        <article class="hero-card hero-dark">
+          <div class="hero-chip alt">API READY</div>
+          <small>Total Portfolio Value</small>
+          <div id="portfolioValue" class="hero-value private">Rp0</div>
+          <div class="hero-inline"><span>Invested <b id="portfolioInvested" class="private">Rp0</b></span><span>Unrealized <b id="portfolioPL" class="private">Rp0</b></span></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head"><div><p>By ticker</p><h3>Allocation</h3></div></div>
+          <div class="donut-layout vertical">
+            <div id="stockDonut"></div>
+            <div id="stockLegend" class="legend"></div>
+          </div>
+        </article>
+      </div>
+
+      <article class="panel">
+        <div class="panel-head">
+          <div><p>Editable positions</p><h3>Holdings</h3></div>
+          <div class="head-actions">
+            <button class="ghost-btn" id="validateSymbolsBtn" title="Test provider symbols">Test</button>
+            <button class="ghost-btn" id="refreshStocksBtn" title="Refresh market prices">↻</button>
+            <button class="ghost-btn" id="addTickerBtn" title="Add">＋</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Ticker</th><th>Market</th><th>Provider (Auto)</th><th>Provider Symbol</th><th>Currency (Auto)</th><th>Qty (Lot / Shares)</th><th>Avg / Share</th><th>Current / Fallback</th><th>Price State</th><th>Value</th><th>P/L</th><th></th></tr></thead>
+            <tbody id="holdingsBody"></tbody>
+          </table>
+        </div>
+      </article>
+
+      <div class="grid-2 gap-lg">
+        <article class="panel">
+          <div class="panel-head">
+            <div><p>Target prices</p><h3>Base</h3></div>
+            <div class="mini-tools">
+              <button id="baseModeToggle" type="button" class="ghost-btn mode-toggle">Manual</button>
+              <input id="baseGrowth" class="mini-input" type="number" value="8" step=".1"><span>%</span>
+            </div>
+          </div>
+          <div class="table-wrap"><table><thead id="baseHead"></thead><tbody id="baseBody"></tbody></table></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head">
+            <div><p>Target prices</p><h3>Optimistic</h3></div>
+            <div class="mini-tools">
+              <button id="optimisticModeToggle" type="button" class="ghost-btn mode-toggle">Manual</button>
+              <input id="optimisticGrowth" class="mini-input" type="number" value="14" step=".1"><span>%</span>
+            </div>
+          </div>
+          <div class="table-wrap"><table><thead id="optimisticHead"></thead><tbody id="optimisticBody"></tbody></table></div>
+        </article>
+      </div>
+    </section>
+
+    <section id="electricity" class="page">
+      <div class="toolbar">
+        <span class="pill">⚡ Rp1,740 / kWh</span>
+        <button class="primary-btn" id="addElectricityBtn">＋ Reading</button>
+      </div>
+
+      <div class="grid-3 compact">
+        <article class="metric-card tint-yellow"><small>Latest Meter Balance</small><strong id="latestKwh">0 kWh</strong></article>
+        <article class="metric-card tint-orange"><small>Average Daily Usage</small><strong id="dailyKwh">0 kWh/day</strong></article>
+        <article class="metric-card tint-purple"><small>Estimated Monthly Cost</small><strong id="monthlyElectricCost" class="private">Rp0</strong></article>
+      </div>
+
+      <div class="grid-2 gap-lg">
+        <article class="panel">
+          <div class="panel-head"><div><p>Usage</p><h3>kWh / Day</h3></div></div>
+          <div id="electricUsageChart" class="chart"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head"><div><p>Latest</p><h3>Usage & Cost</h3></div></div>
+          <div id="electricInterval" class="list"></div>
+        </article>
+      </div>
+
+      <article class="panel">
+        <div class="panel-head"><div><p>Log</p><h3>Meter Readings</h3></div></div>
+        <div id="electricityList" class="list"></div>
+      </article>
+    </section>
+
+    <section id="prospect" class="page">
+      <div class="toolbar">
+        <div class="segmented" id="prospectTabs">
+          <button class="active" data-prospect="base">Base</button>
+          <button data-prospect="optimistic">Optimistic</button>
+        </div>
+        <span class="pill">Read-only projection</span>
+      </div>
+
+      <div class="hero-grid">
+        <article class="hero-card hero-prospect">
+          <div class="hero-chip" id="prospectBadge">BASE</div>
+          <div class="prospect-snapshot current-year">
+            <small id="prospectCurrentHorizonLabel">Projected Net Worth in 2026</small>
+            <div id="prospectCurrentValue" class="prospect-snapshot-value private">Rp0</div>
+            <span>Closing cash + current-year stock value</span>
+          </div>
+          <div class="prospect-snapshot future-year">
+            <small id="prospectHorizonLabel">Projected Net Worth in 2036</small>
+            <div id="prospectValue" class="prospect-snapshot-value private">Rp0</div>
+            <div class="hero-inline">
+              <span id="prospectGrowth">0%</span>
+              <span id="prospectDesc">Uses base stock targets</span>
+            </div>
+          </div>
+          <div id="prospectChart" class="chart chart-hero"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head"><div><p>Inputs</p><h3>Projection Sources</h3></div></div>
+          <div id="prospectSources" class="list"></div>
+        </article>
+      </div>
+
+      <article class="panel">
+        <div class="panel-head"><div><p>Timeline</p><h3>Future Cash + Assets</h3></div></div>
+        <div id="yearGrid" class="year-grid"></div>
+      </article>
+    </section>
+
+    <section id="insights" class="page">
+      <div class="insight-top">
+        <article class="insight-card big blue">
+          <div class="ic">🛡</div>
+          <div><small>Cash Runway</small><strong id="cashRunway">0 months</strong><p>How long your current liquid balance can support the current monthly budget.</p></div>
+        </article>
+        <article class="insight-card big orange">
+          <div class="ic">🔥</div>
+          <div><small>Largest Expense</small><strong id="largestExpense">—</strong><p>Your biggest spending bucket right now.</p></div>
+        </article>
+        <article class="insight-card big purple">
+          <div class="ic">🧠</div>
+          <div><small>Largest Holding</small><strong id="largestHolding">—</strong><p>Your most concentrated stock position.</p></div>
+        </article>
+      </div>
+
+      <div class="grid-2 gap-lg">
+        <article class="panel">
+          <div class="panel-head"><div><p>Projection</p><h3>Base vs Optimistic</h3></div></div>
+          <div id="scenarioCompare" class="chart"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head"><div><p>Briefing</p><h3>Money Story This Month</h3></div></div>
+          <div id="insightCards" class="insight-list"></div>
+        </article>
+      </div>
+
+      <article class="panel">
+        <div class="panel-head"><div><p>Signals</p><h3>Quick Actions</h3></div></div>
+        <div id="insightLong" class="signal-grid"></div>
+      </article>
+    </section>
+  </main>
+
+  <nav class="mobile-nav" aria-label="Primary mobile navigation">
+    <button class="active" data-page="accumulation" type="button" aria-label="Accumulation" title="Accumulation">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7.5h14v11H5zM8 7.5V5.8A1.8 1.8 0 0 1 9.8 4h4.4A1.8 1.8 0 0 1 16 5.8v1.7M5 11h14M9 14.5h6"/></svg>
+    </button>
+    <button data-page="cashflow" type="button" aria-label="History" title="History">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V9m7 10V5m7 14v-7M3 19.5h18"/></svg>
+    </button>
+    <button data-page="clients" type="button" aria-label="Clients" title="Clients">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.3 11.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4ZM2.8 19.2c.4-3 2.2-4.8 5.5-4.8s5.1 1.8 5.5 4.8M16.7 11a2.5 2.5 0 1 0 0-5M15.7 14.7c3.1-.3 5 1.2 5.5 4.5"/></svg>
+    </button>
+    <button class="plus" data-open-tx type="button" aria-label="Add transaction" title="Add transaction">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+    <button data-page="stocks" type="button" aria-label="Stocks" title="Stocks">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 17 5-5 3 3 7-8M15 7h4v4"/></svg>
+    </button>
+    <button data-page="electricity" type="button" aria-label="Electricity" title="Electricity">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m13.5 2-7 11h5l-1 9 7-12h-5l1-8Z"/></svg>
+    </button>
+    <button data-page="prospect" type="button" aria-label="Future projection" title="Future projection">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.2 5.1c2.2-.8 4.1-.9 5.1-.8.1 1-.1 2.9-.9 5.1-1.1 2.8-3.2 5.1-6.2 6.4l-4-4c1.1-3.1 3.3-5.5 6-6.7ZM8.5 15.5 5 19m9-8.5h.01"/></svg>
+    </button>
+  </nav>
+</div>
+
+<dialog id="txModal">
+  <form id="txForm" method="dialog" class="modal">
+    <div class="panel-head">
+      <div><p>Transaction</p><h3 id="txModalTitle">Add Transaction</h3></div>
+      <button type="button" class="ghost-btn close-dialog">×</button>
+    </div>
+    <div class="segmented" id="txType">
+      <button type="button" class="active" data-type="expense">Expense</button>
+      <button type="button" data-type="income">Income</button>
+    </div>
+    <label>Amount<input id="txAmount" type="number" required></label>
+    <label>Description<input id="txDescription" required></label>
+    <label><span id="txCategoryLabel">Budget Tag</span>
+      <select id="txCategory" class="visually-hidden-select" tabindex="-1" aria-hidden="true">
+        <option>Essentials</option>
+        <option>Food</option>
+        <option>Coffee</option>
+        <option>Electricity</option>
+        <option>IPL</option>
+        <option>PAM</option>
+        <option>Internet</option>
+        <option>Needs</option>
+        <option>Subscriptions</option>
+        <option>Others</option>
+      </select>
+      <div id="txCategoryTags" class="category-tags" role="group" aria-label="Budget tag"></div>
+    </label>
+    <label>Channel<input id="txChannel" value="Offline"></label>
+    <label>Date<input id="txDate" type="date"></label>
+    <button class="primary-btn">Save</button>
+  </form>
+</dialog>
+
+<dialog id="dataModal">
+  <div class="modal">
+    <div class="panel-head">
+      <div><p>Private cloud account</p><h3>Data & Sync</h3></div>
+      <button type="button" class="ghost-btn close-dialog">×</button>
+    </div>
+    <div class="account-line"><span>Signed in as</span><b id="accountEmail">—</b></div>
+    <div class="mobile-more">
+      <p>More sections</p>
+      <div class="mobile-more-grid">
+        <button class="ghost-btn" type="button" data-page="expenses"><span>🧾</span>Expenses</button>
+        <button class="ghost-btn" type="button" data-page="clients"><span>🤝</span>Clients</button>
+        <button class="ghost-btn" type="button" data-page="electricity"><span>⚡</span>Electricity</button>
+        <button class="ghost-btn" type="button" data-page="insights"><span>✨</span>Insights</button>
+      </div>
+    </div>
+    <div class="data-actions">
+      <button id="exportBackupBtn" class="ghost-btn" type="button">Export JSON backup</button>
+      <button id="importBackupBtn" class="ghost-btn" type="button">Import JSON backup</button>
+      <button id="legacyImportBtn" class="ghost-btn" type="button" hidden>Import v6.3.1 local data</button>
+      <button id="seedDataBtn" class="ghost-btn" type="button">Load MVP seed data</button>
+      <button id="installPwaBtn" class="primary-btn" type="button" hidden>Install CVFinance</button>
+      <button id="logoutBtn" class="danger-btn" type="button">Sign out</button>
+    </div>
+    <input id="backupFile" type="file" accept="application/json,.json" hidden>
+  </div>
+</dialog>
+
+<section id="authGate" class="auth-gate" hidden>
+  <form id="authForm" class="auth-card">
+    <div class="brand auth-brand"><div class="logo">C</div><div><b>CVFinance</b><small>Private cloud access</small></div></div>
+    <h2>Sign in</h2>
+    <p>Use the single private account created in Supabase.</p>
+    <label>Email<input id="authEmail" type="email" autocomplete="username" required></label>
+    <label>Password<input id="authPassword" type="password" autocomplete="current-password" required></label>
+    <button id="authSubmit" class="primary-btn" type="submit">Sign in</button>
+    <small id="authError" class="auth-error"></small>
+  </form>
+</section>
+
+<dialog id="simpleModal">
+  <form id="simpleForm" method="dialog" class="modal">
+    <div class="panel-head">
+      <div><p>Editor</p><h3 id="simpleTitle">Add</h3></div>
+      <button type="button" class="ghost-btn close-dialog">×</button>
+    </div>
+    <div id="simpleFields" class="form-grid"></div>
+    <button class="primary-btn">Save</button>
+  </form>
+</dialog>
+
+<dialog id="manageAccountsModal">
+  <div class="modal">
+    <div class="panel-head">
+      <div><p>Balances</p><h3>Manage Accounts</h3></div>
+      <button type="button" class="ghost-btn close-dialog">×</button>
+    </div>
+    <div id="manageAccountsList"></div>
+  </div>
+</dialog>
+
+<div id="tooltip" class="chart-tooltip"></div>
+<div id="toast">Saved</div>
+
+</body>
+</html>

@@ -1,0 +1,356 @@
+[
+  {
+    "width": 360,
+    "tab": "accumulation",
+    "scrollWidth": 360,
+    "clientWidth": 360,
+    "visiblePage": "accumulation",
+    "navButtons": 7,
+    "language": "en",
+    "overflow": 0,
+    "translation": {
+      "lang": "id",
+      "title": "Akumulasi",
+      "history": "📊Riwayat"
+    },
+    "dragTest": null,
+    "errors": []
+  },
+  {
+    "width": 360,
+    "tab": "expenses",
+    "scrollWidth": 360,
+    "clientWidth": 360,
+    "visiblePage": "expenses",
+    "navButtons": 7,
+    "language": "en",
+    "overflow": 0,
+    "translation": {
+      "lang": "id",
+      "title": "Akumulasi",
+      "history": "📊Riwayat"
+    },
+    "dragTest": null,
+    "errors": []
+  },
+  {
+    "width": 360,
+    "tab": "clients",
+    "scrollWidth": 360,
+    "clientWidth": 360,
+    "visiblePage": "clients",
+    "navButtons": 7,
+    "language": "en",
+    "overflow": 0,
+    "translation": {
+      "lang": "id",
+      "title": "Akumulasi",
+      "history": "📊Riwayat"
+    },
+    "dragTest": null,
+    "errors": []
+  },
+  {
+    "width": 360,
+    "tab": "stocks",
+    "scrollWidth": 360,
+    "clientWidth": 360,
+    "visiblePage": "stocks",
+    "navButtons": 7,
+    "language": "en",
+    "overflow": 0,
+    "translation": {
+      "lang": "id",
+      "title": "Akumulasi",
+      "history": "📊Riwayat"
+    },
+    "dragTest": null,
+    "errors": []
+  },
+  {
+    "width": 360,
+    "tab": "prospect",
+    "scrollWidth": 360,
+    "clientWidth": 360,
+    "visiblePage": "prospect",
+    "navButtons": 7,
+    "language": "en",
+    "overflow": 0,
+    "translation": {
+      "lang": "id",
+      "title": "Akumulasi",
+      "history": "📊Riwayat"
+    },
+    "dragTest": null,
+    "errors": []
+  },
+  {
+    "width": 360,
+    "tab": "insights",
+    "scrollWidth": 360,
+    "clientWidth": 360,
+    "visiblePage": "insights",
+    "navButtons": 7,
+    "language": "en",
+    "overflow": 0,
+    "translation": {
+      "lang": "id",
+      "title": "Akumulasi",
+      "history": "📊Riwayat"
+    },
+    "dragTest": null,
+    "errors": []
+  },
+  {
+    "width": 412,
+    "tab": "accumulation",
+    "scrollWidth": 412,
+    "clientWidth": 412,
+    "visiblePage": "accumulation",
+    "navButtons": 7,
+    "language": "en",
+    "overflow": 0,
+    "translation": null,
+    "dragTest": {
+      "recurring": 0,
+      "ending": 2
+    },
+    "errors": []
+  },
+  {
+    "width": 412,
+    "tab": "expenses",
+    "scrollWidth": 412,
+    "clientWidth": 412,
+    "visiblePage": "expenses",
+    "navButtons": 7,
+    "language": "en",
+    "overflow": 0,
+    "translation": null,
+    "dragTest": {
+      "recurring": 0,
+      "ending": 2
+    },
+    "errors": []
+  },
+  {
+    "width": 412,
+    "tab": "clients",
+    "scrollWidth": 412,
+    "clientWidth": 412,
+    "visiblePage": "clients",
+    "navButtons": 7,
+    "language": "en",
+    "overflow": 0,
+    "translation": null,
+    "dragTest": {
+      "recurring": 0,
+      "ending": 2
+    },
+    "errors": []
+  },
+  {
+    "width": 412,
+    "tab": "stocks",
+    "scrollWidth": 412,
+    "clientWidth": 412,
+    "visiblePage": "stocks",
+    "navButtons": 7,
+    "language": "en",
+    "overflow": 0,
+    "translation": null,
+    "dragTest": {
+      "recurring": 0,
+      "ending": 2
+    },
+    "errors": []
+  },
+  {
+    "width": 412,
+    "tab": "prospect",
+    "scrollWidth": 412,
+    "clientWidth": 412,
+    "visiblePage": "prospect",
+    "navButtons": 7,
+    "language": "en",
+    "overflow": 0,
+    "translation": null,
+    "dragTest": {
+      "recurring": 0,
+      "ending": 2
+    },
+    "errors": []
+  },
+  {
+    "width": 412,
+    "tab": "insights",
+    "scrollWidth": 412,
+    "clientWidth": 412,
+    "visiblePage": "insights",
+    "navButtons": 7,
+    "language": "en",
+    "overflow": 0,
+    "translation": null,
+    "dragTest": {
+      "recurring": 0,
+      "ending": 2
+    },
+    "errors": []
+  },
+  {
+    "width": 768,
+    "tab": "accumulation",
+    "scrollWidth": 768,
+    "clientWidth": 768,
+    "visiblePage": "accumulation",
+    "navButtons": 7,
+    "language": "en",
+    "overflow": 0,
+    "translation": null,
+    "dragTest": null,
+    "errors": []
+  },
+  {
+    "width": 768,
+    "tab": "expenses",
+    "scrollWidth": 768,
+    "clientWidth": 768,
+    "visiblePage": "expenses",
+    "navButtons": 7,
+    "language": "en",
+    "overflow": 0,
+    "translation": null,
+    "dragTest": null,
+    "errors": []
+  },
+  {
+    "width": 768,
+    "tab": "clients",
+    "scrollWidth": 768,
+    "clientWidth": 768,
+    "visiblePage": "clients",
+    "navButtons": 7,
+    "language": "en",
+    "overflow": 0,
+    "translation": null,
+    "dragTest": null,
+    "errors": []
+  },
+  {
+    "width": 768,
+    "tab": "stocks",
+    "scrollWidth": 768,
+    "clientWidth": 768,
+    "visiblePage": "stocks",
+    "navButtons": 7,
+    "language": "en",
+    "overflow": 0,
+    "translation": null,
+    "dragTest": null,
+    "errors": []
+  },
+  {
+    "width": 768,
+    "tab": "prospect",
+    "scrollWidth": 768,
+    "clientWidth": 768,
+    "visiblePage": "prospect",
+    "navButtons": 7,
+    "language": "en",
+    "overflow": 0,
+    "translation": null,
+    "dragTest": null,
+    "errors": []
+  },
+  {
+    "width": 768,
+    "tab": "insights",
+    "scrollWidth": 768,
+    "clientWidth": 768,
+    "visiblePage": "insights",
+    "navButtons": 7,
+    "language": "en",
+    "overflow": 0,
+    "translation": null,
+    "dragTest": null,
+    "errors": []
+  },
+  {
+    "width": 1440,
+    "tab": "accumulation",
+    "scrollWidth": 1440,
+    "clientWidth": 1440,
+    "visiblePage": "accumulation",
+    "navButtons": 7,
+    "language": "en",
+    "overflow": 0,
+    "translation": null,
+    "dragTest": null,
+    "errors": []
+  },
+  {
+    "width": 1440,
+    "tab": "expenses",
+    "scrollWidth": 1440,
+    "clientWidth": 1440,
+    "visiblePage": "expenses",
+    "navButtons": 7,
+    "language": "en",
+    "overflow": 0,
+    "translation": null,
+    "dragTest": null,
+    "errors": []
+  },
+  {
+    "width": 1440,
+    "tab": "clients",
+    "scrollWidth": 1440,
+    "clientWidth": 1440,
+    "visiblePage": "clients",
+    "navButtons": 7,
+    "language": "en",
+    "overflow": 0,
+    "translation": null,
+    "dragTest": null,
+    "errors": []
+  },
+  {
+    "width": 1440,
+    "tab": "stocks",
+    "scrollWidth": 1440,
+    "clientWidth": 1440,
+    "visiblePage": "stocks",
+    "navButtons": 7,
+    "language": "en",
+    "overflow": 0,
+    "translation": null,
+    "dragTest": null,
+    "errors": []
+  },
+  {
+    "width": 1440,
+    "tab": "prospect",
+    "scrollWidth": 1440,
+    "clientWidth": 1440,
+    "visiblePage": "prospect",
+    "navButtons": 7,
+    "language": "en",
+    "overflow": 0,
+    "translation": null,
+    "dragTest": null,
+    "errors": []
+  },
+  {
+    "width": 1440,
+    "tab": "insights",
+    "scrollWidth": 1440,
+    "clientWidth": 1440,
+    "visiblePage": "insights",
+    "navButtons": 7,
+    "language": "en",
+    "overflow": 0,
+    "translation": null,
+    "dragTest": null,
+    "errors": []
+  }
+]

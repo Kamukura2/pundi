@@ -42,7 +42,7 @@ assert.equal(seed.stocks.find(row => row.ticker === "WDC").quantity, 2.8033875);
 assert.equal(seed.rateKwh, 1740);
 assert.ok(seed.budgets.some(row => row.category === "Food") && seed.budgets.some(row => row.category === "Coffee"));
 
-const { buildMonthlyTimeline, buildProjection, getBudgetProgress, getClientPaidThisMonth, getCurrentNetWorth, getFixedIncome, getTotalOutstanding, remainingYearExpenseBreakdown, remainingYearIncomeBreakdown } = await import("../src/data/finance-model.js");
+const { buildMonthlyTimeline, buildProjection, getBudgetProgress, getClientPaidThisMonth, getCurrentNetWorth, getEntrustedDeduction, getFixedIncome, getTotalOutstanding, remainingYearExpenseBreakdown, remainingYearIncomeBreakdown } = await import("../src/data/finance-model.js");
 const modelClients = [
   {monthly:1000000,paid:300000,carry:0,status:"pending",clientType:"recurring"},
   {monthly:2000000,paid:0,carry:0,status:"pending",clientType:"ending",endingPaid:false},
@@ -51,6 +51,10 @@ const modelClients = [
 assert.equal(getFixedIncome(modelClients),1000000,"Ending clients must not enter recurring income");
 assert.equal(getTotalOutstanding(modelClients),2700000,"Unpaid ending balances remain receivables");
 assert.equal(getCurrentNetWorth(10000000,5000000),15000000,"Accumulation is current liquid plus stocks only");
+const entrusted=[{amount:1500000,source:"cash",settled:false},{amount:750000,source:"stocks",settled:false},{amount:900000,source:"cash",settled:true}];
+assert.equal(getEntrustedDeduction(entrusted),2250000,"Only active entrusted funds reduce net worth");
+assert.equal(getEntrustedDeduction(entrusted,"cash"),1500000,"Cash and stock entrusted deductions remain separate");
+assert.equal(getCurrentNetWorth(10000000-getEntrustedDeduction(entrusted,"cash"),5000000-getEntrustedDeduction(entrusted,"stocks")),12750000,"Entrusted funds reduce their selected asset source exactly once");
 const referenceDate=new Date("2026-08-07T12:00:00+07:00");
 const rolledClient={monthly:1000000,paid:1000000,carry:0,status:"paid",clientType:"recurring",trackingMonth:"2026-07"};
 assert.equal(getClientPaidThisMonth(rolledClient,referenceDate),0,"Recurring client paid state must reset automatically in a new month");
@@ -83,6 +87,9 @@ assert.doesNotMatch(migration007,/drop\s+table|truncate\s+|delete\s+from/i);
 const migration008 = read("supabase/migrations/008_event_credit_sort_order.sql");
 for (const marker of ["planned_events","credit_items","sort_order","tracking_month"]) assert.match(migration008,new RegExp(marker));
 assert.doesNotMatch(migration008,/drop\s+table|truncate\s+|delete\s+from/i);
+const migration009 = read("supabase/migrations/009_entrusted_funds.sql");
+for (const marker of ["entrusted_funds","deduction_source","is_settled","sort_order","enable row level security"]) assert.match(migration009,new RegExp(marker));
+assert.doesNotMatch(migration009,/drop\s+table|truncate\s+|delete\s+from/i);
 
 const { normalizeStockMapping, quantityForDisplay, quantityForStorage } = await import("../src/stocks/holding.js");
 const idxHolding = {ticker:"BMRI",market:"IDX",provider:"finnhub",providerSymbol:"BMRI",currency:"IDR",quantity:10000};
@@ -128,4 +135,4 @@ await repository.queueOperation({table:"accounts",action:"delete",id,previousUpd
 queued = await mutationList();
 assert.equal(queued.length, 0);
 
-console.log("CVFinance checks passed: schema, RLS markers, PWA, 8 tabs, v7.5 remaining-year projection, archives, sorting invariants, stock provider abstraction, offline queue coalescing, environment template, and JavaScript syntax.");
+console.log("CVFinance checks passed: schema, RLS markers, PWA, 8 tabs, v7.5.1 entrusted-fund deductions, dynamic budget tags, remaining-year projection, archives, sorting invariants, stock provider abstraction, offline queue coalescing, environment template, and JavaScript syntax.");

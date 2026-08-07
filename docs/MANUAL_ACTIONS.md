@@ -2,7 +2,7 @@
 
 1. Create accounts: **GitHub**, **Vercel**, **Supabase**, and **Finnhub**.
 2. Create one Supabase project.
-3. Run all five SQL migration files in numeric order. For an existing v7.0.2 deployment, run only `005_telegram_cvfinance.sql`.
+3. For a new deployment, run all SQL migration files in numeric order. For the v7.5.0 → v7.5.1 update, run only `009_entrusted_funds.sql` before uploading the new source.
 4. Disable public sign-ups and manually create one confirmed Auth user.
 5. Create a private GitHub repository and push this project.
 6. Import that repository into Vercel.
