@@ -248,6 +248,15 @@
           </div>
           <div id="creditSummary" class="grid-3 compact"></div>
           <div id="creditItems" class="credit-list"></div>
+          <div class="entrusted-box">
+            <div class="panel-head">
+              <div><p>Non-recurring liability</p><h3>Entrusted Funds</h3></div>
+              <button class="ghost-btn" id="addEntrustedBtn" title="Add">＋</button>
+            </div>
+            <p class="section-note">Active entries reduce either Cash Balance or Stocks once. They never enter recurring expenses or History.</p>
+            <div id="entrustedSummary" class="entrusted-summary"></div>
+            <div id="entrustedItems" class="entrusted-list"></div>
+          </div>
           <div class="archive-box">
             <div class="panel-head"><div><p>Archive</p><h3>Paid Items</h3></div></div>
             <div id="creditArchive"></div>
@@ -490,8 +499,8 @@
     </div>
     <label>Amount<input id="txAmount" type="number" required></label>
     <label>Description<input id="txDescription" required></label>
-    <label>Category
-      <select id="txCategory">
+    <label><span id="txCategoryLabel">Budget Tag</span>
+      <select id="txCategory" class="visually-hidden-select" tabindex="-1" aria-hidden="true">
         <option>Essentials</option>
         <option>Food</option>
         <option>Coffee</option>
@@ -503,6 +512,7 @@
         <option>Subscriptions</option>
         <option>Others</option>
       </select>
+      <div id="txCategoryTags" class="category-tags" role="group" aria-label="Budget tag"></div>
     </label>
     <label>Channel<input id="txChannel" value="Offline"></label>
     <label>Date<input id="txDate" type="date"></label>

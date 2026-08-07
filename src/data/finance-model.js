@@ -41,6 +41,12 @@ export const getFixedIncome = clients => getRecurringClients(clients).reduce((su
 export const getTotalOutstanding = (clients, referenceDate = new Date()) => getReceivableClients(clients, referenceDate).reduce((sum, client) => sum + getClientOutstanding(client, referenceDate), 0);
 export const getTotalPaid = (clients, referenceDate = new Date()) => clients.reduce((sum, client) => sum + getClientPaidThisMonth(client, referenceDate), 0);
 
+export function getEntrustedDeduction(items = [], source) {
+  return items
+    .filter(item => !item.settled && (!source || item.source === source))
+    .reduce((sum, item) => sum + number(item.amount), 0);
+}
+
 export function transactionsForMonth(transactions, year, month, type) {
   const key = `${year}-${pad(month + 1)}`;
   return transactions.filter(row => rowMonthKey(row.date) === key && (!type || row.type === type));

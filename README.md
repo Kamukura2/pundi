@@ -1,4 +1,6 @@
-# CVFinance v7.5.0
+# CVFinance v7.5.1
+
+v7.5.1 adds non-recurring Entrusted Funds with separate Cash Balance or Stocks deductions, active/settled status, persistent ordering, and an additive RLS-protected Supabase table. History expense categories are now rendered as tags sourced dynamically from Monthly Budgets, so selecting a tag fills that budget's current-month meter. Event urgency colors are inverted: the current month is luminous, another month this year is dark orange, and another year remains gray.
 
 v7.5.0 makes the active-year model fully remaining-month aware. The current month uses liquid balances, unpaid client receivables, additional History income, remaining monthly budgets, yearly dues, events, credit due dates, and current stocks; only the full months after it use recurring income and default monthly expense. It adds persistent direct-card sorting for yearly costs, Events, credit and clients, monthly/yearly History archives with delete controls, automatic monthly client payment reset, hover/touch values on every chart, color-coded Events and client states, a remaining-year client income banner, a split current-year/2036 Prospect hero, and refined Insight alignment.
 
@@ -50,6 +52,7 @@ For local full-stack testing, use `vercel dev`; plain `npm run dev` does not emu
 - [Finance and UI v7.3.0 patch](docs/PATCH_v7_3_0_FINANCE_UI.md)
 - [Projection and Insight v7.4.0 patch](docs/PATCH_v7_4_0_PROJECTION_INSIGHTS.md)
 - [Remaining Year and Sorting v7.5.0 patch](docs/PATCH_v7_5_0_REMAINING_YEAR_SORTING.md)
+- [Entrusted Funds and Budget Tags v7.5.1 patch](docs/PATCH_v7_5_1_ENTRUSTED_FUNDS_TAGS.md)
 - [Manual actions](docs/MANUAL_ACTIONS.md)
 - [Test checklist](docs/TEST_CHECKLIST.md)
 - [Rollback](docs/ROLLBACK.md)

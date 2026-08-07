@@ -30,6 +30,7 @@ export function createEmptyState() {
     events: [],
     creditFacilities: [],
     credit: [],
+    entrustedFunds: [],
     stocks: [],
     electricity: []
   };
@@ -102,6 +103,7 @@ export function createMvpSeed() {
       {id:createId(),source:"GoPayLater",description:"Online order",amount:420000,due:"2026-08-31",paid:false,sortOrder:1},
       {id:createId(),source:"ShopeePayLater",description:"Household item",amount:680000,due:"2026-09-25",paid:false,sortOrder:2}
     ],
+    entrustedFunds: [],
     stocks,
     electricity: [
       {id:createId(),date:"2026-08-06",time:"19:00",remaining:500},

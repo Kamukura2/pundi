@@ -4,11 +4,11 @@ import { createEmptyState, createId, YEARS } from "./default-data.js";
 export const DATA_TABLES = [
   "profiles", "accounts", "transactions", "monthly_budgets", "yearly_expenses",
   "planned_events", "credit_facilities", "credit_items", "clients", "stock_holdings",
-  "stock_price_targets", "electricity_readings", "app_settings"
+  "stock_price_targets", "electricity_readings", "entrusted_funds", "app_settings"
 ];
 
 const SAVE_TABLES = DATA_TABLES.filter(table => table !== "profiles");
-const parentFirst = ["accounts","transactions","monthly_budgets","yearly_expenses","planned_events","credit_facilities","credit_items","clients","stock_holdings","stock_price_targets","electricity_readings","app_settings"];
+const parentFirst = ["accounts","transactions","monthly_budgets","yearly_expenses","planned_events","credit_facilities","credit_items","clients","stock_holdings","stock_price_targets","electricity_readings","entrusted_funds","app_settings"];
 const deleteFirst = [...parentFirst].reverse();
 const meta = row => ({ __createdAt: row.created_at, __updatedAt: row.updated_at });
 const clean = value => JSON.parse(JSON.stringify(value));
@@ -29,6 +29,7 @@ function rowsToState(rows) {
   state.events = rows.planned_events.map((row,index) => ({id:row.id,name:row.name,amount:Number(row.amount),date:row.event_date,category:row.category,sortOrder:Number(row.sort_order??index),...meta(row)}));
   state.creditFacilities = rows.credit_facilities.map(row => ({id:row.id,source:row.source,limit:Number(row.limit_amount),...meta(row)}));
   state.credit = rows.credit_items.map((row,index) => ({id:row.id,facilityId:row.facility_id,source:row.source,description:row.description,amount:Number(row.amount),due:row.due_date,paid:row.is_paid,sortOrder:Number(row.sort_order??index),...meta(row)}));
+  state.entrustedFunds = (rows.entrusted_funds || []).map((row,index) => ({id:row.id,name:row.name,amount:Number(row.amount),source:row.deduction_source,settled:Boolean(row.is_settled),sortOrder:Number(row.sort_order??index),...meta(row)}));
   state.clients = rows.clients.map((row,index) => ({id:row.id,name:row.name,monthly:Number(row.monthly_retainer),paid:Number(row.paid_this_month),carry:Number(row.previous_outstanding),status:row.status==="freeze"?"pending":row.status,clientType:row.client_type || "recurring",endingPaid:Boolean(row.ending_paid),sortOrder:Number(row.sort_order??index),trackingMonth:row.tracking_month||null,...meta(row)}));
   const targetsByHolding = new Map();
   rows.stock_price_targets.forEach(row => {
@@ -91,6 +92,7 @@ function stateToRows(state, userId) {
     planned_events: state.events.map((row,index) => owned({id:row.id,name:row.name,amount:Number(row.amount),event_date:row.date,category:row.category,sort_order:Number(row.sortOrder??index),...stamp(row)})),
     credit_facilities: state.creditFacilities.map(row => owned({id:row.id,source:row.source,limit_amount:Number(row.limit),...stamp(row)})),
     credit_items: state.credit.map((row,index) => owned({id:row.id,facility_id:row.facilityId || facilityBySource.get(row.source) || null,source:row.source,description:row.description,amount:Number(row.amount),due_date:row.due,is_paid:Boolean(row.paid),sort_order:Number(row.sortOrder??index),...stamp(row)})),
+    entrusted_funds: state.entrustedFunds.map((row,index) => owned({id:row.id,name:row.name,amount:Number(row.amount),deduction_source:row.source,is_settled:Boolean(row.settled),sort_order:Number(row.sortOrder??index),...stamp(row)})),
     clients: state.clients.map((row,index) => owned({id:row.id,name:row.name,monthly_retainer:Number(row.monthly),paid_this_month:Number(row.paid),previous_outstanding:Number(row.carry),status:row.status==="freeze"?"pending":row.status,client_type:row.clientType || "recurring",ending_paid:Boolean(row.endingPaid),sort_order:Number(row.sortOrder??index),tracking_month:row.trackingMonth||null,...stamp(row)})),
     stock_holdings: state.stocks.map(row => owned({
       id:row.id,display_symbol:row.displaySymbol || row.ticker,market:row.market,provider:row.provider,
@@ -276,5 +278,6 @@ export function validateBackup(value) {
   if (value?.format !== "cvfinance-backup" || value?.version !== 1 || !value?.data) throw new Error("Invalid CVFinance backup file.");
   const required = ["accounts","transactions","budgets","yearly","events","creditFacilities","credit","clients","stocks","electricity"];
   required.forEach(key => { if (!Array.isArray(value.data[key])) throw new Error(`Backup is missing ${key}.`); });
+  if (!Array.isArray(value.data.entrustedFunds)) value.data.entrustedFunds = [];
   return { ...createEmptyState(), ...value.data, settingsId:createId() };
 }

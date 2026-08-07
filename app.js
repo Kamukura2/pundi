@@ -1,5 +1,5 @@
 import { createEmptyState, createId, createMvpSeed, readLegacyLocalStorage, YEARS } from "./src/data/default-data.js";
-import { annualExpenseBreakdown, buildMonthlyTimeline, buildProjection, getBudgetProgress, getClientOutstanding, getClientPaidThisMonth, getCurrentNetWorth, getEndingClients, getFixedIncome, getReceivableClients, getRecurringClients, getTotalOutstanding, getTotalPaid, getYearlyProjectionTotal, monthKey, monthlyBudgetRemaining, remainingYearExpenseBreakdown, remainingYearIncomeBreakdown } from "./src/data/finance-model.js";
+import { annualExpenseBreakdown, buildMonthlyTimeline, buildProjection, getBudgetProgress, getClientOutstanding, getClientPaidThisMonth, getCurrentNetWorth, getEndingClients, getEntrustedDeduction, getFixedIncome, getReceivableClients, getRecurringClients, getTotalOutstanding, getTotalPaid, getYearlyProjectionTotal, monthKey, monthlyBudgetRemaining, remainingYearExpenseBreakdown, remainingYearIncomeBreakdown } from "./src/data/finance-model.js";
 import { SyncManager } from "./src/sync/sync-manager.js";
 import { fetchHoldingQuote, isPriceStale, validateHoldingSymbol } from "./src/stocks/client.js";
 import { normalizeStockMapping, quantityForDisplay, quantityForStorage, quantityUnit } from "./src/stocks/holding.js";
@@ -34,6 +34,8 @@ const saveSettings=()=>save();
 const q=(s)=>document.querySelector(s);
 const qa=(s)=>[...document.querySelectorAll(s)];
 const accountTotal=()=>state.accounts.reduce((a,b)=>a+Number(b.balance),0);
+const entrustedTotal=(source)=>getEntrustedDeduction(state.entrustedFunds,source);
+const netAccountTotal=()=>accountTotal()-entrustedTotal("cash");
 const recurringClients=()=>getRecurringClients(state.clients);
 const endingClients=()=>getEndingClients(state.clients);
 const fixedIncome=()=>getFixedIncome(state.clients);
@@ -73,7 +75,8 @@ const invested=(s)=>{
  return s.currency==="USD"?v*state.usdIdr:v;
 };
 const portfolio=(y=currentYear(),mode="base")=>state.stocks.reduce((a,s)=>a+stockValue(s,y,mode),0);
-const currentNW=()=>getCurrentNetWorth(accountTotal(),portfolio());
+const netPortfolio=(y=currentYear(),mode="base")=>portfolio(y,mode)-entrustedTotal("stocks");
+const currentNW=()=>getCurrentNetWorth(netAccountTotal(),netPortfolio());
 const AGE_BASE=[33,30,0];
 const ageTriplet=(year)=>AGE_BASE.map(v=>v+(year-2026));
 const moneyClass=(n)=>Number(n)<0?"negative":"";
@@ -84,7 +87,7 @@ const ID_TRANSLATIONS={
  "Newest":"Terbaru","Category":"Kategori","Amount":"Nominal","Recorded Income":"Pemasukan Tercatat","Recorded Expense":"Pengeluaran Tercatat","Recorded Net":"Net Tercatat",
  "Expense Categories":"Kategori Pengeluaran","Budget Pace":"Laju Anggaran","Transactions":"Transaksi","Monthly Budget":"Anggaran Bulanan","Yearly Expense":"Pengeluaran Tahunan","Events":"Acara",
  "Remaining Expense This Year":"Sisa Pengeluaran Tahun Ini","Dynamic estimate from this month through December. History expenses are never deducted twice.":"Estimasi dinamis dari bulan ini sampai Desember. Pengeluaran di Riwayat tidak pernah dikurangi dua kali.",
- "Monthly Remaining":"Sisa Bulanan","Events + Credit":"Acara + Kredit","Editable Budgets":"Anggaran yang Dapat Diedit","Category Breakdown":"Rincian Kategori","Credit Card & PayLater":"Kartu Kredit & PayLater",
+ "Monthly Remaining":"Sisa Bulanan","Events + Credit":"Acara + Kredit","Editable Budgets":"Anggaran yang Dapat Diedit","Category Breakdown":"Rincian Kategori","Credit Card & PayLater":"Kartu Kredit & PayLater","Entrusted Funds":"Titipan Dana","Non-recurring liability":"Kewajiban non-berulang","Budget Tag":"Tag Anggaran","Cash Balance":"Saldo Kas","Settled":"Selesai","Active":"Aktif",
  "Paid Items":"Item Lunas","Paid This Month":"Dibayar Bulan Ini","Outstanding":"Belum Dibayar","Fixed Monthly":"Tetap Bulanan","Recurring Clients":"Klien Berulang","Ending Clients":"Klien Berakhir","Estimated Income This Year":"Estimasi Pemasukan Tahun Ini","Outstanding Now":"Piutang Saat Ini",
  "Total Portfolio Value":"Total Nilai Portofolio","Invested":"Modal","Unrealized":"Belum Direalisasi","Allocation":"Alokasi","Holdings":"Kepemilikan","Target prices":"Target harga",
  "Latest Meter Balance":"Sisa Token Terbaru","Average Daily Usage":"Rata-rata Harian","Estimated Monthly Cost":"Estimasi Biaya Bulanan","Meter Readings":"Catatan Meter",
@@ -106,6 +109,7 @@ const ID_REPLACEMENTS=[
  ["Starting balance","Saldo awal"],["Current market value","Nilai pasar saat ini"],["Recurring monthly","Berulang bulanan"],["Final payment","Pembayaran terakhir"],["Previous:","Sebelumnya:"],["Outstanding:","Belum dibayar:"],["Remaining:","Sisa:"],
  ["Paid ","Dibayar "],["Unpaid","Belum dibayar"],["Done this year","Lunas tahun ini"],["Undo done","Batalkan lunas"],["DUE ","JATUH TEMPO "],["DONE ","LUNAS "],
  ["Projected Net Worth in","Proyeksi Net Worth pada"],["Projected ","Proyeksi "],["Cash ","Kas "],["Remaining recurring income","Sisa pemasukan berulang"],["Recurring income","Pemasukan berulang"],["Current receivables","Piutang saat ini"],["Receivables + extra income","Piutang + pemasukan tambahan"],["This month remaining","Sisa bulan ini"],["Recurring expense","Pengeluaran berulang"],["Yearly expense","Pengeluaran tahunan"],["Events + credit","Acara + kredit"],["remaining months","bulan tersisa"],
+ ["Entrusted funds","Titipan dana"],["Active cash + stock liabilities","Kewajiban kas + saham aktif"],["Active Liability","Kewajiban Aktif"],["Person / Description","Nama Orang / Keterangan"],["Deduct From","Kurangi Dari"],["Income Tag","Tag Pemasukan"],["after entrusted funds","setelah dikurangi titipan dana"],["money held on behalf of someone else","dana yang dititipkan oleh orang lain"],["Non-recurring liability","Kewajiban non-berulang"],
  ["Add ","Tambah "],["Edit ","Edit "],["Remove","Hapus"],["No ","Tidak ada "],["This Month","Bulan Ini"],["This Year","Tahun Ini"],["Current year","Tahun berjalan"]
 ];
 function translateText(value){
@@ -138,11 +142,11 @@ function normalizeStockMappings() {
 function projection(mode="base"){
  return buildProjection({
   years:YEARS,referenceDate:new Date(),accountTotal:accountTotal(),clients:state.clients,budgets:state.budgets,yearly:state.yearly,
-  events:state.events,credit:state.credit,transactions:state.transactions,portfolioForYear:year=>portfolio(year,mode)
+  events:state.events,credit:state.credit,transactions:state.transactions,portfolioForYear:year=>netPortfolio(year,mode)
  });
 }
 function monthlyTimeline(mode="base"){
- return buildMonthlyTimeline({referenceDate:new Date(),accountTotal:accountTotal(),clients:state.clients,budgets:state.budgets,yearly:state.yearly,events:state.events,credit:state.credit,transactions:state.transactions,portfolioForYear:year=>portfolio(year,mode)});
+ return buildMonthlyTimeline({referenceDate:new Date(),accountTotal:netAccountTotal(),clients:state.clients,budgets:state.budgets,yearly:state.yearly,events:state.events,credit:state.credit,transactions:state.transactions,portfolioForYear:year=>netPortfolio(year,mode)});
 }
 
 function donut(entries,label){
@@ -214,10 +218,10 @@ function switchPage(p){
 }
 
 function renderAccumulation(){
- const timeline=monthlyTimeline("base"), current=timeline[0]||{nw:currentNW(),cash:accountTotal(),income:0,extraIncome:0,recurringExpense:0,yearlyExpense:0,eventExpense:0,creditExpense:0};
+ const timeline=monthlyTimeline("base"), current=timeline[0]||{nw:currentNW(),cash:netAccountTotal(),income:0,extraIncome:0,recurringExpense:0,yearlyExpense:0,eventExpense:0,creditExpense:0};
  const projected=current.nw;
  projectedCash.textContent=fmt(projected);
- availableBalance.textContent=fmt(accountTotal());
+ availableBalance.textContent=fmt(netAccountTotal());
  outstandingIncome.textContent=fmt(totalOutstanding());
  cashHealth.textContent=projected>monthlyBudget()*2?"Healthy projected net worth":projected>0?"Positive projected net worth":"Negative projected net worth";
  accChart.innerHTML=line(timeline.map(row=>row.nw),timeline.map(row=>new Intl.DateTimeFormat(state.language==="id"?"id-ID":"en-US",{month:"short"}).format(new Date(row.year,row.month,1))),true);
@@ -227,15 +231,16 @@ function renderAccumulation(){
   {icon:"🧾",name:"Remaining monthly budget",sub:"Only the unpaid portion this month",value:fmt(current.recurringExpense)},
   {icon:"📅",name:"Yearly due",sub:"Due or overdue this month",value:fmt(current.yearlyExpense)},
   {icon:"📌",name:"Events + credit due",sub:"Only items due this month",value:fmt(current.eventExpense+current.creditExpense)}
+  ,{icon:"🫱🏻‍🫲🏽",name:"Entrusted funds",sub:"Active cash + stock liabilities",value:`−${fmt(entrustedTotal())}`}
  ]);
  balanceDonut.innerHTML=donut(state.accounts.map(a=>[a.name,Number(a.balance)]),fmt(accountTotal(),true));
  balanceLegend.innerHTML=legend(state.accounts.map(a=>[a.name,Number(a.balance)]));
  monthModel.innerHTML=listRows([
-  {icon:"🏦",name:"Starting balance",sub:"Cash, bank & wallets",value:fmt(accountTotal()),cls:"positive"},
+  {icon:"🏦",name:"Starting balance",sub:"Cash, bank & wallets after entrusted funds",value:fmt(netAccountTotal()),cls:netAccountTotal()<0?"negative":"positive"},
   {icon:"📥",name:"Outstanding clients",sub:"Recurring + ending, unpaid only",value:fmt(current.income),cls:"positive"},
   {icon:"✨",name:"Additional income",sub:"Income recorded in History",value:fmt(current.extraIncome),cls:"positive"},
   {icon:"🧾",name:"Remaining expenses",sub:"Monthly + yearly + events + credit",value:`−${fmt(current.expenses)}`,cls:"negative"},
-  {icon:"📈",name:"Stocks",sub:"Current market value",value:fmt(current.portfolio),cls:"positive"},
+  {icon:"📈",name:"Stocks",sub:"Market value after entrusted funds",value:fmt(current.portfolio),cls:current.portfolio<0?"negative":"positive"},
   {icon:"💎",name:"Projected month-end net worth",sub:"Cash after obligations + stocks",value:fmt(projected),cls:projected<0?"negative":"positive"}
  ]);
 }
@@ -288,7 +293,7 @@ function renderExpenses(){
   const progress=getBudgetProgress(b,state.transactions,new Date());
   const pct=b.monthly?progress.paid/b.monthly*100:0, cls=pct>=100?"done":pct>80?"warn":"";
   const status=progress.status==="done"?"DONE THIS MONTH":progress.status==="partial"?"PARTIAL":"AUTO FROM HISTORY";
-  return `<div class="progress-row budget-progress ${cls}"><div class="progress-top"><b>${b.category}</b><span class="budget-status ${progress.status}">${status}</span></div><div class="progress ${cls}"><span style="width:${Math.min(100,pct)}%"></span></div><div class="budget-numbers private"><small>Paid ${fmt(progress.paid)}</small><b>Remaining ${fmt(progress.remaining)}</b><small>Default ${fmt(b.monthly)}</small></div><div class="tile-actions"><button class="icon-mini" data-edit-budget="${i}" title="Edit">✎</button><button class="icon-mini" data-remove-budget="${i}" title="Remove">🗑</button></div></div>`;
+  return `<div class="progress-row budget-progress ${cls}"><div class="progress-top"><b class="budget-category-tag">${b.category}</b><span class="budget-status ${progress.status}">${status}</span></div><div class="progress ${cls}"><span style="width:${Math.min(100,pct)}%"></span></div><div class="budget-numbers private"><small>Paid ${fmt(progress.paid)}</small><b>Remaining ${fmt(progress.remaining)}</b><small>Default ${fmt(b.monthly)}</small></div><div class="tile-actions"><button class="icon-mini" data-edit-budget="${i}" title="Edit">✎</button><button class="icon-mini" data-remove-budget="${i}" title="Remove">🗑</button></div></div>`;
  }).join("");
  qa("[data-edit-budget]").forEach(b=>b.onclick=()=>editMonthly(Number(b.dataset.editBudget)));
  qa("[data-remove-budget]").forEach(b=>b.onclick=()=>{state.budgets.splice(Number(b.dataset.removeBudget),1); save(); renderAll();});
@@ -363,7 +368,7 @@ function bindNativeSort(cardSelector,laneSelector,onCommit){
  let dragged=null;
  qa(cardSelector).forEach(card=>{
   card.draggable=true;
-  card.ondragstart=event=>{if(event.target.closest("button,input,select,a,label")){event.preventDefault();return;}dragged=card;card.classList.add("is-dragging");event.dataTransfer.effectAllowed="move";event.dataTransfer.setData("text/plain",card.dataset.clientId||card.dataset.yearlyId||card.dataset.eventId||card.dataset.creditId||"");};
+  card.ondragstart=event=>{if(event.target.closest("button,input,select,a,label")){event.preventDefault();return;}dragged=card;card.classList.add("is-dragging");event.dataTransfer.effectAllowed="move";event.dataTransfer.setData("text/plain",card.dataset.clientId||card.dataset.yearlyId||card.dataset.eventId||card.dataset.creditId||card.dataset.entrustedId||"");};
   card.ondragend=()=>{card.classList.remove("is-dragging");dragged=null;};
  });
  qa(laneSelector).forEach(lane=>{
@@ -406,6 +411,19 @@ function renderCredit(){
  bindPointerSort(".credit-row","#creditItems",commit);bindNativeSort(".credit-row","#creditItems",commit);
  const commitArchive=()=>{[...creditArchive.querySelectorAll("[data-credit-id]")].forEach((node,index)=>{const item=state.credit.find(row=>row.id===node.dataset.creditId);if(item)item.sortOrder=index;});save();renderAll();toastMsg("Archive order saved");};
  bindPointerSort(".credit-archive-row","#creditArchive",commitArchive);bindNativeSort(".credit-archive-row","#creditArchive",commitArchive);
+ renderEntrusted();
+}
+
+function renderEntrusted(){
+ const ordered=[...state.entrustedFunds].sort((a,b)=>Number(a.settled)-Number(b.settled)||Number(a.sortOrder||0)-Number(b.sortOrder||0));
+ const cash=entrustedTotal("cash"),stocks=entrustedTotal("stocks");
+ entrustedSummary.innerHTML=`<span><small>Cash Balance</small><b class="private">−${fmt(cash)}</b></span><span><small>Stocks</small><b class="private">−${fmt(stocks)}</b></span><span><small>Active Liability</small><b class="private">−${fmt(cash+stocks)}</b></span>`;
+ entrustedItems.innerHTML=ordered.map(item=>`<div class="entrusted-row ${item.settled?"settled":"active"}" data-entrusted-id="${item.id}" title="Drag card to reorder"><input type="checkbox" data-settled-entrusted="${item.id}" ${item.settled?"checked":""} aria-label="Mark ${item.name} settled"><div class="entrusted-source ${item.source}">${item.source==="cash"?"💵":"📈"}</div><div class="entrusted-main"><b>${item.name}</b><small>${item.source==="cash"?"Cash Balance":"Stocks"} · ${item.settled?"Settled":"Active"}</small></div><strong class="private">−${fmt(item.amount)}</strong><button class="icon-mini" data-edit-entrusted="${item.id}" title="Edit">✎</button><button class="icon-mini" data-delete-entrusted="${item.id}" title="Remove">🗑</button></div>`).join("")||`<div class="list-row"><div class="list-ic">ℹ</div><div class="list-meta"><b>No entrusted funds</b><small>Add money held on behalf of someone else</small></div></div>`;
+ qa("[data-settled-entrusted]").forEach(input=>input.onchange=()=>{const item=state.entrustedFunds.find(row=>row.id===input.dataset.settledEntrusted);if(item){item.settled=input.checked;save();renderAll();}});
+ qa("[data-edit-entrusted]").forEach(button=>button.onclick=()=>editEntrusted(button.dataset.editEntrusted));
+ qa("[data-delete-entrusted]").forEach(button=>button.onclick=()=>{const item=state.entrustedFunds.find(row=>row.id===button.dataset.deleteEntrusted);if(!item||!confirm(`Delete ${item.name}?`))return;state.entrustedFunds=state.entrustedFunds.filter(row=>row.id!==item.id);save();renderAll();});
+ const commit=()=>{[...entrustedItems.querySelectorAll("[data-entrusted-id]")].forEach((node,index)=>{const item=state.entrustedFunds.find(row=>row.id===node.dataset.entrustedId);if(item)item.sortOrder=index;});save();renderAll();toastMsg("Entrusted funds order saved");};
+ bindPointerSort(".entrusted-row","#entrustedItems",commit);bindNativeSort(".entrusted-row","#entrustedItems",commit);
 }
 
 function renderClients(){
@@ -441,13 +459,13 @@ function renderClients(){
 }
 
 function renderStocks(){
- const p=portfolio(), inv=state.stocks.reduce((a,s)=>a+invested(s),0);
+ const gross=portfolio(),p=netPortfolio(), inv=state.stocks.reduce((a,s)=>a+invested(s),0),pl=gross-inv;
  portfolioValue.textContent=fmt(p);
  portfolioInvested.textContent=fmt(inv);
- portfolioPL.textContent=fmt(p-inv);
- portfolioPL.className=`private ${p-inv<0?"negative":p-inv>0?"positive":""}`;
+ portfolioPL.textContent=fmt(pl);
+ portfolioPL.className=`private ${pl<0?"negative":pl>0?"positive":""}`;
  const entries=state.stocks.map(s=>[s.ticker,stockValue(s)]);
- stockDonut.innerHTML=donut(entries,fmt(p,true));
+ stockDonut.innerHTML=donut(entries,fmt(gross,true));
  stockLegend.innerHTML=legend(entries);
  holdingsBody.innerHTML=state.stocks.map((s,i)=>{
   const stale=isPriceStale(s), status=s.priceStatus||"manual", stamp=s.priceAsOf?new Date(s.priceAsOf).toLocaleString("en-GB",{dateStyle:"medium",timeStyle:"short"}):"Never";
@@ -545,22 +563,22 @@ function renderProspect(){
  prospectDesc.textContent=state.prospectMode==="base"?"Uses base stock targets":"Uses optimistic stock targets";
  prospectChart.innerHTML=line(pr.map(p=>p.nw),pr.map(p=>String(p.year).slice(2)),true);
  prospectSources.innerHTML=listRows([
-  {icon:"🏦",name:"Liquid balance",sub:"Cash + bank + wallets",value:fmt(accountTotal())},
+  {icon:"🏦",name:"Liquid balance",sub:"Cash + bank + wallets after entrusted funds",value:fmt(netAccountTotal())},
   {icon:"🤝",name:"Remaining recurring income",sub:`${Math.max(0,11-new Date().getMonth())} full months after this month`,value:fmt(first.incomeBreakdown.recurring)},
   {icon:"📨",name:"Current receivables",sub:"Recurring + ending clients",value:fmt(first.incomeBreakdown.outstanding)},
   {icon:"🧾",name:"Remaining current-year expense",sub:"Monthly + yearly + events + credit",value:fmt(first.expenses.total)},
-  {icon:"📈",name:"Stock scenario",sub:state.prospectMode==="base"?"Base target prices":"Optimistic target prices",value:fmt(portfolio(last.year,state.prospectMode))}
+  {icon:"📈",name:"Stock scenario",sub:`${state.prospectMode==="base"?"Base target prices":"Optimistic target prices"} after entrusted funds`,value:fmt(netPortfolio(last.year,state.prospectMode))}
  ]);
  yearGrid.innerHTML=pr.map(y=>{const ages=ageTriplet(y.year).join(", "),current=y.year===currentYear(); return `<div class="year-card"><div class="year-head"><small>${y.year}</small><span class="age-triplet">${ages}</span></div><h4 class="private ${moneyClass(y.nw)}">${fmt(y.nw)}</h4><small class="year-split private"><span>Cash <b class="${moneyClass(y.closing)}">${fmt(y.closing)}</b></span><span>Stocks <b class="${moneyClass(y.portfolio)}">${fmt(y.portfolio)}</b></span><span>${current?"Remaining recurring income":"Recurring income"} <b class="positive">+${fmt(y.incomeBreakdown.recurring)}</b></span>${y.incomeBreakdown.outstanding||y.incomeBreakdown.additional?`<span>${current?"Receivables + extra income":"Additional income"} <b class="positive">+${fmt(y.incomeBreakdown.outstanding+y.incomeBreakdown.additional)}</b></span>`:""}${current?`<span>This month remaining <b class="negative">−${fmt(y.expenses.currentMonth)}</b></span>`:""}<span>Recurring expense <b class="negative">−${fmt(y.expenses.recurring)}</b></span><span>Yearly expense <b class="negative">−${fmt(y.expenses.yearly)}</b></span><span>Events + credit <b class="negative">−${fmt(y.expenses.events)}</b></span></small></div>`;}).join("");
 }
 
 function renderInsights(){
- const runway=monthlyBudget()?accountTotal()/monthlyBudget():0;
+ const runway=monthlyBudget()?netAccountTotal()/monthlyBudget():0;
  const biggestBudget=[...state.budgets].sort((a,b)=>b.monthly-a.monthly)[0];
  const biggestHold=[...state.stocks].sort((a,b)=>stockValue(b)-stockValue(a))[0];
  cashRunway.textContent=`${runway.toFixed(1)} months`;
  largestExpense.textContent=biggestBudget?.category||"—";
- largestHolding.textContent=biggestHold?`${biggestHold.ticker} ${(stockValue(biggestHold)/portfolio()*100).toFixed(0)}%`:"—";
+ largestHolding.textContent=biggestHold?`${biggestHold.ticker} ${(stockValue(biggestHold)/Math.max(1,portfolio())*100).toFixed(0)}%`:"—";
  scenarioCompare.innerHTML=lineMulti([
   {name:"Base",vals:projection("base").map(x=>x.nw),color:COLORS[0]},
   {name:"Optimistic",vals:projection("optimistic").map(x=>x.nw),color:COLORS[2]}
@@ -573,7 +591,7 @@ function renderInsights(){
  const collected=totalPaid()+totalOutstanding()?totalPaid()/(totalPaid()+totalOutstanding())*100:100;
  const pl=portfolio()-state.stocks.reduce((sum,row)=>sum+invested(row),0);
  const insightData=[
-  {asset:"wallet",tone:runway>=6?"green":runway>=3?"yellow":"red",eyebrow:"Cash runway",title:`${runway.toFixed(1)} months of runway`,text:`Current liquid balance is ${fmt(accountTotal())}; remaining monthly obligations are ${fmt(budgetRemaining())}.`},
+  {asset:"wallet",tone:runway>=6?"green":runway>=3?"yellow":"red",eyebrow:"Cash runway",title:`${runway.toFixed(1)} months of runway`,text:`Current liquid balance after entrusted funds is ${fmt(netAccountTotal())}; remaining monthly obligations are ${fmt(budgetRemaining())}.`},
   {asset:"clients",tone:collected>=80?"green":collected>=50?"yellow":"red",eyebrow:"Client collection",title:`${collected.toFixed(0)}% collected`,text:totalOutstanding()?`${fmt(totalOutstanding())} is still outstanding from recurring and ending clients.`:"All client payments are collected. Good job!"},
   {asset:"coffee",tone:coffeePct>100?"red":coffeePct>75?"yellow":"green",eyebrow:"Coffee check",title:coffeePct>100?"Coffee is over budget":coffeePct>75?"Coffee is getting expensive":"Coffee spending is controlled",text:`Coffee usage is ${coffeePct.toFixed(0)}% of its default monthly budget.`},
   {asset:"electricity",tone:electricDelta>5?"red":electricDelta<-5?"green":"blue",eyebrow:"Electricity trend",title:!latestElectric?"More readings needed":electricDelta<-5?"Electricity is decreasing — good job!":electricDelta>5?"Electricity usage is rising":"Electricity is stable",text:latestElectric?`Latest pace is ${latestElectric.daily.toFixed(1)} kWh/day (${electricDelta>=0?"+":""}${electricDelta.toFixed(1)}% versus the prior interval).`:"Add at least two readings to unlock a usage trend."},
@@ -618,20 +636,33 @@ function openSimple(title,fields,callback){
  };
  simpleModal.showModal();
 }
+function renderTxCategoryTags(preferred){
+ const type=q("#txType .active")?.dataset.type||"expense";
+ const budgetTags=state.budgets.map(item=>String(item.category).trim()).filter(Boolean);
+ const existing=state.transactions.filter(item=>item.type===type).map(item=>String(item.category).trim()).filter(Boolean);
+ const fallbackExpense=["Essentials","Food","Coffee","Electricity","IPL","PAM","Internet","Needs","Subscriptions","Others"];
+ const incomeTags=[...existing,"Bonus","Business","Investment","Other Income"];
+ const tags=[...new Set(type==="expense"?[...(budgetTags.length?budgetTags:fallbackExpense),...(preferred&&!budgetTags.includes(preferred)?[preferred]:[])]:incomeTags)];
+ const selected=tags.includes(preferred)?preferred:(tags.includes(txCategory.value)?txCategory.value:tags[0]);
+ txCategoryLabel.textContent=type==="expense"?"Budget Tag":"Income Tag";
+ txCategory.innerHTML=tags.map(tag=>`<option ${tag===selected?"selected":""}>${tag}</option>`).join("");
+ txCategoryTags.innerHTML=tags.map(tag=>`<button type="button" class="category-tag ${tag===selected?"active":""}" data-category-tag="${tag}">${tag}</button>`).join("");
+ qa("[data-category-tag]").forEach(button=>button.onclick=()=>{txCategory.value=button.dataset.categoryTag;qa("[data-category-tag]").forEach(item=>item.classList.toggle("active",item===button));});
+}
 function openTxEditor(id){
  const tx=state.transactions.find(t=>t.id===id);
  if(!tx) return;
  state.txEdit=id;
  txModalTitle.textContent="Edit Transaction";
  qa("#txType button").forEach(b=>b.classList.toggle("active",b.dataset.type===tx.type));
- txAmount.value=tx.amount; txDescription.value=tx.description; txCategory.value=tx.category; txChannel.value=tx.channel; txDate.value=tx.date;
+ txAmount.value=tx.amount; txDescription.value=tx.description; txChannel.value=tx.channel; txDate.value=tx.date;renderTxCategoryTags(tx.category);
  txModal.showModal();
 }
 function resetTxModal(){
  state.txEdit=null;
  txModalTitle.textContent="Add Transaction";
  qa("#txType button").forEach((b,i)=>b.classList.toggle("active",i===0));
- txAmount.value=""; txDescription.value=""; txCategory.value="Essentials"; txChannel.value="Offline"; txDate.value=todayISO();
+ txAmount.value=""; txDescription.value=""; txChannel.value="Offline"; txDate.value=todayISO();renderTxCategoryTags();
 }
 function editMonthly(i){
  const x=state.budgets[i];
@@ -703,6 +734,16 @@ function editCredit(id){
   {key:"payment",label:"Payment Status",options:["unpaid","paid"],value:x.paid?"paid":"unpaid"}
  ],o=>state.credit[i]={...x,source:o.source,description:o.description,amount:o.amount,due:o.due,paid:o.payment==="paid"});
 }
+function editEntrusted(id){
+ const i=state.entrustedFunds.findIndex(item=>item.id===id),x=state.entrustedFunds[i];
+ if(!x)return;
+ openSimple("Edit Entrusted Fund",[
+  {key:"name",label:"Person / Description",value:x.name},
+  {key:"amount",label:"Amount",type:"number",value:x.amount},
+  {key:"source",label:"Deduct From",options:["Cash Balance","Stocks"],value:x.source==="cash"?"Cash Balance":"Stocks"},
+  {key:"status",label:"Status",options:["Active","Settled"],value:x.settled?"Settled":"Active"}
+ ],o=>state.entrustedFunds[i]={...x,name:o.name,amount:o.amount,source:o.source==="Cash Balance"?"cash":"stocks",settled:o.status==="Settled"});
+}
 function autoDueDate(source){
  const dueDays={"Credit Card":26,"GoPayLater":31,"ShopeePayLater":25};
  const now=new Date(), target=new Date(now.getFullYear(),now.getMonth(),Math.min(dueDays[source]||25,new Date(now.getFullYear(),now.getMonth()+1,0).getDate()));
@@ -760,7 +801,7 @@ baseGrowth.oninput=()=>{state.baseGrowth=Number(baseGrowth.value); saveSettings(
 optimisticGrowth.oninput=()=>{state.optimisticGrowth=Number(optimisticGrowth.value); saveSettings(); if(state.optimisticMode==="auto") renderAll();};
 
 qa("[data-open-tx]").forEach(b=>b.onclick=()=>{resetTxModal(); txModal.showModal();});
-qa("#txType button").forEach(b=>b.onclick=()=>{qa("#txType button").forEach(x=>x.classList.remove("active")); b.classList.add("active");});
+qa("#txType button").forEach(b=>b.onclick=()=>{qa("#txType button").forEach(x=>x.classList.remove("active")); b.classList.add("active");renderTxCategoryTags();});
 txForm.onsubmit=(e)=>{
  e.preventDefault();
  const tx={id:state.txEdit||createId(),type:q("#txType .active").dataset.type,amount:Number(txAmount.value),description:txDescription.value,category:txCategory.value,channel:txChannel.value,date:txDate.value};
@@ -817,6 +858,11 @@ addCreditBtn.onclick=()=>{
  };
  simpleModal.showModal();
 };
+addEntrustedBtn.onclick=()=>openSimple("Add Entrusted Fund",[
+ {key:"name",label:"Person / Description"},
+ {key:"amount",label:"Amount",type:"number"},
+ {key:"source",label:"Deduct From",options:["Cash Balance","Stocks"],value:"Cash Balance"}
+],o=>state.entrustedFunds.push({id:createId(),name:o.name,amount:o.amount,source:o.source==="Cash Balance"?"cash":"stocks",settled:false,sortOrder:state.entrustedFunds.length}));
 addClientBtn.onclick=()=>openSimple("Add Client",[
  {key:"name",label:"Client Name"},
  {key:"clientType",label:"Client Type",options:["recurring","ending"],value:"recurring"},
