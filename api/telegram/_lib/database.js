@@ -111,7 +111,7 @@ export class CVFinanceDatabase {
 
   async listClients() {
     const { data, error } = await this.client.from("clients")
-      .select("id,name,monthly_retainer,paid_this_month,previous_outstanding,status")
+      .select("id,name,monthly_retainer,paid_this_month,previous_outstanding,status,client_type,ending_paid")
       .eq("user_id", this.ownerUserId).order("name");
     if (error) throw dbError(error, "clients_read_failed");
     return data || [];
@@ -126,13 +126,18 @@ export class CVFinanceDatabase {
     const totalDue = Number(client.monthly_retainer) + Number(client.previous_outstanding);
     let paid = Number(client.paid_this_month);
     let status = client.status;
+    let endingPaid = Boolean(client.ending_paid);
+    if (client.client_type === "ending") {
+      if (action === "paid") { paid = totalDue; status = "paid"; endingPaid = true; }
+      if (action === "amount") { paid = Number(amount); endingPaid = paid >= totalDue; status = endingPaid ? "paid" : "pending"; }
+    }
     if (action === "freeze") status = "freeze";
     if (action === "unfreeze") status = paid >= totalDue ? "paid" : "pending";
-    if (action === "paid") { paid = totalDue; status = "paid"; }
-    if (action === "amount") { paid = Number(amount); status = paid >= totalDue ? "paid" : "pending"; }
-    const { data, error } = await this.client.from("clients").update({paid_this_month:paid,status})
+    if (client.client_type !== "ending" && action === "paid") { paid = totalDue; status = "paid"; }
+    if (client.client_type !== "ending" && action === "amount") { paid = Number(amount); status = paid >= totalDue ? "paid" : "pending"; }
+    const { data, error } = await this.client.from("clients").update({paid_this_month:paid,status,ending_paid:endingPaid})
       .eq("id", client.id).eq("user_id", this.ownerUserId)
-      .select("id,name,monthly_retainer,paid_this_month,previous_outstanding,status").single();
+      .select("id,name,monthly_retainer,paid_this_month,previous_outstanding,status,client_type,ending_paid").single();
     if (error) throw dbError(error, "client_write_failed", "clients");
     logEvent("info","supabase_write",{table:"clients",success:true});
     return data;
@@ -225,7 +230,7 @@ export class CVFinanceDatabase {
     if (budgetsResult.error) throw dbError(budgetsResult.error, "budgets_read_failed");
     if (transactionsResult.error) throw dbError(transactionsResult.error, "transactions_read_failed");
     const liquid = accounts.reduce((sum,row)=>sum+Number(row.balance),0);
-    const outstanding = clients.filter(row=>row.status!=="freeze").reduce((sum,row)=>sum+Math.max(0,Number(row.monthly_retainer)+Number(row.previous_outstanding)-Number(row.paid_this_month)),0);
+    const outstanding = clients.filter(row=>row.status!=="freeze" && !(row.client_type==="ending"&&row.ending_paid)).reduce((sum,row)=>sum+Math.max(0,Number(row.monthly_retainer)+Number(row.previous_outstanding)-Number(row.paid_this_month)),0);
     const unpaidCredit = credit.reduce((sum,row)=>sum+Number(row.amount),0);
     const monthlyBudget = (budgetsResult.data || []).reduce((sum,row)=>sum+Number(row.monthly_amount),0);
     const transactions = transactionsResult.data || [];
@@ -236,7 +241,7 @@ export class CVFinanceDatabase {
       const value = Number(row.quantity) * price;
       return sum + (row.currency === "USD" ? value * stocksResult.usdIdr : value);
     },0);
-    return {liquid,income,expenses,outstanding,unpaidCredit,portfolio,projected:liquid+outstanding-monthlyBudget-unpaidCredit};
+    return {liquid,income,expenses,outstanding,unpaidCredit,portfolio,projected:liquid+portfolio};
   }
 }
 

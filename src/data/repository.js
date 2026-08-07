@@ -25,11 +25,11 @@ function rowsToState(rows) {
   state.accounts = rows.accounts.map(row => ({id:row.id,name:row.name,type:row.account_type,balance:Number(row.balance),...meta(row)}));
   state.transactions = rows.transactions.map(row => ({id:row.id,type:row.transaction_type,amount:Number(row.amount),description:row.description,category:row.category,channel:row.channel,date:row.transaction_date,...meta(row)}));
   state.budgets = rows.monthly_budgets.map(row => ({id:row.id,category:row.category,monthly:Number(row.monthly_amount),...meta(row)}));
-  state.yearly = rows.yearly_expenses.map(row => ({id:row.id,name:row.name,amount:Number(row.amount),month:row.payment_month,category:row.category,...meta(row)}));
+  state.yearly = rows.yearly_expenses.map(row => ({id:row.id,name:row.name,amount:Number(row.amount),month:row.payment_month,category:row.category,lastPaidYear:row.last_paid_year == null ? null : Number(row.last_paid_year),...meta(row)}));
   state.events = rows.planned_events.map(row => ({id:row.id,name:row.name,amount:Number(row.amount),date:row.event_date,category:row.category,...meta(row)}));
   state.creditFacilities = rows.credit_facilities.map(row => ({id:row.id,source:row.source,limit:Number(row.limit_amount),...meta(row)}));
   state.credit = rows.credit_items.map(row => ({id:row.id,facilityId:row.facility_id,source:row.source,description:row.description,amount:Number(row.amount),due:row.due_date,paid:row.is_paid,...meta(row)}));
-  state.clients = rows.clients.map(row => ({id:row.id,name:row.name,monthly:Number(row.monthly_retainer),paid:Number(row.paid_this_month),carry:Number(row.previous_outstanding),status:row.status,...meta(row)}));
+  state.clients = rows.clients.map(row => ({id:row.id,name:row.name,monthly:Number(row.monthly_retainer),paid:Number(row.paid_this_month),carry:Number(row.previous_outstanding),status:row.status,clientType:row.client_type || "recurring",endingPaid:Boolean(row.ending_paid),...meta(row)}));
   const targetsByHolding = new Map();
   rows.stock_price_targets.forEach(row => {
     if (!targetsByHolding.has(row.holding_id)) targetsByHolding.set(row.holding_id, {base:{},optimistic:{},ids:{base:{},optimistic:{}}});
@@ -86,11 +86,11 @@ function stateToRows(state, userId) {
     accounts: state.accounts.map(row => owned({id:row.id,name:row.name,account_type:row.type,balance:Number(row.balance),...stamp(row)})),
     transactions: state.transactions.map(row => owned({id:row.id,transaction_type:row.type,amount:Number(row.amount),description:row.description,category:row.category,channel:row.channel,transaction_date:row.date,...stamp(row)})),
     monthly_budgets: state.budgets.map(row => owned({id:row.id,category:row.category,monthly_amount:Number(row.monthly),...stamp(row)})),
-    yearly_expenses: state.yearly.map(row => owned({id:row.id,name:row.name,amount:Number(row.amount),payment_month:row.month,category:row.category,...stamp(row)})),
+    yearly_expenses: state.yearly.map(row => owned({id:row.id,name:row.name,amount:Number(row.amount),payment_month:row.month,category:row.category,last_paid_year:row.lastPaidYear ?? null,...stamp(row)})),
     planned_events: state.events.map(row => owned({id:row.id,name:row.name,amount:Number(row.amount),event_date:row.date,category:row.category,...stamp(row)})),
     credit_facilities: state.creditFacilities.map(row => owned({id:row.id,source:row.source,limit_amount:Number(row.limit),...stamp(row)})),
     credit_items: state.credit.map(row => owned({id:row.id,facility_id:row.facilityId || facilityBySource.get(row.source) || null,source:row.source,description:row.description,amount:Number(row.amount),due_date:row.due,is_paid:Boolean(row.paid),...stamp(row)})),
-    clients: state.clients.map(row => owned({id:row.id,name:row.name,monthly_retainer:Number(row.monthly),paid_this_month:Number(row.paid),previous_outstanding:Number(row.carry),status:row.status,...stamp(row)})),
+    clients: state.clients.map(row => owned({id:row.id,name:row.name,monthly_retainer:Number(row.monthly),paid_this_month:Number(row.paid),previous_outstanding:Number(row.carry),status:row.status,client_type:row.clientType || "recurring",ending_paid:Boolean(row.endingPaid),...stamp(row)})),
     stock_holdings: state.stocks.map(row => owned({
       id:row.id,display_symbol:row.displaySymbol || row.ticker,market:row.market,provider:row.provider,
       provider_symbol:row.providerSymbol || row.ticker,currency:row.currency,quantity:Number(row.quantity),
@@ -267,7 +267,7 @@ export class FinanceRepository {
 
 export function exportBackup(state, userId) {
   const data = clean(state);
-  ["page","privacy","filter","sort","txEdit","prospectMode"].forEach(key => delete data[key]);
+  ["page","privacy","filter","sort","expenseView","txEdit","prospectMode"].forEach(key => delete data[key]);
   return { format:"cvfinance-backup", version:1, exportedAt:new Date().toISOString(), userId, data };
 }
 

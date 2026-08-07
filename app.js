@@ -1,4 +1,5 @@
 import { createEmptyState, createId, createMvpSeed, readLegacyLocalStorage, YEARS } from "./src/data/default-data.js";
+import { buildProjection, getClientOutstanding, getCurrentNetWorth, getEndingClients, getFixedIncome, getFrozenClients, getReceivableClients, getRecurringClients, getTotalOutstanding, getTotalPaid, getYearlyProjectionTotal } from "./src/data/finance-model.js";
 import { SyncManager } from "./src/sync/sync-manager.js";
 import { fetchHoldingQuote, isPriceStale, validateHoldingSymbol } from "./src/stocks/client.js";
 import { normalizeStockMapping, quantityForDisplay, quantityForStorage, quantityUnit } from "./src/stocks/holding.js";
@@ -14,6 +15,7 @@ const state=createEmptyState();
 state.theme=localStorage.getItem("cvfinance-theme-cache")||"dark";
 let syncManager;
 let stockRefreshStarted=false;
+const currentYear=()=>new Date().getFullYear();
 
 const fmt=(n,compact=false)=>{
  if(state.privacy) return "Rp••••••";
@@ -31,14 +33,18 @@ const saveSettings=()=>save();
 const q=(s)=>document.querySelector(s);
 const qa=(s)=>[...document.querySelectorAll(s)];
 const accountTotal=()=>state.accounts.reduce((a,b)=>a+Number(b.balance),0);
-const recurringClients=()=>state.clients.filter(c=>c.status!=="freeze");
-const fixedIncome=()=>recurringClients().reduce((a,b)=>a+Number(b.monthly),0);
-const clientOutstanding=(c)=>Math.max(0,Number(c.monthly)+Number(c.carry)-Number(c.paid));
-const totalOutstanding=()=>recurringClients().reduce((a,b)=>a+clientOutstanding(b),0);
-const totalPaid=()=>recurringClients().reduce((a,b)=>a+Number(b.paid),0);
+const recurringClients=()=>getRecurringClients(state.clients);
+const endingClients=()=>getEndingClients(state.clients);
+const frozenClients=()=>getFrozenClients(state.clients);
+const fixedIncome=()=>getFixedIncome(state.clients);
+const clientOutstanding=(c)=>getClientOutstanding(c);
+const receivableClients=()=>getReceivableClients(state.clients);
+const totalOutstanding=()=>getTotalOutstanding(state.clients);
+const totalPaid=()=>getTotalPaid(state.clients);
 const txTotals=()=>state.transactions.reduce((a,t)=>(a[t.type]+=Number(t.amount),a),{income:0,expense:0});
 const monthlyBudget=()=>state.budgets.reduce((a,b)=>a+Number(b.monthly),0);
 const yearlyTotal=()=>state.yearly.reduce((a,b)=>a+Number(b.amount),0);
+const yearlyProjectionTotal=(year)=>getYearlyProjectionTotal(state.yearly,year,currentYear());
 const eventTotal=()=>state.events.reduce((a,b)=>a+Number(b.amount),0);
 const unpaidCreditTotal=()=>state.credit.filter(x=>!x.paid).reduce((a,b)=>a+Number(b.amount),0);
 const spentExact=(cat)=>state.transactions.filter(t=>t.type==="expense"&&t.category===cat).reduce((a,b)=>a+Number(b.amount),0);
@@ -64,7 +70,7 @@ const invested=(s)=>{
  return s.currency==="USD"?v*state.usdIdr:v;
 };
 const portfolio=(y=2026,mode="base")=>state.stocks.reduce((a,s)=>a+stockValue(s,y,mode),0);
-const currentNW=()=>accountTotal()+portfolio();
+const currentNW=()=>getCurrentNetWorth(accountTotal(),portfolio());
 const AGE_BASE=[33,30,0];
 const ageTriplet=(year)=>AGE_BASE.map(v=>v+(year-2026));
 const moneyClass=(n)=>Number(n)<0?"negative":"";
@@ -76,17 +82,9 @@ function normalizeStockMappings() {
 }
 
 function projection(mode="base"){
- let cash=accountTotal();
- return YEARS.map(y=>{
-  const income=fixedIncome()*12;
-  const eventExp=state.events.filter(e=>new Date(e.date).getFullYear()===y).reduce((a,b)=>a+Number(b.amount),0);
-  const expense=monthlyBudget()*12 + yearlyTotal() + eventExp + (y===2026?unpaidCreditTotal():0);
-  const port=portfolio(y,mode);
-  const closing=cash + income - expense;
-  const nw=closing + port;
-  const res={year:y,income,expense,portfolio:port,closing,nw};
-  cash=closing;
-  return res;
+ return buildProjection({
+  years:YEARS,accountTotal:accountTotal(),clients:state.clients,monthlyBudget:monthlyBudget(),yearly:state.yearly,
+  events:state.events,unpaidCredit:unpaidCreditTotal(),portfolioForYear:year=>portfolio(year,mode),activeYear:currentYear()
  });
 }
 
@@ -153,14 +151,14 @@ function switchPage(p){
 }
 
 function renderAccumulation(){
- const projected=accountTotal()+totalOutstanding()-monthlyBudget()-unpaidCreditTotal();
+ const projected=currentNW();
  projectedCash.textContent=fmt(projected);
  availableBalance.textContent=fmt(accountTotal());
  outstandingIncome.textContent=fmt(totalOutstanding());
- cashHealth.textContent=projected>monthlyBudget()*2?"Healthy buffer":projected>0?"Tight but positive":"Negative cash risk";
- accChart.innerHTML=line([accountTotal()*.84,accountTotal()*.89,accountTotal()*.94,accountTotal()*.98,accountTotal(),projected],[],true);
+ cashHealth.textContent=projected>monthlyBudget()*2?"Healthy net worth":projected>0?"Positive net worth":"Negative net worth";
+ accChart.innerHTML=line([projected*.82,projected*.87,projected*.91,projected*.95,projected*.98,projected],[],true);
  accountList.innerHTML=listRows(state.accounts.map(a=>({icon:a.type==="Cash"?"💵":a.type==="Bank"?"🏦":"📱",name:a.name,sub:a.type,value:fmt(a.balance)})));
- paymentSummary.innerHTML=listRows(recurringClients().map(c=>({icon:c.status==="paid"?"✅":"⏳",name:c.name,sub:`Paid ${fmt(c.paid)}`,value:fmt(clientOutstanding(c)),cls:c.status==="paid"?"positive":""})));
+ paymentSummary.innerHTML=listRows(receivableClients().map(c=>({icon:c.clientType==="ending"?"🏁":c.status==="paid"?"✅":"⏳",name:c.name,sub:c.clientType==="ending"?"Ending client":`Paid ${fmt(c.paid)}`,value:fmt(clientOutstanding(c)),cls:clientOutstanding(c)===0?"positive":""})));
  pendingSummary.innerHTML=listRows([
   ...state.events.slice(0,3).map(e=>({icon:"📌",name:e.name,sub:e.date,value:fmt(e.amount)})),
   {icon:"💳",name:"Credit / PayLater",sub:`${state.credit.filter(x=>!x.paid).length} active items`,value:fmt(unpaidCreditTotal())}
@@ -168,10 +166,10 @@ function renderAccumulation(){
  balanceDonut.innerHTML=donut(state.accounts.map(a=>[a.name,Number(a.balance)]),fmt(accountTotal(),true));
  balanceLegend.innerHTML=legend(state.accounts.map(a=>[a.name,Number(a.balance)]));
  monthModel.innerHTML=listRows([
-  {icon:"📥",name:"Receivables",sub:"Pending clients",value:fmt(totalOutstanding()),cls:"positive"},
-  {icon:"🧾",name:"Budget",sub:"Monthly categories",value:fmt(monthlyBudget())},
-  {icon:"💳",name:"Credit",sub:"Unpaid items",value:fmt(unpaidCreditTotal())},
-  {icon:"📊",name:"Projected",sub:"Month-end balance",value:fmt(projected),cls:projected<0?"negative":"positive"}
+  {icon:"🏦",name:"Liquid",sub:"Cash, bank & wallets",value:fmt(accountTotal()),cls:"positive"},
+  {icon:"📈",name:"Stocks",sub:"Current market value",value:fmt(portfolio()),cls:"positive"},
+  {icon:"📥",name:"Receivables",sub:"Shown separately; not yet owned",value:fmt(totalOutstanding())},
+  {icon:"✨",name:"Net worth",sub:"Liquid + stocks",value:fmt(projected),cls:projected<0?"negative":"positive"}
  ]);
 }
 
@@ -202,6 +200,8 @@ function renderExpenses(){
  monthlyExpenseTotal.textContent=fmt(monthlyBudget());
  yearlyExpenseTotal.textContent=fmt(yearlyTotal());
  eventExpenseTotal.textContent=fmt(eventTotal());
+ qa("[data-expense-view]").forEach(button=>button.classList.toggle("active",button.dataset.expenseView===state.expenseView));
+ qa("[data-expense-panel]").forEach(panel=>panel.classList.toggle("active",panel.dataset.expensePanel===state.expenseView));
  budgetRows.innerHTML=state.budgets.map((b,i)=>{
   const spent=spentExact(b.category);
   const pct=b.monthly?spent/b.monthly*100:0, cls=pct>100?"over":pct>80?"warn":"";
@@ -212,23 +212,40 @@ function renderExpenses(){
  const budgetEntries=state.budgets.map(b=>[b.category,Number(b.monthly)]).sort((a,b)=>b[1]-a[1]);
  expenseDonut.innerHTML=donut(budgetEntries,fmt(monthlyBudget(),true));
  expenseLegend.innerHTML=legend(budgetEntries);
- yearlyExpenseGrid.innerHTML=state.yearly.map((y,i)=>`<div class="tile"><h4>${y.name}</h4><small>${y.month} · ${y.category}</small><strong class="private">${fmt(y.amount)}</strong><div class="tile-actions"><button class="icon-mini" data-edit-yearly="${i}" title="Edit">✎</button><button class="icon-mini" data-remove-yearly="${i}" title="Remove">🗑</button></div></div>`).join("") || `<div class="list-row"><div class="list-ic">ℹ</div><div class="list-meta"><b>No yearly expenses</b></div></div>`;
- eventGrid.innerHTML=state.events.map((e,i)=>`<div class="tile"><h4>${e.name}</h4><small>${e.date} · ${e.category}</small><strong class="private">${fmt(e.amount)}</strong><div class="tile-actions"><button class="icon-mini" data-edit-event="${i}" title="Edit">✎</button><button class="icon-mini" data-remove-event="${i}" title="Remove">🗑</button></div></div>`).join("") || `<div class="list-row"><div class="list-ic">ℹ</div><div class="list-meta"><b>No events</b></div></div>`;
+ yearlyExpenseGrid.innerHTML=state.yearly.map((y,i)=>{
+  const done=Number(y.lastPaidYear)===currentYear();
+  return `<div class="tile yearly-tile ${done?"done":"due"}"><span class="payment-badge ${done?"done":"due"}">${done?`DONE ${currentYear()}`:`DUE ${currentYear()}`}</span><h4>${y.name}</h4><small>${y.month} · ${y.category}</small><strong class="private">${fmt(y.amount)}</strong><div class="tile-actions"><button class="year-paid-toggle ${done?"done":""}" data-paid-yearly="${i}">${done?"Undo done":"Done this year"}</button><button class="icon-mini" data-edit-yearly="${i}" title="Edit">✎</button><button class="icon-mini" data-remove-yearly="${i}" title="Remove">🗑</button></div></div>`;
+ }).join("") || `<div class="list-row"><div class="list-ic">ℹ</div><div class="list-meta"><b>No yearly expenses</b></div></div>`;
+ eventGrid.innerHTML=state.events.map((e,i)=>`<div class="tile event-tile"><span class="event-year">${new Date(`${e.date}T00:00:00`).getFullYear()}</span><h4>${e.name}</h4><small>${e.date} · ${e.category}</small><strong class="private">${fmt(e.amount)}</strong><div class="tile-actions"><button class="icon-mini" data-edit-event="${i}" title="Edit">✎</button><button class="icon-mini" data-remove-event="${i}" title="Remove">🗑</button></div></div>`).join("") || `<div class="list-row"><div class="list-ic">ℹ</div><div class="list-meta"><b>No events</b></div></div>`;
  qa("[data-edit-yearly]").forEach(b=>b.onclick=()=>editYearly(Number(b.dataset.editYearly)));
  qa("[data-remove-yearly]").forEach(b=>b.onclick=()=>{state.yearly.splice(Number(b.dataset.removeYearly),1); save(); renderAll();});
+ qa("[data-paid-yearly]").forEach(b=>b.onclick=()=>{const item=state.yearly[Number(b.dataset.paidYearly)];item.lastPaidYear=Number(item.lastPaidYear)===currentYear()?null:currentYear();save();renderAll();});
  qa("[data-edit-event]").forEach(b=>b.onclick=()=>editEvent(Number(b.dataset.editEvent)));
  qa("[data-remove-event]").forEach(b=>b.onclick=()=>{state.events.splice(Number(b.dataset.removeEvent),1); save(); renderAll();});
  renderCredit();
 }
 
+function creditClass(source){
+ return source==="ShopeePayLater"?"shopee":source==="GoPayLater"?"gopay":"card";
+}
+function creditIcon(source){
+ if(source==="ShopeePayLater")return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 8V6.7A5 5 0 0 1 17 6.7V8M4.5 8h15l-1 12h-13l-1-12Z"/><path d="M9.2 13.2c.6-.7 1.5-1 2.8-1 1.6 0 2.7.6 2.7 1.7 0 2.7-5.4.8-5.4 3.3 0 1.1 1.1 1.8 2.8 1.8 1.2 0 2.2-.3 2.9-1"/></svg>`;
+ if(source==="GoPayLater")return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 6.2V12h-5.8M8.3 9.2h4.2a2.8 2.8 0 1 1 0 5.6H9.7v-3.2h2.8"/></svg>`;
+ return `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18M7 15h4"/></svg>`;
+}
+function emptyLane(label){
+ return `<div class="lane-empty"><span>＋</span><small>${label}</small></div>`;
+}
+
 function renderCredit(){
  creditSummary.innerHTML=state.creditFacilities.map(facility=>{
   const used=state.credit.filter(x=>x.source===facility.source && !x.paid).reduce((a,b)=>a+Number(b.amount),0);
-  return `<article class="metric-card"><small>${facility.source} · limit ${fmt(facility.limit)}</small><strong class="private">${fmt(used)}</strong></article>`;
+  return `<article class="metric-card credit-facility ${creditClass(facility.source)}"><div class="credit-brand-icon">${creditIcon(facility.source)}</div><small>${facility.source}</small><strong class="private">${fmt(used)}</strong><span>Limit ${fmt(facility.limit)}</span></article>`;
  }).join("");
- creditItems.innerHTML=state.credit.filter(x=>!x.paid).map(c=>`<div class="credit-row"><input type="checkbox" class="credit-check" data-paid="${c.id}"><div class="credit-main"><b>${c.description}</b><small>${c.source}</small></div><div>${c.source}</div><div>${c.due}</div><div class="list-value private">${fmt(c.amount)}</div><button class="icon-mini" data-del-credit="${c.id}" title="Remove">🗑</button></div>`).join("") || `<div class="list-row"><div class="list-ic">ℹ</div><div class="list-meta"><b>No active credit items</b><small>Add an item using the plus button</small></div></div>`;
- creditArchive.innerHTML=state.credit.filter(x=>x.paid).length?listRows(state.credit.filter(x=>x.paid).map(c=>({icon:"✅",name:c.description,sub:c.source,value:fmt(c.amount)}))):`<div class="list-row"><div class="list-ic">ℹ</div><div class="list-meta"><b>No archive yet</b></div></div>`;
+ creditItems.innerHTML=state.credit.filter(x=>!x.paid).map(c=>`<div class="credit-row"><input type="checkbox" class="credit-check" data-paid="${c.id}"><div class="credit-source-icon ${creditClass(c.source)}">${creditIcon(c.source)}</div><div class="credit-main"><b>${c.description}</b><small>${c.source} · due ${c.due}</small></div><div class="list-value private">${fmt(c.amount)}</div><button class="icon-mini" data-edit-credit="${c.id}" title="Edit">✎</button><button class="icon-mini" data-del-credit="${c.id}" title="Remove">🗑</button></div>`).join("") || `<div class="list-row"><div class="list-ic">ℹ</div><div class="list-meta"><b>No active credit items</b><small>Add an item using the plus button</small></div></div>`;
+ creditArchive.innerHTML=state.credit.filter(x=>x.paid).length?state.credit.filter(x=>x.paid).map(c=>`<div class="list-row"><div class="list-ic credit-source-icon ${creditClass(c.source)}">${creditIcon(c.source)}</div><div class="list-meta"><b>${c.description}</b><small>${c.source}</small></div><div class="list-value private">${fmt(c.amount)}</div><button class="icon-mini" data-edit-credit="${c.id}" title="Edit">✎</button></div>`).join(""):`<div class="list-row"><div class="list-ic">ℹ</div><div class="list-meta"><b>No archive yet</b></div></div>`;
  qa("[data-paid]").forEach(c=>c.onchange=()=>{const item=state.credit.find(x=>x.id===c.dataset.paid); if(item){item.paid=true; save(); renderAll();}});
+ qa("[data-edit-credit]").forEach(c=>c.onclick=()=>editCredit(c.dataset.editCredit));
  qa("[data-del-credit]").forEach(c=>c.onclick=()=>{state.credit=state.credit.filter(x=>x.id!==c.dataset.delCredit); save(); renderAll();});
 }
 
@@ -236,10 +253,12 @@ function renderClients(){
  fixedIncomeTotal.textContent=fmt(fixedIncome());
  clientOutstandingTotal.textContent=fmt(totalOutstanding());
  clientPaidTotal.textContent=fmt(totalPaid());
- clientGrid.innerHTML=state.clients.map((c,i)=>{
-  const statusIcon=c.status==="freeze"?"❄":c.status==="paid"?"✓":"⏳";
-  return `<div class="client-card ${c.status}"><div class="status-icon ${c.status}" title="${c.status}">${statusIcon}</div>${c.status==="freeze"?'<div class="freeze-ribbon">FROZEN</div>':''}<h4>${c.name}</h4><small>${fmt(c.monthly)} monthly</small><strong class="private">${fmt(c.paid)} paid</strong><small>Previous: ${fmt(c.carry)}<br>Outstanding: ${fmt(clientOutstanding(c))}</small><div class="client-actions"><button class="icon-mini" data-edit-client="${i}" title="Edit">✎</button><button class="icon-mini" data-status-client="${i}" title="Status">◉</button><button class="icon-mini" data-remove-client="${i}" title="Remove">🗑</button></div></div>`;
- }).join("");
+ const card=(c)=>{const i=state.clients.indexOf(c),ending=c.clientType==="ending",status=ending?(c.endingPaid?"paid":"pending"):c.status,statusIcon=status==="freeze"?"❄":status==="paid"?"✓":"⏳";return `<div class="client-card ${status} ${ending?"ending":"recurring"}"><div class="status-icon ${status}" title="${status}">${statusIcon}</div>${status==="freeze"?'<div class="freeze-ribbon">FROZEN</div>':''}<h4>${c.name}</h4><small>${ending?"Final payment":"Recurring monthly"} · ${fmt(c.monthly)}</small><strong class="private">${ending?(c.endingPaid?"Paid":"Unpaid"):`${fmt(c.paid)} paid`}</strong><small>${ending?`Remaining: ${fmt(clientOutstanding(c))}`:`Previous: ${fmt(c.carry)}<br>Outstanding: ${fmt(clientOutstanding(c))}`}</small><div class="client-actions"><button class="icon-mini" data-edit-client="${i}" title="Edit">✎</button><button class="icon-mini" data-status-client="${i}" title="Status">◉</button><button class="icon-mini" data-remove-client="${i}" title="Remove">🗑</button></div></div>`;};
+ const recurring=recurringClients(),ending=endingClients(),frozen=frozenClients();
+ recurringClientCount.textContent=recurring.length;endingClientCount.textContent=ending.length;frozenClientCount.textContent=frozen.length;
+ recurringClientGrid.innerHTML=recurring.map(card).join("")||emptyLane("No recurring clients");
+ endingClientGrid.innerHTML=ending.map(card).join("")||emptyLane("No ending clients");
+ frozenClientGrid.innerHTML=frozen.map(card).join("")||emptyLane("No frozen clients");
  qa("[data-edit-client]").forEach(b=>b.onclick=()=>editClient(Number(b.dataset.editClient)));
  qa("[data-status-client]").forEach(b=>b.onclick=()=>changeClientStatus(Number(b.dataset.statusClient)));
  qa("[data-remove-client]").forEach(b=>b.onclick=()=>{state.clients.splice(Number(b.dataset.removeClient),1); save(); renderAll();});
@@ -335,6 +354,8 @@ function renderElectricity(){
 function renderProspect(){
  const pr=projection(state.prospectMode), last=pr.at(-1), growth=currentNW()?((last.nw/currentNW()-1)*100):0;
  prospectValue.textContent=fmt(last.nw);
+ sideCurrentLabel.textContent=`Projected ${currentYear()}`;
+ sideCurrentProjection.textContent=fmt(currentNW(),true);
  sideProjection.textContent=fmt(last.nw,true);
  sideScenario.textContent=state.prospectMode==="base"?"Base":"Optimistic";
  prospectBadge.textContent=state.prospectMode.toUpperCase();
@@ -344,10 +365,10 @@ function renderProspect(){
  prospectSources.innerHTML=listRows([
   {icon:"🏦",name:"Liquid balance",sub:"Cash + bank + wallets",value:fmt(accountTotal())},
   {icon:"🤝",name:"Recurring income",sub:"Fixed clients / year",value:fmt(fixedIncome()*12)},
-  {icon:"🧾",name:"Yearly outflow",sub:"Monthly budgets + yearly costs",value:fmt(monthlyBudget()*12+yearlyTotal())},
+  {icon:"🧾",name:"Yearly outflow",sub:"Monthly budgets + unpaid yearly costs",value:fmt(monthlyBudget()*12+yearlyProjectionTotal(currentYear()))},
   {icon:"📈",name:"Stock scenario",sub:state.prospectMode==="base"?"Base target prices":"Optimistic target prices",value:fmt(portfolio(2036,state.prospectMode))}
  ]);
- yearGrid.innerHTML=pr.map(y=>{const ages=ageTriplet(y.year).join(", "); return `<div class="year-card"><div class="year-head"><small>${y.year}</small><span class="age-triplet">${ages}</span></div><h4 class="private ${moneyClass(y.nw)}">${fmt(y.nw)}</h4><small class="private">Cash <span class="${moneyClass(y.closing)}">${fmt(y.closing)}</span> · Stocks <span class="${moneyClass(y.portfolio)}">${fmt(y.portfolio)}</span></small></div>`;}).join("");
+ yearGrid.innerHTML=pr.map(y=>{const ages=ageTriplet(y.year).join(", "); return `<div class="year-card"><div class="year-head"><small>${y.year}</small><span class="age-triplet">${ages}</span></div><h4 class="private ${moneyClass(y.nw)}">${fmt(y.nw)}</h4><small class="year-split private"><span>Cash <b class="${moneyClass(y.closing)}">${fmt(y.closing)}</b></span><span>Stocks <b class="${moneyClass(y.portfolio)}">${fmt(y.portfolio)}</b></span></small></div>`;}).join("");
 }
 
 function renderInsights(){
@@ -453,22 +474,44 @@ function editClient(i){
  const x=state.clients[i];
  openSimple("Edit Client",[
   {key:"name",label:"Client Name",value:x.name},
-  {key:"monthly",label:"Monthly Retainer",type:"number",value:x.monthly},
+  {key:"clientType",label:"Client Type",options:["recurring","ending"],value:x.clientType||"recurring"},
+  {key:"monthly",label:"Monthly Retainer / Final Amount",type:"number",value:x.monthly},
   {key:"paid",label:"Paid This Month",type:"number",value:x.paid},
   {key:"carry",label:"Previous Outstanding",type:"number",value:x.carry}
  ],o=>{
   state.clients[i]={...x,...o};
-  if(state.clients[i].status!=="freeze"){
+  if(o.clientType==="ending"){
+   state.clients[i].endingPaid=Boolean(x.endingPaid)&&o.paid>=o.monthly+o.carry;
+   state.clients[i].status=state.clients[i].endingPaid?"paid":"pending";
+  }else if(state.clients[i].status!=="freeze"){
+   state.clients[i].endingPaid=false;
    state.clients[i].status = o.paid >= o.monthly + o.carry ? "paid" : "pending";
   }
  });
 }
 function changeClientStatus(i){
  const x=state.clients[i];
+ if(x.clientType==="ending"){
+  openSimple("Update Ending Client",[
+   {key:"payment",label:"Final Payment",options:["unpaid","paid"],value:x.endingPaid?"paid":"unpaid"}
+  ],o=>{const done=o.payment==="paid";state.clients[i]={...x,endingPaid:done,status:done?"paid":"pending",paid:done?Number(x.monthly)+Number(x.carry):0};});
+  return;
+ }
  openSimple("Update Client Status",[
   {key:"status",label:"Status",options:["paid","pending","freeze"],value:x.status},
   {key:"paid",label:"Paid This Month",type:"number",value:x.paid}
  ],o=>state.clients[i]={...x,status:o.status,paid:o.paid});
+}
+function editCredit(id){
+ const i=state.credit.findIndex(item=>item.id===id),x=state.credit[i];
+ if(!x)return;
+ openSimple("Edit Credit / PayLater Item",[
+  {key:"source",label:"Source",options:["Credit Card","GoPayLater","ShopeePayLater"],value:x.source},
+  {key:"description",label:"Description",value:x.description},
+  {key:"amount",label:"Amount",type:"number",value:x.amount},
+  {key:"due",label:"Due Date",type:"date",value:x.due},
+  {key:"payment",label:"Payment Status",options:["unpaid","paid"],value:x.paid?"paid":"unpaid"}
+ ],o=>state.credit[i]={...x,source:o.source,description:o.description,amount:o.amount,due:o.due,paid:o.payment==="paid"});
 }
 function autoDueDate(source){
  const dueDays={"Credit Card":26,"GoPayLater":31,"ShopeePayLater":25};
@@ -519,6 +562,7 @@ qa("#cashFilter button").forEach(b=>b.onclick=()=>{qa("#cashFilter button").forE
 cashSort.onchange=()=>{state.sort=cashSort.value; renderCashflow();};
 txSearch.oninput=()=>renderCashflow();
 qa("#prospectTabs button").forEach(b=>b.onclick=()=>{qa("#prospectTabs button").forEach(x=>x.classList.remove("active")); b.classList.add("active"); state.prospectMode=b.dataset.prospect; renderProspect(); renderInsights();});
+qa("[data-expense-view]").forEach(b=>b.onclick=()=>{state.expenseView=b.dataset.expenseView;renderExpenses();});
 baseModeToggle.onclick=()=>{state.baseMode = state.baseMode === "manual" ? "auto" : "manual"; saveSettings(); updateModeToggleLabels(); renderAll();};
 optimisticModeToggle.onclick=()=>{state.optimisticMode = state.optimisticMode === "manual" ? "auto" : "manual"; saveSettings(); updateModeToggleLabels(); renderAll();};
 baseGrowth.oninput=()=>{state.baseGrowth=Number(baseGrowth.value); saveSettings(); if(state.baseMode==="auto") renderAll();};
@@ -562,7 +606,7 @@ addYearlyBtn.onclick=()=>openSimple("Add Yearly Expense",[
  {key:"amount",label:"Amount",type:"number"},
  {key:"month",label:"Payment Month"},
  {key:"category",label:"Category"}
-],o=>state.yearly.push({id:createId(),...o}));
+],o=>state.yearly.push({id:createId(),...o,lastPaidYear:null}));
 addEventBtn.onclick=addEventBtnTop.onclick=()=>openSimple("Add Event",[
  {key:"name",label:"Name"},
  {key:"amount",label:"Amount",type:"number"},
@@ -582,11 +626,12 @@ addCreditBtn.onclick=()=>{
 };
 addClientBtn.onclick=()=>openSimple("Add Client",[
  {key:"name",label:"Client Name"},
- {key:"monthly",label:"Monthly Retainer",type:"number"},
+ {key:"clientType",label:"Client Type",options:["recurring","ending"],value:"recurring"},
+ {key:"monthly",label:"Monthly Retainer / Final Amount",type:"number"},
  {key:"paid",label:"Paid This Month",type:"number",value:0},
  {key:"carry",label:"Previous Outstanding",type:"number",value:0},
  {key:"status",label:"Status",options:["paid","pending","freeze"],value:"pending"}
-],o=>state.clients.push({id:createId(),...o}));
+],o=>state.clients.push({id:createId(),...o,endingPaid:o.clientType==="ending"&&o.status==="paid",status:o.clientType==="ending"?(o.status==="paid"?"paid":"pending"):o.status}));
 addTickerBtn.onclick=()=>openSimple("Add Ticker",[
  {key:"ticker",label:"Ticker"},
  {key:"market",label:"Market",options:["IDX","NASDAQ","NYSE"],value:"NASDAQ"},
@@ -606,7 +651,7 @@ qa("dialog").forEach(d=>d.addEventListener("click",e=>{if(e.target===d)d.close()
 
 function applyCloudState(next,{preserveUi=false}={}){
  if(preserveUi){renderAll();return;}
- const ui={page:state.page,privacy:state.privacy,filter:state.filter,sort:state.sort,txEdit:null,prospectMode:state.prospectMode};
+ const ui={page:state.page,privacy:state.privacy,filter:state.filter,sort:state.sort,expenseView:state.expenseView,txEdit:null,prospectMode:state.prospectMode};
  Object.assign(state,next,ui);
  document.documentElement.dataset.theme=state.theme;
  localStorage.setItem("cvfinance-theme-cache",state.theme);

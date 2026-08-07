@@ -1,4 +1,6 @@
-# CVFinance v7.2.0
+# CVFinance v7.3.0
+
+v7.3.0 adds theme-aware vibrant surfaces and corrects the finance model requested after mobile testing. Accumulation now represents current liquid balances plus current stock value; future plans do not reduce it. Clients are separated into recurring, ending, and frozen lanes; only active recurring clients enter Prospect. Events reduce only their matching projection year, yearly costs track `DONE THIS YEAR`, credit items are editable with provider-specific SVG icons, and the mobile navigation now includes Clients and Electricity.
 
 v7.2.0 adds a mobile/tablet-only responsive shell while leaving the desktop layout and all financial logic intact. It includes compact type and cards, safe currency wrapping, touch-friendly forms, mobile stock holding cards, internally scrollable projection tables, an icon-only persistent bottom navigation, automatic mobile scroll-to-top, and a polished standalone PWA experience.
 
@@ -20,6 +22,10 @@ Deployment-ready continuation of CVFinance v6.3.1. The existing eight-tab UI and
 - Isolated `/api/telegram/cvfinance-webhook` route with deterministic Indonesian money/date parsing
 - Telegram quick transactions, balances, clients, credit, electricity, stocks, targets, and summary commands
 - Isolated phone/tablet breakpoints up to 1024 px; existing desktop rendering stays unchanged
+- Three client lifecycle lanes with recurring-income isolation
+- Year-aware Events and annual payment completion tracking
+- Theme-aware vibrant cards without dark light-mode panels
+- Seven-button icon-only mobile navigation and compact stock editing cards
 - App-like Android installation through the existing PWA, with no second database or desktop process
 
 ## Commands
@@ -39,6 +45,7 @@ For local full-stack testing, use `vercel dev`; plain `npm run dev` does not emu
 - [Stock API setup](docs/STOCK_API_SETUP.md)
 - [Private Telegram bot setup](docs/TELEGRAM_SETUP.md)
 - [Mobile v7.2.0 patch](docs/PATCH_v7_2_0_MOBILE.md)
+- [Finance and UI v7.3.0 patch](docs/PATCH_v7_3_0_FINANCE_UI.md)
 - [Manual actions](docs/MANUAL_ACTIONS.md)
 - [Test checklist](docs/TEST_CHECKLIST.md)
 - [Rollback](docs/ROLLBACK.md)

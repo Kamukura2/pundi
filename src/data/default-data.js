@@ -9,6 +9,7 @@ export function createEmptyState() {
     privacy: false,
     filter: "all",
     sort: "date",
+    expenseView: "monthly",
     txEdit: null,
     prospectMode: "base",
     baseMode: "manual",
@@ -58,10 +59,10 @@ export function createMvpSeed() {
       {id:createId(),name:"SeaBank",type:"Bank",balance:52000}
     ],
     clients: [
-      {id:createId(),name:"Getlook",monthly:4000000,paid:2000000,status:"pending",carry:0},
-      {id:createId(),name:"Client B",monthly:2500000,paid:1200000,status:"pending",carry:500000},
-      {id:createId(),name:"New Client C",monthly:1800000,paid:0,status:"pending",carry:0},
-      {id:createId(),name:"Paused Client",monthly:2200000,paid:0,status:"freeze",carry:0}
+      {id:createId(),name:"Getlook",monthly:4000000,paid:2000000,status:"pending",carry:0,clientType:"recurring",endingPaid:false},
+      {id:createId(),name:"Client B",monthly:2500000,paid:1200000,status:"pending",carry:500000,clientType:"recurring",endingPaid:false},
+      {id:createId(),name:"New Client C",monthly:1800000,paid:0,status:"pending",carry:0,clientType:"recurring",endingPaid:false},
+      {id:createId(),name:"Paused Client",monthly:2200000,paid:0,status:"freeze",carry:0,clientType:"recurring",endingPaid:false}
     ],
     transactions: [
       {id:createId(),type:"expense",amount:240000,description:"Internet bill",category:"Essentials",channel:"Transfer",date:"2026-08-06"},
@@ -76,8 +77,8 @@ export function createMvpSeed() {
       {id:createId(),category:"Subscriptions",monthly:260000},{id:createId(),category:"Others",monthly:1000000}
     ],
     yearly: [
-      {id:createId(),name:"Annual Insurance",amount:6000000,month:"December",category:"Insurance"},
-      {id:createId(),name:"Vehicle Tax",amount:2500000,month:"March",category:"Tax"}
+      {id:createId(),name:"Annual Insurance",amount:6000000,month:"December",category:"Insurance",lastPaidYear:null},
+      {id:createId(),name:"Vehicle Tax",amount:2500000,month:"March",category:"Tax",lastPaidYear:null}
     ],
     events: [
       {id:createId(),name:"Child Vaccine",amount:1950000,date:"2027-07-01",category:"Health"},
@@ -128,9 +129,9 @@ export function readLegacyLocalStorage() {
     optimisticMode: settings.optimisticMode === "auto" ? "auto" : "manual",
     baseGrowth: Number(settings.baseGrowth ?? 8), optimisticGrowth: Number(settings.optimisticGrowth ?? 14),
     usdIdr: Number(settings.usdIdr ?? 16250), rateKwh: Number(settings.rateKwh ?? 1740),
-    accounts: withIds(read("v6-accounts")), clients: withIds(read("v6-clients")),
+    accounts: withIds(read("v6-accounts")), clients: withIds(read("v6-clients")).map(client=>({...client,clientType:"recurring",endingPaid:false})),
     transactions: withIds(read("v6-tx")), budgets: withIds(read("v6-budgets")),
-    yearly: withIds(read("v6-yearly")), events: withIds(read("v6-events")),
+    yearly: withIds(read("v6-yearly")).map(item=>({...item,lastPaidYear:null})), events: withIds(read("v6-events")),
     creditFacilities: createMvpSeed().creditFacilities,
     credit: withIds(read("v6-credit")), stocks, electricity: withIds(read("v6-electric"))
   };

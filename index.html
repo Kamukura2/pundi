@@ -35,9 +35,16 @@
     </nav>
 
     <div class="side-projection">
-      <small>Projected 2036</small>
-      <strong id="sideProjection">Rp0</strong>
-      <span id="sideScenario">Base</span>
+      <div class="side-projection-now">
+        <small id="sideCurrentLabel">Projected 2026</small>
+        <strong id="sideCurrentProjection">Rp0</strong>
+        <span>Current net worth</span>
+      </div>
+      <div class="side-projection-future">
+        <small>Projected 2036</small>
+        <strong id="sideProjection">Rp0</strong>
+        <span id="sideScenario">Base</span>
+      </div>
     </div>
   </aside>
 
@@ -61,11 +68,11 @@
       <div class="hero-grid">
         <article class="hero-card hero-main">
           <div class="hero-chip">LIVE MODEL</div>
-          <small>Projected Cash After This Month</small>
+          <small>Total Net Worth This Month</small>
           <div id="projectedCash" class="hero-value private">Rp0</div>
           <div class="hero-inline">
             <span id="cashHealth">Healthy buffer</span>
-            <span>Balances − pending + receivables</span>
+            <span>Liquid balance + current stocks</span>
           </div>
           <div id="accChart" class="chart chart-hero"></div>
         </article>
@@ -180,13 +187,13 @@
     </section>
 
     <section id="expenses" class="page">
-      <div class="grid-3 compact">
-        <article class="metric-card tint-purple"><small>Monthly Budget</small><strong id="monthlyExpenseTotal" class="private">Rp0</strong></article>
-        <article class="metric-card tint-orange"><small>Yearly Expense</small><strong id="yearlyExpenseTotal" class="private">Rp0</strong></article>
-        <article class="metric-card tint-cyan"><small>Events</small><strong id="eventExpenseTotal" class="private">Rp0</strong></article>
+      <div class="expense-tabs" id="expenseTabs" aria-label="Expense sections">
+        <button class="expense-tab monthly active" type="button" data-expense-view="monthly"><small>Monthly Budget</small><strong id="monthlyExpenseTotal" class="private">Rp0</strong></button>
+        <button class="expense-tab yearly" type="button" data-expense-view="yearly"><small>Yearly Expense</small><strong id="yearlyExpenseTotal" class="private">Rp0</strong></button>
+        <button class="expense-tab events" type="button" data-expense-view="events"><small>Events</small><strong id="eventExpenseTotal" class="private">Rp0</strong></button>
       </div>
 
-      <div class="grid-2 gap-lg">
+      <div class="grid-2 gap-lg expense-view active" data-expense-panel="monthly">
         <article class="panel">
           <div class="panel-head">
             <div><p>Monthly</p><h3>Editable Budgets</h3></div>
@@ -204,8 +211,8 @@
         </article>
       </div>
 
-      <div class="grid-2 gap-lg">
-        <article class="panel">
+      <div class="expense-view" data-expense-panel="yearly">
+        <article class="panel expense-feature-panel">
           <div class="panel-head">
             <div><p>Yearly</p><h3>Yearly Expense</h3></div>
             <button class="ghost-btn" id="addYearlyBtn" title="Add">＋</button>
@@ -213,11 +220,15 @@
           <div id="yearlyExpenseGrid" class="tile-grid"></div>
         </article>
 
-        <article class="panel">
+      </div>
+
+      <div class="expense-view" data-expense-panel="events">
+        <article class="panel expense-feature-panel">
           <div class="panel-head">
-            <div><p>Events</p><h3>Planned Events</h3></div>
+            <div><p>Future spending</p><h3>Events</h3></div>
             <button class="ghost-btn" id="addEventBtn" title="Add">＋</button>
           </div>
+          <p class="section-note">Each event reduces Prospect only in its event year. It never reduces this month's Accumulation.</p>
           <div id="eventGrid" class="tile-grid"></div>
         </article>
       </div>
@@ -248,10 +259,20 @@
         <article class="metric-card tint-blue"><small>Fixed Monthly</small><strong id="fixedIncomeTotal" class="private">Rp0</strong></article>
       </div>
 
-      <article class="panel">
-        <div class="panel-head"><div><p>Clients</p><h3>Payment Tracking</h3></div></div>
-        <div id="clientGrid" class="client-grid"></div>
-      </article>
+      <div class="client-lanes">
+        <article class="panel client-lane recurring-lane">
+          <div class="panel-head"><div><p>Projected income</p><h3>Recurring Clients</h3></div><span id="recurringClientCount" class="lane-count">0</span></div>
+          <div id="recurringClientGrid" class="client-grid"></div>
+        </article>
+        <article class="panel client-lane ending-lane">
+          <div class="panel-head"><div><p>Final payment only</p><h3>Ending Clients</h3></div><span id="endingClientCount" class="lane-count">0</span></div>
+          <div id="endingClientGrid" class="client-grid"></div>
+        </article>
+        <article class="panel client-lane frozen-lane">
+          <div class="panel-head"><div><p>Not projected</p><h3>Frozen Clients</h3></div><span id="frozenClientCount" class="lane-count">0</span></div>
+          <div id="frozenClientGrid" class="client-grid"></div>
+        </article>
+      </div>
     </section>
 
     <section id="stocks" class="page">
@@ -419,11 +440,17 @@
     <button data-page="cashflow" type="button" aria-label="Cashflow" title="Cashflow">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V9m7 10V5m7 14v-7M3 19.5h18"/></svg>
     </button>
+    <button data-page="clients" type="button" aria-label="Clients" title="Clients">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.3 11.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4ZM2.8 19.2c.4-3 2.2-4.8 5.5-4.8s5.1 1.8 5.5 4.8M16.7 11a2.5 2.5 0 1 0 0-5M15.7 14.7c3.1-.3 5 1.2 5.5 4.5"/></svg>
+    </button>
     <button class="plus" data-open-tx type="button" aria-label="Add transaction" title="Add transaction">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
     </button>
     <button data-page="stocks" type="button" aria-label="Stocks" title="Stocks">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 17 5-5 3 3 7-8M15 7h4v4"/></svg>
+    </button>
+    <button data-page="electricity" type="button" aria-label="Electricity" title="Electricity">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m13.5 2-7 11h5l-1 9 7-12h-5l1-8Z"/></svg>
     </button>
     <button data-page="prospect" type="button" aria-label="Future projection" title="Future projection">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.2 5.1c2.2-.8 4.1-.9 5.1-.8.1 1-.1 2.9-.9 5.1-1.1 2.8-3.2 5.1-6.2 6.4l-4-4c1.1-3.1 3.3-5.5 6-6.7ZM8.5 15.5 5 19m9-8.5h.01"/></svg>
