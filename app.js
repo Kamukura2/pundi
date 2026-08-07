@@ -6,6 +6,7 @@ import { normalizeStockMapping, quantityForDisplay, quantityForStorage, quantity
 import { getSupabase } from "./src/lib/supabase.js";
 
 const COLORS=["#7F66FF","#39C3FF","#FF8F63","#36D695","#F4C24F","#FF6EA8","#62C8FF","#8D7AFF"];
+const COMPANY_EXPENSE_TAG="Expense Perusahaan";
 const todayISO=()=>{
  const d=new Date(), pad=n=>String(n).padStart(2,"0");
  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
@@ -61,6 +62,8 @@ const yearlyProjectionTotal=(year)=>getYearlyProjectionTotal(state.yearly,year,c
 const eventTotal=()=>state.events.reduce((a,b)=>a+Number(b.amount),0);
 const unpaidCreditTotal=()=>state.credit.filter(x=>!x.paid).reduce((a,b)=>a+Number(b.amount),0);
 const isCurrentMonthTx=t=>String(t.date).startsWith(monthKey(new Date()));
+const isCompanyExpenseTx=t=>t.type==="expense"&&String(t.category||"").trim().toLowerCase()===COMPANY_EXPENSE_TAG.toLowerCase();
+const isCompanyExpenseTag=value=>String(value||"").trim().toLowerCase()===COMPANY_EXPENSE_TAG.toLowerCase();
 const spentExact=(cat)=>state.transactions.filter(t=>t.type==="expense"&&t.category===cat&&isCurrentMonthTx(t)).reduce((a,b)=>a+Number(b.amount),0);
 const coffeeSpentForInsight=()=>state.transactions.filter(t=>t.type==="expense"&&String(t.category).toLowerCase()==="coffee"&&String(t.date).startsWith(monthKey(new Date()))).reduce((a,b)=>a+Number(b.amount),0);
 const foodSpent=()=>state.transactions.filter(t=>t.type==="expense"&&isCurrentMonthTx(t)&&(t.category==="Food"||t.category==="Coffee")).reduce((a,b)=>a+Number(b.amount),0);
@@ -101,6 +104,7 @@ const ID_TRANSLATIONS={
  "Remaining Expense This Year":"Sisa Pengeluaran Tahun Ini","Dynamic estimate from this month through December. History expenses are never deducted twice.":"Estimasi dinamis dari bulan ini sampai Desember. Pengeluaran di Riwayat tidak pernah dikurangi dua kali.",
  "Monthly Remaining":"Sisa Bulanan","Events + Credit":"Acara + Kredit","Editable Budgets":"Anggaran yang Dapat Diedit","Category Breakdown":"Rincian Kategori","Credit Card & PayLater":"Kartu Kredit & PayLater","Entrusted Funds":"Titipan Dana","Non-recurring liability":"Kewajiban non-berulang","Budget Tag":"Tag Anggaran","Cash Balance":"Saldo Kas","Settled":"Selesai","Active":"Aktif",
  "Paid Items":"Item Lunas","Paid This Month":"Dibayar Bulan Ini","Outstanding":"Belum Dibayar","Fixed Monthly":"Tetap Bulanan","Recurring Clients":"Klien Berulang","Ending Clients":"Klien Berakhir","Estimated Income This Year":"Estimasi Pemasukan Tahun Ini","Outstanding Now":"Piutang Saat Ini",
+ "Fixed Yearly":"Tetap Tahunan","Expense Perusahaan":"Expense Perusahaan","Capital record only":"Pencatatan modal saja",
  "Total Portfolio Value":"Total Nilai Portofolio","Invested":"Modal","Unrealized":"Belum Direalisasi","Allocation":"Alokasi","Holdings":"Kepemilikan","Target prices":"Target harga","Budget":"Anggaran","Optional liquid assets":"Aset likuid opsional","Netcash & USD Wallet":"Netcash & Dompet USD","Included in total assets":"Masuk ke total aset",
  "Latest Meter Balance":"Sisa Token Terbaru","Average Daily Usage":"Rata-rata Harian","Estimated Monthly Cost":"Estimasi Biaya Bulanan","Meter Readings":"Catatan Meter",
  "Read-only projection":"Proyeksi hanya-baca","Projection Sources":"Sumber Proyeksi","Future Cash + Assets":"Kas + Aset Masa Depan","Cash Runway":"Daya Tahan Kas","Largest Expense":"Pengeluaran Terbesar","Largest Holding":"Saham Terbesar",
@@ -315,6 +319,14 @@ function renderExpenses(){
  const budgetEntries=state.budgets.map(b=>[b.category,Number(b.monthly)]).sort((a,b)=>b[1]-a[1]);
  expenseDonut.innerHTML=donut(budgetEntries,fmt(monthlyBudget(),true));
  expenseLegend.innerHTML=legend(budgetEntries);
+ const companyRows=state.transactions.filter(isCompanyExpenseTx).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+ const nowForCompany=new Date(),companyYear=nowForCompany.getFullYear(),companyMonth=monthKey(nowForCompany);
+ const companyThisMonth=companyRows.filter(row=>String(row.date).startsWith(companyMonth)).reduce((sum,row)=>sum+Math.abs(Number(row.amount)),0);
+ const companyThisYear=companyRows.filter(row=>String(row.date).startsWith(`${companyYear}-`)).reduce((sum,row)=>sum+Math.abs(Number(row.amount)),0);
+ const companyMonthly=Array.from({length:12},(_,index)=>companyRows.filter(row=>String(row.date).startsWith(`${companyYear}-${String(index+1).padStart(2,"0")}`)).reduce((sum,row)=>sum+Math.abs(Number(row.amount)),0));
+ const companyPeak=Math.max(1,...companyMonthly);
+ const companyRecent=companyRows.slice(0,4);
+ companyExpenseDashboard.innerHTML=`<div class="company-expense-hero"><div><small>FIXED HISTORY TAG</small><h3>${COMPANY_EXPENSE_TAG}</h3><p>Capital record only · never changes Balance, Budget, or Prospect.</p></div><strong class="private">${fmt(companyThisMonth)}</strong><span>This month</span></div><div class="company-expense-kpis"><span><small>${companyYear}</small><b class="private">${fmt(companyThisYear)}</b></span><span><small>All-time records</small><b>${companyRows.length}</b></span></div><div class="company-expense-bars" aria-label="${companyYear} company expense by month">${companyMonthly.map((value,index)=>`<span title="${new Intl.DateTimeFormat(state.language==="id"?"id-ID":"en-US",{month:"long"}).format(new Date(companyYear,index,1))}: ${fmt(value)}"><i style="height:${Math.max(value?12:3,value/companyPeak*100)}%"></i><small>${new Intl.DateTimeFormat(state.language==="id"?"id-ID":"en-US",{month:"narrow"}).format(new Date(companyYear,index,1))}</small></span>`).join("")}</div><div class="company-expense-recent">${companyRecent.length?companyRecent.map(row=>`<span><b>${row.description}</b><small>${row.date}</small><em class="private">${fmt(row.amount)}</em></span>`).join(""):`<div class="company-expense-empty"><b>No company expenses recorded</b><small>Choose the ${COMPANY_EXPENSE_TAG} tag when adding an expense in History.</small></div>`}</div>`;
  const orderedYearly=[...state.yearly].sort((a,b)=>{
   const doneA=Number(a.lastPaidYear)===currentYear(),doneB=Number(b.lastPaidYear)===currentYear();
   return Number(doneA)-Number(doneB)||Number(a.sortOrder||0)-Number(b.sortOrder||0);
@@ -475,6 +487,7 @@ function renderEntrusted(){
 
 function renderClients(){
  fixedIncomeTotal.textContent=fmt(fixedIncome());
+ fixedYearlyIncomeTotal.textContent=fmt(fixedIncome()*12);
  clientOutstandingTotal.textContent=fmt(totalOutstanding());
  clientPaidTotal.textContent=fmt(totalPaid());
  const income=remainingYearIncomeBreakdown({referenceDate:new Date(),clients:state.clients,transactions:[]});
@@ -482,7 +495,7 @@ function renderClients(){
  clientIncomeOutstanding.textContent=fmt(income.outstanding);
  clientIncomeRecurring.textContent=fmt(income.recurring);
  clientIncomeRemainingMonths.textContent=`${Math.max(0,11-new Date().getMonth())} remaining months`;
- const card=(c)=>{const i=state.clients.indexOf(c),ending=c.clientType==="ending",paid=ending?c.endingPaid:clientOutstanding(c)===0,visual=ending?"ending":paid?"paid":"outstanding",statusIcon=ending?"⚑":paid?"✓":"⏳";return `<div class="client-card ${visual} ${ending?"ending":"recurring"}" data-client-id="${c.id}" title="Drag card to reorder or move between sections"><div class="status-icon ${paid?"paid":"pending"}" title="${ending?"ending client":paid?"paid":"outstanding"}">${statusIcon}</div><h4>${c.name}</h4><small>${ending?"Final payment":"Recurring monthly"} · ${fmt(c.monthly)}</small><strong class="private">${ending?(c.endingPaid?"Paid":"Unpaid"):`${fmt(getClientPaidThisMonth(c))} paid`}</strong><small>${ending?`Remaining: ${fmt(clientOutstanding(c))}`:`Previous: ${fmt(c.carry)}<br>Outstanding: ${fmt(clientOutstanding(c))}`}</small><div class="client-actions"><button class="icon-mini" data-edit-client="${i}" title="Edit">✎</button><button class="icon-mini" data-status-client="${i}" title="Status">◉</button><button class="icon-mini" data-remove-client="${i}" title="Remove">🗑</button></div></div>`;};
+ const card=(c)=>{const i=state.clients.indexOf(c),ending=c.clientType==="ending",paid=ending?c.endingPaid:clientOutstanding(c)===0,visual=ending?(paid?"ending-paid":"ending-unpaid"):paid?"paid":"outstanding",statusIcon=ending?"⚑":paid?"✓":"⏳";return `<div class="client-card ${visual} ${ending?"ending":"recurring"}" data-client-id="${c.id}" title="Drag card to reorder or move between sections"><div class="status-icon ${paid?"paid":"pending"}" title="${ending?`ending client · ${paid?"paid":"unpaid"}`:paid?"paid":"outstanding"}">${statusIcon}</div><h4>${c.name}</h4><small>${ending?"Final payment":"Recurring monthly"} · ${fmt(c.monthly)}</small><strong class="private">${ending?(c.endingPaid?"Paid":"Unpaid"):`${fmt(getClientPaidThisMonth(c))} paid`}</strong><small>${ending?`Remaining: ${fmt(clientOutstanding(c))}`:`Previous: ${fmt(c.carry)}<br>Outstanding: ${fmt(clientOutstanding(c))}`}</small><div class="client-actions"><button class="icon-mini" data-edit-client="${i}" title="Edit">✎</button><button class="icon-mini" data-status-client="${i}" title="Status">◉</button><button class="icon-mini" data-remove-client="${i}" title="Remove">🗑</button></div></div>`;};
  const recurring=[...recurringClients()].sort((a,b)=>Number(a.sortOrder||0)-Number(b.sortOrder||0)),ending=[...endingClients()].sort((a,b)=>Number(a.sortOrder||0)-Number(b.sortOrder||0));
  recurringClientCount.textContent=recurring.length;endingClientCount.textContent=ending.length;
  recurringClientGrid.innerHTML=recurring.map(card).join("")||emptyLane("No recurring clients");
@@ -523,7 +536,7 @@ function renderStocks(){
  stockWalletValue.textContent=fmt(Number(state.stockExtras?.walletUsd||0)*Number(state.usdIdr||0));
  if(typeof usdIdrRate!=="undefined"){
   const meta=state.usdIdrMeta;
-  const providerLabel={"google-finance":"GOOGLE FINANCE",yahoo:"YAHOO",finnhub:"FINNHUB"}[meta?.provider]||"SAVED RATE";
+  const providerLabel=meta?.provider==="google-finance"?"GOOGLE FINANCE":meta?.error?"GOOGLE UNAVAILABLE":"SAVED RATE · REFRESH GOOGLE";
   usdIdrRate.textContent=`1 USD = ${new Intl.NumberFormat("id-ID",{maximumFractionDigits:2}).format(Number(state.usdIdr||0))} IDR · ${providerLabel}`;
   usdIdrRate.title=meta?.asOf?`${providerLabel} · updated ${new Date(meta.asOf).toLocaleString("en-GB",{dateStyle:"medium",timeStyle:"short"})}`:"Last saved exchange rate";
  }
@@ -658,6 +671,12 @@ function renderInsights(){
  ],baseProjection.map(x=>String(x.year)));
  const scenarioGap=optimisticLast.nw-baseLast.nw,baseGrowthPct=currentNW()?((baseLast.nw/currentNW()-1)*100):0;
  scenarioKpis.innerHTML=`<article><small>2036 Scenario Gap</small><strong class="private ${moneyClass(scenarioGap)}">${scenarioGap>=0?"+":""}${fmt(scenarioGap)}</strong></article><article><small>Base Growth</small><strong>${baseGrowthPct>=0?"+":""}${baseGrowthPct.toFixed(1)}%</strong></article><article><small>2036 Closing Cash</small><strong class="private ${moneyClass(baseLast.closing)}">${fmt(baseLast.closing)}</strong></article><article><small>2036 Stock Assets</small><strong class="private ${moneyClass(baseLast.portfolio)}">${fmt(baseLast.portfolio)}</strong></article>`;
+ const yearlyMomentum=baseProjection.map((row,index)=>index?row.nw-baseProjection[index-1].nw:row.nw-currentNW());
+ const momentumPeak=Math.max(1,...yearlyMomentum.map(value=>Math.abs(value)));
+ const positiveYears=yearlyMomentum.filter(value=>value>=0).length;
+ const coachTitle=baseLast.nw>=currentNW()?"Consistency is compounding":"The model is a signal, not a verdict";
+ const coachText=baseLast.nw>=currentNW()?`${positiveYears} of ${yearlyMomentum.length} projected years improve or hold net worth. Keep income visible, protect runway, and review targets regularly.`:`Your base path needs an adjustment. Closing the income–expense gap now has more impact than waiting for a perfect market year.`;
+ insightCoach.innerHTML=`<div class="coach-message"><span>✦</span><div><small>MOMENTUM NOTE</small><h3>${coachTitle}</h3><p>${coachText}</p></div></div><div class="momentum-strip" aria-label="Year-over-year net worth momentum">${yearlyMomentum.map((value,index)=>`<span title="${baseProjection[index].year}: ${value>=0?"+":""}${fmt(value)}"><i class="${value<0?"down":"up"}" style="height:${Math.max(8,Math.abs(value)/momentumPeak*100)}%"></i><small>${String(baseProjection[index].year).slice(2)}</small></span>`).join("")}</div>`;
  const now=new Date(),prev=new Date(now.getFullYear(),now.getMonth()-1,1);
  const expenseIn=(date)=>state.transactions.filter(row=>row.type==="expense"&&String(row.date).startsWith(`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}`)).reduce((sum,row)=>sum+Number(row.amount),0);
  const thisExpense=expenseIn(now),previousExpense=expenseIn(prev),expenseDelta=previousExpense?((thisExpense-previousExpense)/previousExpense*100):0;
@@ -705,7 +724,7 @@ function openSimple(title,fields,callback){
    const el=q("#sf_"+f.key);
    obj[f.key]=f.type==="number"?Number(el.value):el.value;
   });
-  callback(obj);
+  if(callback(obj)===false)return;
   simpleModal.close();
   save(); renderAll(); toastMsg("Saved");
  };
@@ -717,9 +736,9 @@ function renderTxCategoryTags(preferred){
  const existing=state.transactions.filter(item=>item.type===type).map(item=>String(item.category).trim()).filter(Boolean);
  const fallbackExpense=["Essentials","Food","Coffee","Electricity","IPL","PAM","Internet","Needs","Subscriptions","Others"];
  const incomeTags=[...existing,"Bonus","Business","Investment","Other Income"];
- const tags=[...new Set(type==="expense"?[...(budgetTags.length?budgetTags:fallbackExpense),...(preferred&&!budgetTags.includes(preferred)?[preferred]:[])]:incomeTags)];
+ const tags=[...new Set(type==="expense"?[...(budgetTags.length?budgetTags:fallbackExpense),COMPANY_EXPENSE_TAG,...(preferred&&!budgetTags.includes(preferred)?[preferred]:[])]:incomeTags)];
  const selected=tags.includes(preferred)?preferred:(tags.includes(txCategory.value)?txCategory.value:tags[0]);
- txCategoryLabel.textContent=type==="expense"?"Budget Tag":"Income Tag";
+ txCategoryLabel.textContent=type==="expense"?"Budget / Record Tag":"Income Tag";
  txCategory.innerHTML=tags.map(tag=>`<option ${tag===selected?"selected":""}>${tag}</option>`).join("");
  txCategoryTags.innerHTML=tags.map(tag=>`<button type="button" class="category-tag ${tag===selected?"active":""}" data-category-tag="${tag}">${tag}</button>`).join("");
  qa("[data-category-tag]").forEach(button=>button.onclick=()=>{txCategory.value=button.dataset.categoryTag;qa("[data-category-tag]").forEach(item=>item.classList.toggle("active",item===button));});
@@ -746,7 +765,7 @@ function editMonthly(i){
   {key:"monthly",label:"Default Monthly Budget",type:"number",value:x.monthly},
   {key:"paymentStatus",label:"This Month Status",options:["auto","partial","done"],value:x.trackingMonth===monthKey(new Date())?(x.paymentStatus||"auto"):"auto"},
   {key:"paidAmount",label:"Paid Amount (used for partial)",type:"number",value:x.trackingMonth===monthKey(new Date())?Number(x.paidAmount||0):0}
- ],o=>state.budgets[i]={...x,...o,trackingMonth:monthKey(new Date())});
+ ],o=>{if(isCompanyExpenseTag(o.category)){alert(`${COMPANY_EXPENSE_TAG} is a fixed History-only tag and cannot become a budget.`);return false;}state.budgets[i]={...x,...o,trackingMonth:monthKey(new Date())};});
 }
 function editYearly(i){
  const x=state.yearly[i];
@@ -864,8 +883,8 @@ async function refreshExchangeRate({silent=false,force=false}={}){
   return true;
  }catch(error){
   state.usdIdrMeta={status:"saved fallback",error:error.message};
-  if(typeof usdIdrRate!=="undefined"){usdIdrRate.textContent=`1 USD = ${new Intl.NumberFormat("id-ID",{maximumFractionDigits:2}).format(Number(state.usdIdr||0))} IDR · SAVED FALLBACK`;usdIdrRate.title=error.message;}
-  if(!silent)toastMsg("Live USD/IDR unavailable · saved rate retained");
+  if(typeof usdIdrRate!=="undefined"){usdIdrRate.textContent=`1 USD = ${new Intl.NumberFormat("id-ID",{maximumFractionDigits:2}).format(Number(state.usdIdr||0))} IDR · GOOGLE UNAVAILABLE`;usdIdrRate.title=`Google Finance refresh failed · ${error.message}`;}
+  if(!silent)toastMsg("Google Finance unavailable · last Google rate retained");
   return false;
  }finally{
   if(typeof refreshFxBtn!=="undefined"){refreshFxBtn.disabled=false;refreshFxBtn.classList.remove("is-loading");}
@@ -942,7 +961,7 @@ addMonthlyBtn.onclick=()=>openSimple("Add Monthly Budget",[
  {key:"monthly",label:"Monthly Budget",type:"number"},
  {key:"paymentStatus",label:"This Month Status",options:["auto","partial","done"],value:"auto"},
  {key:"paidAmount",label:"Paid Amount (used for partial)",type:"number",value:0}
-],o=>state.budgets.push({id:createId(),...o,trackingMonth:monthKey(new Date()),sortOrder:state.budgets.length}));
+],o=>{if(isCompanyExpenseTag(o.category)){alert(`${COMPANY_EXPENSE_TAG} is a fixed History-only tag and cannot become a budget.`);return false;}state.budgets.push({id:createId(),...o,trackingMonth:monthKey(new Date()),sortOrder:state.budgets.length});});
 addYearlyBtn.onclick=()=>openSimple("Add Yearly Expense",[
  {key:"name",label:"Name"},
  {key:"amount",label:"Amount",type:"number"},

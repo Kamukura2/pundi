@@ -1,4 +1,6 @@
-# CVFinance v7.6.0
+# CVFinance v7.7.0
+
+v7.7.0 enforces Google-only USD/IDR refresh, adds separate recurring/ending client payment palettes and a full-year recurring income metric, introduces a fixed History-only Expense Perusahaan dashboard, increases Stocks spacing, and fills the Insight projection panel with momentum guidance and bars.
 
 v7.6.0 makes every Prospect headline auditable as `Opening Cash + Stocks + Income − Expenses`, separates one-time dated Credit from Events, adds optional IDR Netcash and USD Wallet assets, improves two-dimensional drag sorting, and refreshes yearly/Insight contrast.
 
@@ -24,7 +26,7 @@ Deployment-ready continuation of CVFinance v6.3.1. The existing eight-tab UI and
 - JSON export/import and v6.3.1 `localStorage` migration
 - Installable PWA with offline application shell
 - Vercel server routes for Finnhub US quotes and Yahoo Finance delayed IDX quotes
-- Google Finance-first USD/IDR market rate with a dedicated cache-bypassing refresh button; Yahoo intraday and Finnhub remain fallbacks
+- Strict Google Finance USD/IDR market rate with a dedicated cache-bypassing refresh button; a failed Google request keeps the last saved rate and never substitutes Yahoo or Finnhub
 - Provider mapping, validation, cache, timeout, quota fallback, stale status, manual override, and optional daily cron refresh
 - Isolated `/api/telegram/cvfinance-webhook` route with deterministic Indonesian money/date parsing
 - Telegram quick transactions, balances, clients, credit, electricity, stocks, targets, and summary commands
@@ -58,6 +60,7 @@ For local full-stack testing, use `vercel dev`; plain `npm run dev` does not emu
 - [Entrusted Funds and Budget Tags v7.5.1 patch](docs/PATCH_v7_5_1_ENTRUSTED_FUNDS_TAGS.md)
 - [Visual, sorting, and multi-user v7.5.2 patch](docs/PATCH_v7_5_2_VISUAL_SORT_MULTIUSER.md)
 - [Auditable projection and stock cash v7.6.0 patch](docs/PATCH_v7_6_0_AUDITABLE_PROJECTION.md)
+- [Google-only FX and dashboard v7.7.0 patch](docs/PATCH_v7_7_0_GOOGLE_STATUS_DASHBOARDS.md)
 - [Second account setup](docs/SECOND_ACCOUNT_SETUP.md)
 - [Manual actions](docs/MANUAL_ACTIONS.md)
 - [Test checklist](docs/TEST_CHECKLIST.md)

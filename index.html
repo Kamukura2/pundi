@@ -218,6 +218,7 @@
             <div id="expenseDonut"></div>
             <div id="expenseLegend" class="legend"></div>
           </div>
+          <div id="companyExpenseDashboard" class="company-expense-dashboard"></div>
         </article>
       </div>
 
@@ -271,10 +272,11 @@
         <button class="primary-btn" id="addClientBtn">＋ Client</button>
       </div>
 
-      <div class="grid-3 compact">
+      <div class="client-metrics compact">
         <article class="metric-card tint-green"><small>Paid This Month</small><strong id="clientPaidTotal" class="private">Rp0</strong></article>
         <article class="metric-card tint-orange"><small>Outstanding</small><strong id="clientOutstandingTotal" class="private">Rp0</strong></article>
-        <article class="metric-card tint-blue"><small>Fixed Monthly</small><strong id="fixedIncomeTotal" class="private">Rp0</strong></article>
+        <article class="metric-card client-fixed-monthly"><small>Fixed Monthly</small><strong id="fixedIncomeTotal" class="private">Rp0</strong></article>
+        <article class="metric-card client-fixed-yearly"><small>Fixed Yearly</small><strong id="fixedYearlyIncomeTotal" class="private">Rp0</strong></article>
       </div>
 
       <article class="client-income-summary">
@@ -477,6 +479,7 @@
           <div class="panel-head"><div><p>Projection</p><h3>Base vs Optimistic</h3></div></div>
           <div id="scenarioCompare" class="chart"></div>
           <div id="scenarioKpis" class="scenario-kpis"></div>
+          <div id="insightCoach" class="insight-coach"></div>
         </article>
 
         <article class="panel">

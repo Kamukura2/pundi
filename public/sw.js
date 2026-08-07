@@ -1,4 +1,4 @@
-const SHELL_CACHE = "cvfinance-shell-v7.6.2-google-live-fx-refresh";
+const SHELL_CACHE = "cvfinance-shell-v7.7.0-google-only-dashboard-refresh";
 const SHELL = ["/", "/index.html", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", event => {

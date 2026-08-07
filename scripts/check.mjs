@@ -130,21 +130,25 @@ assert.equal(idxQuote.price, 4220);
 assert.equal(idxQuote.provider, "yahoo");
 assert.equal(idxQuote.status, "delayed");
 globalThis.fetch = async url => {
-  assert.match(String(url), /google\.com\/finance\/quote\/USD-IDR/);
+  assert.match(String(url), /google\.com\/finance\/(?:beta\/)?quote\/USD-IDR/);
   return new Response('<main data-last-price="17810.25" data-last-normal-market-timestamp="1786134000"><div class="YMlKec fxKbKc">17,810.25</div></main>', {status:200,headers:{"content-type":"text/html"}});
 };
 const fxQuote = await fetchUsdIdrQuote();
 assert.equal(fxQuote.rate, 17810.25);
 assert.equal(fxQuote.provider, "google-finance");
 globalThis.fetch = async url => {
-  if (String(url).includes("google.com")) return new Response("blocked", {status:503,headers:{"content-type":"text/plain"}});
-  if (String(url).includes("finnhub.io")) return new Response(JSON.stringify({error:"plan unavailable"}), {status:403,headers:{"content-type":"application/json"}});
-  assert.match(String(url), /\/IDR=X\?/);
-  return new Response(JSON.stringify({chart:{result:[{meta:{regularMarketPrice:17914,regularMarketTime:Math.floor(Date.now()/1000)-60},timestamp:[Math.floor(Date.now()/1000)-60,Math.floor(Date.now()/1000)],indicators:{quote:[{close:[17799,17810]}]}}],error:null}}), {status:200,headers:{"content-type":"application/json"}});
+  assert.match(String(url), /google\.com\/finance\//, "USD/IDR must never fall through to Yahoo or Finnhub");
+  if (String(url).includes("hl=id")) return new Response('<div class="YMlKec fxKbKc">17.810,2500</div>', {status:200,headers:{"content-type":"text/html"}});
+  return new Response("blocked", {status:503,headers:{"content-type":"text/plain"}});
 };
-const fallbackFxQuote = await fetchUsdIdrQuote();
-assert.equal(fallbackFxQuote.rate, 17810);
-assert.equal(fallbackFxQuote.provider, "yahoo");
+const localizedFxQuote = await fetchUsdIdrQuote();
+assert.equal(localizedFxQuote.rate, 17810.25);
+assert.equal(localizedFxQuote.provider, "google-finance");
+globalThis.fetch = async url => {
+  assert.match(String(url), /google\.com\/finance\//, "A failed Google refresh must not substitute another provider");
+  return new Response("blocked", {status:503,headers:{"content-type":"text/plain"}});
+};
+await assert.rejects(fetchUsdIdrQuote(), /Google Finance USD\/IDR unavailable/);
 globalThis.fetch = realFetch;
 
 await import("fake-indexeddb/auto");
@@ -170,4 +174,8 @@ assert.match(appSource, /backdropPress/, "Dialog dismissal must distinguish back
 assert.match(appSource, /fetchUsdIdrRate/, "USD\/IDR live refresh must be wired into the app");
 assert.match(appSource, /Number\(s\.quantity\)\*stockPrice[\s\S]*s\.currency===\"USD\"\?v\*state\.usdIdr:v/, "US holdings must convert shares times USD price using USD\/IDR");
 
-console.log("CVFinance checks passed: schema, RLS markers, PWA, 8 tabs, v7.6.2 stable target inputs, safe dialog dismissal, Google-first live USD/IDR with forced refresh and fallback, auditable projections, one-time dated credit, optional stock cash assets, sorting invariants, stock provider abstraction, offline queue coalescing, and JavaScript syntax.");
+assert.match(appSource, /COMPANY_EXPENSE_TAG="Expense Perusahaan"/, "Expense Perusahaan must remain a fixed History-only tag");
+assert.match(appSource, /fixedYearlyIncomeTotal\.textContent=fmt\(fixedIncome\(\)\*12\)/, "Fixed Yearly must equal Fixed Monthly times twelve");
+assert.doesNotMatch(appSource, /providerLabel=\{"google-finance":"GOOGLE FINANCE",yahoo:/, "The FX badge must not advertise a non-Google substitution");
+
+console.log("CVFinance checks passed: schema, RLS markers, PWA, 8 tabs, v7.7.0 stable inputs, safe dialog dismissal, strict Google-only USD/IDR with forced refresh, client status palette, fixed yearly income, company-expense history tracking, richer insights, auditable projections, one-time dated credit, optional stock cash assets, sorting invariants, stock provider abstraction, offline queue coalescing, and JavaScript syntax.");
