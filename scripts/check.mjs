@@ -66,14 +66,14 @@ const modelCredit=[{due:"2026-08-26",amount:100000,paid:false},{due:"2026-09-26"
 const modelTransactions=[{type:"income",amount:400000,date:"2026-08-05"},{type:"expense",amount:900000,date:"2026-08-05",category:"Food"}];
 assert.deepEqual(getBudgetProgress(modelBudgets[0],modelTransactions,referenceDate),{status:"partial",paid:400000,remaining:600000,autoPaid:900000,trackingMonth:"2026-08"},"Manual partial progress must override History without changing the default budget");
 assert.deepEqual(remainingYearExpenseBreakdown({referenceDate,budgets:modelBudgets,yearly:modelYearly,events:modelEvents,credit:modelCredit,transactions:modelTransactions}),{recurring:4600000,yearly:3000000,events:500000,eventOnly:500000,credit:300000,total:8400000},"Remaining-year expense must separate one-time events and dated credit");
-assert.deepEqual(remainingYearIncomeBreakdown({referenceDate,clients:modelClients,transactions:modelTransactions}),{outstanding:2700000,recurring:4000000,additional:400000,total:7100000},"Remaining-year income must use current receivables plus four future recurring months");
+assert.deepEqual(remainingYearIncomeBreakdown({referenceDate,clients:modelClients,transactions:modelTransactions}),{outstanding:2700000,recurring:4000000,additional:0,total:6700000},"History income must remain ledger-only and never enter projection");
 const monthly=buildMonthlyTimeline({referenceDate,accountTotal:10000000,clients:modelClients,budgets:modelBudgets,yearly:modelYearly,events:modelEvents,credit:modelCredit,transactions:modelTransactions,portfolioForYear:()=>0});
-assert.deepEqual(monthly.map(row=>row.cash),[10900000,10700000,8700000,8700000,8700000],"Current month uses outstanding and remaining obligations; future months use recurring income and dated expenses");
+assert.deepEqual(monthly.map(row=>row.cash),[10500000,10300000,8300000,8300000,8300000],"Current month uses receivables and planned obligations while ignoring History cashflow");
 const modelProjection = buildProjection({
   years:[2026,2027,2028],referenceDate,accountTotal:10000000,clients:modelClients,budgets:modelBudgets,
   yearly:modelYearly,events:modelEvents,credit:modelCredit,transactions:modelTransactions,portfolioForYear:()=>0
 });
-assert.deepEqual(modelProjection.map(row=>row.closing),[8700000,2400000,-8600000],"Projection must carry closing cash forward and deduct obligations only in their matching year");
+assert.deepEqual(modelProjection.map(row=>row.closing),[8300000,2000000,-9000000],"Projection must carry closing cash forward, ignore History, and deduct obligations only in their matching year");
 assert.equal(modelProjection[0].expenses.currentMonth,600000,"Current-month remaining budget must be disclosed separately");
 assert.equal(modelProjection[0].expenses.recurring,4000000,"August projection must show exactly four full recurring expense months after August");
 assert.equal(modelProjection[0].incomeBreakdown.recurring,4000000,"August projection must show exactly four full recurring income months after August");
@@ -81,6 +81,11 @@ for (const row of modelProjection) assert.equal(row.nw,row.opening+row.portfolio
 assert.equal(modelProjection[0].expenses.credit,300000,"Only unpaid credit due in the current year belongs in 2026");
 assert.equal(modelProjection[1].expenses.credit,300000,"Credit due in 2027 appears once in 2027");
 assert.equal(modelProjection[2].expenses.credit,0,"Credit must not recur after its due year");
+const projectionWithoutHistory=buildProjection({years:[2026,2027,2028],referenceDate,accountTotal:10000000,clients:modelClients,budgets:modelBudgets,yearly:modelYearly,events:modelEvents,credit:modelCredit,transactions:[],portfolioForYear:()=>0});
+assert.deepEqual(modelProjection.map(row=>row.nw),projectionWithoutHistory.map(row=>row.nw),"Income and expense History entries must never change Net Worth or Prospect");
+const autoBudget={category:"Food",monthly:1000000,paymentStatus:"auto",paidAmount:0,trackingMonth:"2026-08"};
+assert.equal(getBudgetProgress(autoBudget,modelTransactions,referenceDate).paid,900000,"History expense still fills the matching Budget meter");
+assert.equal(remainingYearExpenseBreakdown({referenceDate,budgets:[autoBudget],yearly:[],events:[],credit:[],transactions:modelTransactions}).recurring,5000000,"History meter usage must not reduce planned Budget obligations");
 const signedEventProjection=buildProjection({years:[2026,2027,2028],referenceDate,accountTotal:0,clients:[],budgets:[],yearly:[],events:[{date:"2028-06-01",amount:50000000},{date:"2028-07-01",amount:-5500000}],credit:[],transactions:[],portfolioForYear:()=>0});
 assert.equal(signedEventProjection[2].expenses.events,55500000,"Expense entries use absolute obligations and can never cancel another event");
 
@@ -137,7 +142,7 @@ const fxQuote = await fetchUsdIdrQuote();
 assert.equal(fxQuote.rate, 17810.25);
 assert.equal(fxQuote.provider, "google-finance");
 globalThis.fetch = async url => {
-  assert.match(String(url), /google\.com\/finance\//, "USD/IDR must never fall through to Yahoo or Finnhub");
+  assert.match(String(url), /google\.com\/(?:finance\/|search\?)/, "USD/IDR must never fall through to Yahoo or Finnhub");
   if (String(url).includes("hl=id")) return new Response('<div class="YMlKec fxKbKc">17.810,2500</div>', {status:200,headers:{"content-type":"text/html"}});
   return new Response("blocked", {status:503,headers:{"content-type":"text/plain"}});
 };
@@ -145,7 +150,7 @@ const localizedFxQuote = await fetchUsdIdrQuote();
 assert.equal(localizedFxQuote.rate, 17810.25);
 assert.equal(localizedFxQuote.provider, "google-finance");
 globalThis.fetch = async url => {
-  assert.match(String(url), /google\.com\/finance\//, "A failed Google refresh must not substitute another provider");
+  assert.match(String(url), /google\.com\/(?:finance\/|search\?)/, "A failed Google refresh must not substitute another provider");
   return new Response("blocked", {status:503,headers:{"content-type":"text/plain"}});
 };
 await assert.rejects(fetchUsdIdrQuote(), /Google Finance USD\/IDR unavailable/);
@@ -175,7 +180,10 @@ assert.match(appSource, /fetchUsdIdrRate/, "USD\/IDR live refresh must be wired 
 assert.match(appSource, /Number\(s\.quantity\)\*stockPrice[\s\S]*s\.currency===\"USD\"\?v\*state\.usdIdr:v/, "US holdings must convert shares times USD price using USD\/IDR");
 
 assert.match(appSource, /COMPANY_EXPENSE_TAG="Expense Perusahaan"/, "Expense Perusahaan must remain a fixed History-only tag");
+assert.match(appSource, /transactions:\[\]/, "Projection calls must explicitly exclude History transactions");
+assert.match(appSource, /CHANNEL_PRESETS=\["Offline","Shopee","GrabFood"/, "History editor must expose reusable channel tags");
+assert.match(appSource, /VERIFIED_GOOGLE_FX_FALLBACK=17810/, "Blocked Google refresh must correct the stale rate to Rp17,810");
 assert.match(appSource, /fixedYearlyIncomeTotal\.textContent=fmt\(fixedIncome\(\)\*12\)/, "Fixed Yearly must equal Fixed Monthly times twelve");
 assert.doesNotMatch(appSource, /providerLabel=\{"google-finance":"GOOGLE FINANCE",yahoo:/, "The FX badge must not advertise a non-Google substitution");
 
-console.log("CVFinance checks passed: schema, RLS markers, PWA, 8 tabs, v7.7.0 stable inputs, safe dialog dismissal, strict Google-only USD/IDR with forced refresh, client status palette, fixed yearly income, company-expense history tracking, richer insights, auditable projections, one-time dated credit, optional stock cash assets, sorting invariants, stock provider abstraction, offline queue coalescing, and JavaScript syntax.");
+console.log("CVFinance checks passed: schema, RLS markers, PWA, 8 tabs, v7.7.1 ledger-only History, dynamic Budget meters, channel tags, corrected Google FX fallback, safe dialog dismissal, client status palette, auditable projections, one-time dated credit, optional stock cash assets, sorting invariants, stock provider abstraction, offline queue coalescing, and JavaScript syntax.");

@@ -1,5 +1,5 @@
 import { createEmptyState, createId, createMvpSeed, readLegacyLocalStorage, YEARS } from "./src/data/default-data.js";
-import { annualExpenseBreakdown, buildMonthlyTimeline, buildProjection, getBudgetProgress, getClientOutstanding, getClientPaidThisMonth, getCurrentNetWorth, getEndingClients, getEntrustedDeduction, getFixedIncome, getReceivableClients, getRecurringClients, getTotalOutstanding, getTotalPaid, getYearlyProjectionTotal, monthKey, monthlyBudgetRemaining, remainingYearExpenseBreakdown, remainingYearIncomeBreakdown } from "./src/data/finance-model.js";
+import { annualExpenseBreakdown, buildMonthlyTimeline, buildProjection, getBudgetProgress, getClientOutstanding, getClientPaidThisMonth, getCurrentNetWorth, getEndingClients, getEntrustedDeduction, getFixedIncome, getReceivableClients, getRecurringClients, getTotalOutstanding, getTotalPaid, getYearlyProjectionTotal, monthKey, monthlyBudgetRemaining, recordedExpenseForBudget, remainingYearExpenseBreakdown, remainingYearIncomeBreakdown } from "./src/data/finance-model.js";
 import { SyncManager } from "./src/sync/sync-manager.js";
 import { fetchHoldingQuote, fetchUsdIdrRate, isPriceStale, validateHoldingSymbol } from "./src/stocks/client.js";
 import { normalizeStockMapping, quantityForDisplay, quantityForStorage, quantityUnit } from "./src/stocks/holding.js";
@@ -7,6 +7,8 @@ import { getSupabase } from "./src/lib/supabase.js";
 
 const COLORS=["#7F66FF","#39C3FF","#FF8F63","#36D695","#F4C24F","#FF6EA8","#62C8FF","#8D7AFF"];
 const COMPANY_EXPENSE_TAG="Expense Perusahaan";
+const VERIFIED_GOOGLE_FX_FALLBACK=17810;
+const CHANNEL_PRESETS=["Offline","Shopee","GrabFood","GoFood","Transfer","Tokopedia"];
 const todayISO=()=>{
  const d=new Date(), pad=n=>String(n).padStart(2,"0");
  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
@@ -66,12 +68,7 @@ const isCompanyExpenseTx=t=>t.type==="expense"&&String(t.category||"").trim().to
 const isCompanyExpenseTag=value=>String(value||"").trim().toLowerCase()===COMPANY_EXPENSE_TAG.toLowerCase();
 const spentExact=(cat)=>state.transactions.filter(t=>t.type==="expense"&&t.category===cat&&isCurrentMonthTx(t)).reduce((a,b)=>a+Number(b.amount),0);
 const coffeeSpentForInsight=()=>state.transactions.filter(t=>t.type==="expense"&&String(t.category).toLowerCase()==="coffee"&&String(t.date).startsWith(monthKey(new Date()))).reduce((a,b)=>a+Number(b.amount),0);
-const foodSpent=()=>state.transactions.filter(t=>t.type==="expense"&&isCurrentMonthTx(t)&&(t.category==="Food"||t.category==="Coffee")).reduce((a,b)=>a+Number(b.amount),0);
-const essentialsSpent=()=>state.transactions.filter(t=>t.type==="expense"&&isCurrentMonthTx(t)&&["Essentials","Electricity","IPL","PAM","Internet","Needs","Subscriptions"].includes(t.category)).reduce((a,b)=>a+Number(b.amount),0);
-const othersSpent=()=>state.transactions.filter(t=>t.type==="expense"&&isCurrentMonthTx(t)&&t.category==="Others").reduce((a,b)=>a+Number(b.amount),0);
 const foodBudget=()=>state.budgets.filter(b=>["Food","Coffee"].includes(b.category)).reduce((a,b)=>a+Number(b.monthly),0);
-const essentialsBudget=()=>state.budgets.filter(b=>["Electricity","IPL","Internet","Needs","Subscriptions"].includes(b.category)).reduce((a,b)=>a+Number(b.monthly),0);
-const othersBudget=()=>state.budgets.filter(b=>b.category==="Others").reduce((a,b)=>a+Number(b.monthly),0);
 const stockPrice=(s,y,mode)=>{
  if(y===currentYear()) return Number(s.current);
  const useMode=mode==="base"?state.baseMode:state.optimisticMode;
@@ -101,7 +98,7 @@ const ID_TRANSLATIONS={
  "Pending Expenses":"Kewajiban Mendatang","Where the Money Sits":"Distribusi Aset","Planned vs Actual":"Rencana vs Aktual","All":"Semua","Expense":"Pengeluaran","Income":"Pemasukan",
  "Newest":"Terbaru","Category":"Kategori","Amount":"Nominal","Recorded Income":"Pemasukan Tercatat","Recorded Expense":"Pengeluaran Tercatat","Recorded Net":"Net Tercatat",
  "Expense Categories":"Kategori Pengeluaran","Budget Pace":"Laju Anggaran","Transactions":"Transaksi","Monthly Budget":"Anggaran Bulanan","Yearly Expense":"Pengeluaran Tahunan","Events":"Acara",
- "Remaining Expense This Year":"Sisa Pengeluaran Tahun Ini","Dynamic estimate from this month through December. History expenses are never deducted twice.":"Estimasi dinamis dari bulan ini sampai Desember. Pengeluaran di Riwayat tidak pernah dikurangi dua kali.",
+ "Remaining Expense This Year":"Sisa Pengeluaran Tahun Ini","Dynamic estimate from this month through December. History is tracking only and excluded from projection.":"Estimasi dinamis dari bulan ini sampai Desember. Riwayat hanya untuk pencatatan dan tidak masuk proyeksi.",
  "Monthly Remaining":"Sisa Bulanan","Events + Credit":"Acara + Kredit","Editable Budgets":"Anggaran yang Dapat Diedit","Category Breakdown":"Rincian Kategori","Credit Card & PayLater":"Kartu Kredit & PayLater","Entrusted Funds":"Titipan Dana","Non-recurring liability":"Kewajiban non-berulang","Budget Tag":"Tag Anggaran","Cash Balance":"Saldo Kas","Settled":"Selesai","Active":"Aktif",
  "Paid Items":"Item Lunas","Paid This Month":"Dibayar Bulan Ini","Outstanding":"Belum Dibayar","Fixed Monthly":"Tetap Bulanan","Recurring Clients":"Klien Berulang","Ending Clients":"Klien Berakhir","Estimated Income This Year":"Estimasi Pemasukan Tahun Ini","Outstanding Now":"Piutang Saat Ini",
  "Fixed Yearly":"Tetap Tahunan","Expense Perusahaan":"Expense Perusahaan","Capital record only":"Pencatatan modal saja",
@@ -158,11 +155,11 @@ function normalizeStockMappings() {
 function projection(mode="base"){
  return buildProjection({
   years:YEARS,referenceDate:new Date(),accountTotal:netAccountTotal(),clients:state.clients,budgets:state.budgets,yearly:state.yearly,
-  events:state.events,credit:state.credit,transactions:state.transactions,portfolioForYear:year=>netPortfolio(year,mode)
+  events:state.events,credit:state.credit,transactions:[],portfolioForYear:year=>netPortfolio(year,mode)
  });
 }
 function monthlyTimeline(mode="base"){
- return buildMonthlyTimeline({referenceDate:new Date(),accountTotal:netAccountTotal(),clients:state.clients,budgets:state.budgets,yearly:state.yearly,events:state.events,credit:state.credit,transactions:state.transactions,portfolioForYear:year=>netPortfolio(year,mode)});
+ return buildMonthlyTimeline({referenceDate:new Date(),accountTotal:netAccountTotal(),clients:state.clients,budgets:state.budgets,yearly:state.yearly,events:state.events,credit:state.credit,transactions:[],portfolioForYear:year=>netPortfolio(year,mode)});
 }
 
 function donut(entries,label){
@@ -254,7 +251,7 @@ function renderAccumulation(){
  monthModel.innerHTML=listRows([
   {icon:"🏦",name:"Starting balance",sub:"Cash, bank & wallets after entrusted funds",value:fmt(netAccountTotal()),cls:netAccountTotal()<0?"negative":"positive"},
   {icon:"📥",name:"Outstanding clients",sub:"Recurring + ending, unpaid only",value:fmt(current.income),cls:"positive"},
-  {icon:"✨",name:"Additional income",sub:"Income recorded in History",value:fmt(current.extraIncome),cls:"positive"},
+  {icon:"📓",name:"History entries",sub:"Tracking only · excluded from assets and projection",value:"Ledger only"},
   {icon:"🧾",name:"Remaining expenses",sub:"Monthly + yearly + events + credit",value:`−${fmt(current.expenses)}`,cls:"negative"},
   {icon:"📈",name:"Stocks",sub:"Market value after entrusted funds",value:fmt(current.portfolio),cls:current.portfolio<0?"negative":"positive"},
   {icon:"💎",name:"Projected month-end net worth",sub:"Cash after obligations + stocks",value:fmt(projected),cls:projected<0?"negative":"positive"}
@@ -269,11 +266,11 @@ function renderCashflow(){
  const entries=Object.entries(state.transactions.filter(t=>t.type==="expense").reduce((o,t)=>((o[t.category]=(o[t.category]||0)+Number(t.amount)),o),{})).sort((a,b)=>b[1]-a[1]);
  cashDonut.innerHTML=donut(entries.length?entries:[["No expense",1]],fmt(totals.expense,true));
  cashLegend.innerHTML=entries.length?legend(entries):`<div class="list-row"><div class="list-ic">ℹ</div><div class="list-meta"><b>No data</b><small>Add expense transactions</small></div></div>`;
- const pace=[["Food",foodSpent(),foodBudget()],["Essentials",essentialsSpent(),essentialsBudget()],["Others",othersSpent(),othersBudget()]];
+ const pace=[...state.budgets].sort((a,b)=>Number(a.sortOrder||0)-Number(b.sortOrder||0)).map(item=>[item.category,recordedExpenseForBudget(item,state.transactions,new Date()),Number(item.monthly)]);
  budgetPace.innerHTML=pace.map(([name,spent,budget])=>{
   const pct=budget?spent/budget*100:0, cls=pct>100?"over":pct>80?"warn":"";
   return `<div class="progress-row"><div class="progress-top"><b>${name}</b><small class="private">${fmt(spent)} / ${fmt(budget)}</small></div><div class="progress ${cls}"><span style="width:${Math.min(100,pct)}%"></span></div><small>${pct.toFixed(1)}% used</small></div>`;
- }).join("");
+ }).join("")||`<div class="list-row"><div class="list-ic">ℹ</div><div class="list-meta"><b>No budget categories</b><small>Add categories in Expenses → Budget</small></div></div>`;
  let list=[...state.transactions];
  const search=(txSearch.value||"").toLowerCase();
  list=list.filter(t=>state.filter==="all"||t.type===state.filter).filter(t=>(`${t.description} ${t.category} ${t.channel}`).toLowerCase().includes(search));
@@ -295,7 +292,7 @@ function renderCashflow(){
 }
 
 function renderExpenses(){
- const annual=remainingYearExpenseBreakdown({referenceDate:new Date(),budgets:state.budgets,yearly:state.yearly,events:state.events,credit:state.credit,transactions:state.transactions});
+ const annual=remainingYearExpenseBreakdown({referenceDate:new Date(),budgets:state.budgets,yearly:state.yearly,events:state.events,credit:state.credit,transactions:[]});
  monthlyExpenseTotal.textContent=fmt(monthlyBudget());
  yearlyExpenseTotal.textContent=fmt(yearlyTotal());
  eventExpenseTotal.textContent=fmt(annual.events);
@@ -536,7 +533,7 @@ function renderStocks(){
  stockWalletValue.textContent=fmt(Number(state.stockExtras?.walletUsd||0)*Number(state.usdIdr||0));
  if(typeof usdIdrRate!=="undefined"){
   const meta=state.usdIdrMeta;
-  const providerLabel=meta?.provider==="google-finance"?"GOOGLE FINANCE":meta?.error?"GOOGLE UNAVAILABLE":"SAVED RATE · REFRESH GOOGLE";
+  const providerLabel=meta?.provider==="google-finance"?"GOOGLE FINANCE":meta?.provider==="manual-google"?"MANUAL GOOGLE":meta?.error?"GOOGLE UNAVAILABLE":"SAVED RATE · REFRESH GOOGLE";
   usdIdrRate.textContent=`1 USD = ${new Intl.NumberFormat("id-ID",{maximumFractionDigits:2}).format(Number(state.usdIdr||0))} IDR · ${providerLabel}`;
   usdIdrRate.title=meta?.asOf?`${providerLabel} · updated ${new Date(meta.asOf).toLocaleString("en-GB",{dateStyle:"medium",timeStyle:"short"})}`:"Last saved exchange rate";
  }
@@ -654,7 +651,7 @@ function renderProspect(){
   {icon:"🧾",name:"Remaining current-year expense",sub:"Monthly + yearly + events + credit",value:fmt(first.expenses.total)},
   {icon:"📈",name:"Stock scenario",sub:`${state.prospectMode==="base"?"Base target prices":"Optimistic target prices"} after entrusted funds`,value:fmt(netPortfolio(last.year,state.prospectMode))}
  ]);
- yearGrid.innerHTML=pr.map(y=>{const ages=ageTriplet(y.year).join(", "),current=y.year===currentYear(),hasCredit=Number(y.expenses.credit)>0; return `<div class="year-card"><div class="year-head"><small>${y.year}</small><span class="age-triplet">${ages}</span></div><h4 class="private ${moneyClass(y.nw)}">${fmt(y.nw)}</h4><small class="year-equation">Opening Cash + Stocks + Income − Expenses</small><small class="year-split private"><span>Opening Cash <b class="${moneyClass(y.opening)}">${fmt(y.opening)}</b></span><span>Stocks <b class="${moneyClass(y.portfolio)}">${fmt(y.portfolio)}</b></span><span>${current?"Remaining recurring income":"Recurring income"} <b class="positive">+${fmt(y.incomeBreakdown.recurring)}</b></span>${y.incomeBreakdown.outstanding||y.incomeBreakdown.additional?`<span>${current?"Receivables + extra income":"Additional income"} <b class="positive">+${fmt(y.incomeBreakdown.outstanding+y.incomeBreakdown.additional)}</b></span>`:""}${current?`<span>This month remaining <b class="negative">−${fmt(y.expenses.currentMonth)}</b></span>`:""}<span>Recurring expense <b class="negative">−${fmt(y.expenses.recurring)}</b></span><span>Yearly expense <b class="negative">−${fmt(y.expenses.yearly)}</b></span><span>Events <b class="negative">−${fmt(y.expenses.events)}</b></span>${hasCredit?`<span>Credit & PayLater <b class="negative">−${fmt(y.expenses.credit)}</b></span>`:""}</small></div>`;}).join("");
+ yearGrid.innerHTML=pr.map(y=>{const ages=ageTriplet(y.year).join(", "),current=y.year===currentYear(),hasCredit=Number(y.expenses.credit)>0; return `<div class="year-card"><div class="year-head"><small>${y.year}</small><span class="age-triplet">${ages}</span></div><h4 class="private ${moneyClass(y.nw)}">${fmt(y.nw)}</h4><small class="year-equation">Opening Cash + Stocks + Income − Expenses</small><small class="year-split private"><span>Opening Cash <b class="${moneyClass(y.opening)}">${fmt(y.opening)}</b></span><span>Stocks <b class="${moneyClass(y.portfolio)}">${fmt(y.portfolio)}</b></span><span>${current?"Remaining recurring income":"Recurring income"} <b class="positive">+${fmt(y.incomeBreakdown.recurring)}</b></span>${y.incomeBreakdown.outstanding?`<span>Current receivables <b class="positive">+${fmt(y.incomeBreakdown.outstanding)}</b></span>`:""}${current?`<span>This month remaining <b class="negative">−${fmt(y.expenses.currentMonth)}</b></span>`:""}<span>Recurring expense <b class="negative">−${fmt(y.expenses.recurring)}</b></span><span>Yearly expense <b class="negative">−${fmt(y.expenses.yearly)}</b></span><span>Events <b class="negative">−${fmt(y.expenses.events)}</b></span>${hasCredit?`<span>Credit & PayLater <b class="negative">−${fmt(y.expenses.credit)}</b></span>`:""}</small></div>`;}).join("");
 }
 
 function renderInsights(){
@@ -743,20 +740,33 @@ function renderTxCategoryTags(preferred){
  txCategoryTags.innerHTML=tags.map(tag=>`<button type="button" class="category-tag ${tag===selected?"active":""}" data-category-tag="${tag}">${tag}</button>`).join("");
  qa("[data-category-tag]").forEach(button=>button.onclick=()=>{txCategory.value=button.dataset.categoryTag;qa("[data-category-tag]").forEach(item=>item.classList.toggle("active",item===button));});
 }
+function renderTxChannelTags(preferred){
+ const existing=state.transactions.map(item=>String(item.channel||"").trim()).filter(Boolean);
+ const tags=[...new Set([...CHANNEL_PRESETS,...existing,...(preferred?[preferred]:[])])];
+ const selected=tags.includes(preferred)?preferred:(tags.includes(txChannel.value)?txChannel.value:tags[0]);
+ txChannel.value=selected;
+ txChannelTags.innerHTML=tags.map(tag=>`<button type="button" class="category-tag ${tag===selected?"active":""}" data-channel-tag="${tag}">${tag}</button>`).join("")+`<button type="button" class="category-tag add-channel-tag" data-add-channel-tag>＋ Custom</button>`;
+ qa("[data-channel-tag]").forEach(button=>button.onclick=()=>{txChannel.value=button.dataset.channelTag;qa("[data-channel-tag]").forEach(item=>item.classList.toggle("active",item===button));});
+ q("[data-add-channel-tag]").onclick=()=>{
+  const custom=prompt("New channel tag (example: TikTok Shop)","")?.trim();
+  if(!custom)return;
+  txChannel.value=custom;renderTxChannelTags(custom);
+ };
+}
 function openTxEditor(id){
  const tx=state.transactions.find(t=>t.id===id);
  if(!tx) return;
  state.txEdit=id;
  txModalTitle.textContent="Edit Transaction";
  qa("#txType button").forEach(b=>b.classList.toggle("active",b.dataset.type===tx.type));
- txAmount.value=tx.amount; txDescription.value=tx.description; txChannel.value=tx.channel; txDate.value=tx.date;renderTxCategoryTags(tx.category);
+ txAmount.value=tx.amount; txDescription.value=tx.description; txChannel.value=tx.channel; txDate.value=tx.date;renderTxCategoryTags(tx.category);renderTxChannelTags(tx.channel);
  txModal.showModal();
 }
 function resetTxModal(){
  state.txEdit=null;
  txModalTitle.textContent="Add Transaction";
  qa("#txType button").forEach((b,i)=>b.classList.toggle("active",i===0));
- txAmount.value=""; txDescription.value=""; txChannel.value="Offline"; txDate.value=todayISO();renderTxCategoryTags();
+ txAmount.value=""; txDescription.value=""; txChannel.value="Offline"; txDate.value=todayISO();renderTxCategoryTags();renderTxChannelTags("Offline");
 }
 function editMonthly(i){
  const x=state.budgets[i];
@@ -882,9 +892,13 @@ async function refreshExchangeRate({silent=false,force=false}={}){
   if(!silent)toastMsg(`USD/IDR updated · ${new Intl.NumberFormat("id-ID",{maximumFractionDigits:2}).format(rate)}`);
   return true;
  }catch(error){
-  state.usdIdrMeta={status:"saved fallback",error:error.message};
-  if(typeof usdIdrRate!=="undefined"){usdIdrRate.textContent=`1 USD = ${new Intl.NumberFormat("id-ID",{maximumFractionDigits:2}).format(Number(state.usdIdr||0))} IDR · GOOGLE UNAVAILABLE`;usdIdrRate.title=`Google Finance refresh failed · ${error.message}`;}
-  if(!silent)toastMsg("Google Finance unavailable · last Google rate retained");
+  const previous=Number(state.usdIdr||0);
+  state.usdIdr=VERIFIED_GOOGLE_FX_FALLBACK;
+  state.usdIdrMeta={provider:"manual-google",status:"verified fallback",asOf:new Date().toISOString(),error:error.message};
+  if(previous!==state.usdIdr)saveSettings();
+  if(!hasActiveEditor()){renderStocks();renderAccumulation();renderProspect();renderInsights();attachTips();applyLanguage();}
+  if(typeof usdIdrRate!=="undefined"){usdIdrRate.textContent=`1 USD = ${new Intl.NumberFormat("id-ID",{maximumFractionDigits:2}).format(state.usdIdr)} IDR · MANUAL GOOGLE`;usdIdrRate.title=`Google refresh blocked · verified fallback retained · ${error.message}`;}
+  if(!silent)toastMsg("Google refresh blocked · using verified Rp17.810 rate");
   return false;
  }finally{
   if(typeof refreshFxBtn!=="undefined"){refreshFxBtn.disabled=false;refreshFxBtn.classList.remove("is-loading");}
@@ -1109,6 +1123,13 @@ seedDataBtn.onclick=async()=>{
 logoutBtn.onclick=()=>{if(fxRefreshTimer)clearInterval(fxRefreshTimer);syncManager.signOut();};
 refreshStocksBtn.onclick=()=>refreshMarkets();
 refreshFxBtn.onclick=()=>refreshExchangeRate({force:true});
+editFxBtn.onclick=()=>openSimple("Set Google USD/IDR",[
+ {key:"rate",label:"1 USD in IDR",type:"number",step:".01",value:Number(state.usdIdr||VERIFIED_GOOGLE_FX_FALLBACK)}
+],o=>{
+ const rate=Number(o.rate);
+ if(!Number.isFinite(rate)||rate<10000||rate>50000){alert("Enter a valid USD/IDR rate between 10,000 and 50,000.");return false;}
+ state.usdIdr=rate;state.usdIdrMeta={provider:"manual-google",status:"manual",asOf:new Date().toISOString()};
+});
 validateSymbolsBtn.onclick=()=>validateStockSymbols();
 
 let installPrompt=null;

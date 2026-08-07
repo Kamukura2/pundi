@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-  <title>CVFinance</title>
+  <title>CVFinance v7.7.1</title>
   <meta name="theme-color" content="#0b1120">
   <meta name="description" content="Private synchronized personal finance dashboard">
   <meta name="mobile-web-app-capable" content="yes">
@@ -171,7 +171,7 @@
 
         <article class="panel">
           <div class="panel-head">
-            <div><p>Budget Pace</p><h3>Food, Essentials & Others</h3></div>
+            <div><p>Budget Pace</p><h3>Budget</h3></div>
             <button class="ghost-btn" data-go="expenses" title="Open">↗</button>
           </div>
           <div id="budgetPace"></div>
@@ -195,7 +195,7 @@
       </div>
 
       <article class="annual-expense-summary">
-        <div><small>Remaining Expense This Year</small><strong id="annualExpenseGrandTotal" class="private">Rp0</strong><p>Dynamic estimate from this month through December. History expenses are never deducted twice.</p></div>
+        <div><small>Remaining Expense This Year</small><strong id="annualExpenseGrandTotal" class="private">Rp0</strong><p>Dynamic estimate from this month through December. History is tracking only and excluded from projection.</p></div>
         <div class="annual-expense-parts">
           <span><small>Monthly Remaining</small><b id="annualRecurringExpense" class="private">Rp0</b></span>
           <span><small>Yearly</small><b id="annualYearlyExpense" class="private">Rp0</b></span>
@@ -327,6 +327,7 @@
           <div class="head-actions stock-rate-pills">
             <span class="pill">Included in total assets</span>
             <span id="usdIdrRate" class="pill fx-rate" title="Last saved exchange rate">USD/IDR loading…</span>
+            <button id="editFxBtn" class="ghost-btn fx-refresh-btn" type="button" title="Set Google USD/IDR manually" aria-label="Set Google USD to IDR manually">✎</button>
             <button id="refreshFxBtn" class="ghost-btn fx-refresh-btn" type="button" title="Refresh USD/IDR now" aria-label="Refresh USD to IDR exchange rate">↻</button>
           </div>
         </div>
@@ -547,7 +548,10 @@
       </select>
       <div id="txCategoryTags" class="category-tags" role="group" aria-label="Budget tag"></div>
     </label>
-    <label>Channel<input id="txChannel" value="Offline"></label>
+    <label>Channel
+      <input id="txChannel" class="visually-hidden-select" tabindex="-1" aria-hidden="true" value="Offline">
+      <div id="txChannelTags" class="category-tags channel-tags" role="group" aria-label="Transaction channel"></div>
+    </label>
     <label>Date<input id="txDate" type="date"></label>
     <button class="primary-btn">Save</button>
   </form>

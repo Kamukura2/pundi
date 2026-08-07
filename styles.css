@@ -707,3 +707,13 @@ select,input,.search{width:100%;min-width:0;height:46px;padding:0 12px;border-ra
 
 @media (max-width:1180px){.client-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:680px){.client-metrics{grid-template-columns:1fr;gap:12px}.company-expense-hero{grid-template-columns:1fr;padding:18px}.company-expense-hero>div{grid-row:auto}.company-expense-hero strong{margin-top:8px}.company-expense-hero>span{text-align:left}.company-expense-kpis{padding:0 18px 14px}.company-expense-bars{padding-left:14px;padding-right:14px;gap:3px}.company-expense-recent>span{padding:10px 18px}.momentum-strip{gap:3px;padding-left:8px;padding-right:8px}.momentum-strip i{width:min(16px,74%)}}
+
+/* v7.7.1 ledger-only History, dynamic Budget meters and corrected yearly palette */
+.yearly-tile.due,.yearly-tile.due[data-yearly-id]{background:linear-gradient(145deg,#347fca,#20508d 58%,#183b73)!important;border-color:rgba(46,122,211,.42)!important;color:#fff!important;box-shadow:0 15px 34px rgba(29,91,170,.20)!important}
+.yearly-tile.due h4,.yearly-tile.due strong,.yearly-tile.due small{color:#fff!important}.yearly-tile.due small{opacity:.76}
+.yearly-tile.due .payment-badge,.yearly-tile.due .payment-badge.due{color:#fff!important;background:rgba(183,222,255,.34)!important;border:1px solid rgba(255,255,255,.18)}
+.yearly-tile.due .year-paid-toggle{background:#29d49a;color:#082b28;border-color:transparent}.yearly-tile.due .icon-mini{background:#fff;color:#102343;border-color:rgba(255,255,255,.66)}
+[data-theme=dark] .yearly-tile.due,[data-theme=dark] .yearly-tile.due[data-yearly-id]{background:linear-gradient(145deg,#347fca,#20508d 58%,#183b73)!important;color:#fff!important}
+[data-theme=dark] .yearly-tile.due .payment-badge{color:#fff!important;background:rgba(183,222,255,.27)!important}
+.channel-tags{padding-top:2px}.channel-tags .category-tag{background:linear-gradient(135deg,rgba(55,184,238,.12),rgba(101,91,235,.12))}.channel-tags .category-tag.active{background:linear-gradient(135deg,#2dbbe8,#5266e8);color:#fff}.channel-tags .add-channel-tag{border-style:dashed;background:var(--surface2);color:var(--muted)}
+#budgetPace{display:grid;gap:14px}.fx-rate{max-width:100%;white-space:normal;text-align:center}

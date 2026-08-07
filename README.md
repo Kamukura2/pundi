@@ -1,6 +1,6 @@
-# CVFinance v7.7.0
+# CVFinance v7.7.1
 
-v7.7.0 enforces Google-only USD/IDR refresh, adds separate recurring/ending client payment palettes and a full-year recurring income metric, introduces a fixed History-only Expense Perusahaan dashboard, increases Stocks spacing, and fills the Insight projection panel with momentum guidance and bars.
+v7.7.1 makes History a strict ledger: neither recorded income nor expense changes Balance, Net Worth, or Prospect, while expense tags still fill the matching Budget meter. Budget Pace is fully dynamic, channels use reusable/custom tags, Yearly due cards use the dark-blue white-text palette, and blocked Google refreshes now fall back to the user-verified Rp17,810 rate with a manual correction control.
 
 v7.6.0 makes every Prospect headline auditable as `Opening Cash + Stocks + Income − Expenses`, separates one-time dated Credit from Events, adds optional IDR Netcash and USD Wallet assets, improves two-dimensional drag sorting, and refreshes yearly/Insight contrast.
 

@@ -12,7 +12,7 @@
 - [ ] Holdings become touch-friendly cards on phones; target-price tables scroll only inside their panel.
 - [ ] Above 1024 px the established desktop sidebar, grids, typography, and flow remain unchanged.
 - [ ] Editing an Android balance appears on PC/laptop without refresh.
-- [ ] A new transaction updates Cashflow, Accumulation, Expenses, Prospect, and Insights.
+- [ ] A new History transaction updates only the ledger, History analytics, and matching Budget meter; Balance, Net Worth, and Prospect remain identical.
 - [ ] Client payment/status updates outstanding income and Prospect; Freeze stays excluded.
 - [ ] Fractional US quantities remain exact.
 - [ ] Stock price refresh updates portfolio/Prospect without changing Base/Optimistic targets.

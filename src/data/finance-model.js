@@ -76,7 +76,14 @@ export function getBudgetProgress(item, transactions, referenceDate = new Date()
 }
 
 export function monthlyBudgetRemaining(items, transactions, referenceDate = new Date()) {
-  return items.reduce((sum, item) => sum + getBudgetProgress(item, transactions, referenceDate).remaining, 0);
+  const activeKey = monthKey(referenceDate);
+  return items.reduce((sum, item) => {
+    const trackingThisMonth = item.trackingMonth === activeKey;
+    const status = trackingThisMonth ? (item.paymentStatus || "auto") : "auto";
+    if (status === "done") return sum;
+    if (status === "partial") return sum + Math.max(0, expense(item.monthly) - number(item.paidAmount));
+    return sum + expense(item.monthly);
+  }, 0);
 }
 
 export function getYearlyProjectionTotal(items, year, activeYear) {
@@ -134,12 +141,11 @@ export function remainingYearExpenseBreakdown({referenceDate = new Date(), budge
 }
 
 export function remainingYearIncomeBreakdown({referenceDate = new Date(), clients = [], transactions = []}) {
-  const year = referenceDate.getFullYear();
   const currentMonth = referenceDate.getMonth();
   const outstanding = getTotalOutstanding(clients, referenceDate);
   const recurring = getFixedIncome(clients) * (11 - currentMonth);
-  const additional = Array.from({length:12-currentMonth},(_,index)=>currentMonth+index)
-    .reduce((sum, month) => sum + additionalIncomeForMonth(transactions, year, month), 0);
+  // History is a ledger only. Recorded income never changes cash or projection.
+  const additional = 0;
   return {outstanding, recurring, additional, total:outstanding + recurring + additional};
 }
 
@@ -153,7 +159,8 @@ export function buildMonthlyTimeline({referenceDate = new Date(), accountTotal, 
   for (let month = currentMonth; month < 12; month += 1) {
     const isCurrent = month === currentMonth;
     const income = isCurrent ? getTotalOutstanding(clients, referenceDate) : fixedIncome;
-    const extraIncome = additionalIncomeForMonth(transactions, year, month);
+    // History is a ledger only. It cannot change projected cash.
+    const extraIncome = 0;
     const recurringExpense = isCurrent ? monthlyBudgetRemaining(budgets, transactions, referenceDate) : monthlyBudget;
     const yearlyExpense = dueYearly(yearly, year, month, year, currentMonth);
     const eventExpense = dueEvents(events, year, month);
@@ -192,9 +199,7 @@ export function buildProjection({years, referenceDate = new Date(), accountTotal
       return {year,opening,income,incomeBreakdown,expense,expenses:remainingBreakdown,eventExpense:remainingBreakdown.events,creditExpense:remainingBreakdown.credit,portfolio,closing:currentClosing,nw:opening + portfolio + incomeBreakdown.total - remainingBreakdown.total};
     }
     const opening = cash;
-    const annualIncome = getFixedIncome(clients) * 12 + transactions
-      .filter(row => row.type === "income" && new Date(`${row.date}T00:00:00`).getFullYear() === year)
-      .reduce((sum, row) => sum + number(row.amount), 0);
+    const annualIncome = getFixedIncome(clients) * 12;
     cash += annualIncome - breakdown.total;
     const portfolio = number(portfolioForYear(year));
     const incomeBreakdown = {outstanding:0,recurring:getFixedIncome(clients)*12,additional:annualIncome-getFixedIncome(clients)*12,total:annualIncome};

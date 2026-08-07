@@ -110,7 +110,8 @@ async function googleFinanceUsdIdr() {
   const urls = [
     "https://www.google.com/finance/beta/quote/USD-IDR?hl=id&gl=ID",
     "https://www.google.com/finance/beta/quote/USD-IDR?hl=en&gl=US",
-    "https://www.google.com/finance/quote/USD-IDR?hl=en&gl=US"
+    "https://www.google.com/finance/quote/USD-IDR?hl=en&gl=US",
+    "https://www.google.com/search?q=1%20USD%20to%20IDR&hl=en&gl=US"
   ];
   const failures = [];
   for (const target of urls) {
@@ -128,8 +129,10 @@ async function googleFinanceUsdIdr() {
       }, 9000);
       const candidates = [
         ...[...html.matchAll(/data-last-price=["']([^"']+)["']/gi)].map(match => match[1]),
+        ...[...html.matchAll(/data-value=["']([^"']+)["']/gi)].map(match => match[1]),
         ...[...html.matchAll(/class=["'][^"']*(?:YMlKec|fxKbKc)[^"']*["'][^>]*>([\s\S]{0,160}?)<\/[^>]+>/gi)].map(match => match[1].replace(/<[^>]+>/g, "")),
-        ...[...html.matchAll(/(?:USD\s*\/\s*IDR|USD\s*-\s*IDR)[\s\S]{0,600}?([0-9]{1,3}(?:[.,][0-9]{3})+(?:[.,][0-9]{1,4})?)/gi)].map(match => match[1])
+        ...[...html.matchAll(/(?:USD\s*\/\s*IDR|USD\s*-\s*IDR|United States Dollar)[\s\S]{0,900}?([0-9]{1,3}(?:[.,][0-9]{3})+(?:[.,][0-9]{1,4})?)/gi)].map(match => match[1]),
+        ...[...html.matchAll(/\b(?:1[0-9]|2[0-9]|3[0-9]|4[0-9])(?:[.,][0-9]{3})(?:[.,][0-9]{1,4})?\b/g)].map(match => match[0])
       ];
       const rate = candidates.map(validUsdIdr).find(Boolean);
       if (!rate) throw new Error("price marker missing");
