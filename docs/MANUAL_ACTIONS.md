@@ -1,0 +1,15 @@
+# Exact manual actions
+
+1. Create accounts: **GitHub**, **Vercel**, **Supabase**, **Finnhub**, and **Twelve Data**.
+2. Create one Supabase project.
+3. Run all three SQL migration files in numeric order.
+4. Disable public sign-ups and manually create one confirmed Auth user.
+5. Create a private GitHub repository and push this project.
+6. Import that repository into Vercel.
+7. Create and add these Vercel values: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `FINNHUB_API_KEY`, `TWELVE_DATA_API_KEY`, and `STOCK_SYMBOL_ALLOWLIST`.
+8. Optional cron: add `SUPABASE_SERVICE_ROLE_KEY` and a long random `CRON_SECRET`; keep both server-only.
+9. Deploy and copy the default Vercel URL into Supabase Auth Site URL.
+10. Sign in from the old browser and choose **Import v6.3.1 local data**, or import a JSON backup. Do this once.
+11. Open the same Vercel URL on desktop, laptop, and Android; sign in with the same private account.
+12. Test every stock mapping. Confirm whether the Twelve Data plan supports each IDX symbol.
+13. Install the PWA on Android.
