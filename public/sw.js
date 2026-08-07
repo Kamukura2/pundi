@@ -1,4 +1,4 @@
-const SHELL_CACHE = "cvfinance-shell-v7.7.3-annual-operating-performance";
+const SHELL_CACHE = "cvfinance-shell-v7.7.4-monthly-net";
 const SHELL = ["/", "/index.html", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", event => {

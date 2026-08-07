@@ -99,7 +99,7 @@ async function yahooUsdIdr() {
       const data = await fetchJson(url, {
         headers:{
           Accept:"application/json,text/plain,*/*",
-          "User-Agent":"Mozilla/5.0 (compatible; CVFinance/7.7.3; personal-use FX lookup)"
+          "User-Agent":"Mozilla/5.0 (compatible; CVFinance/7.7.4; personal-use FX lookup)"
         }
       });
       const chart = data?.chart;

@@ -666,6 +666,8 @@ function renderProspect(){
  prospectChart.innerHTML=line(pr.map(p=>p.nw),pr.map(p=>String(p.year).slice(2)),true);
  const operating=annualOperatingPerformance({clients:state.clients,budgets:state.budgets,yearly:state.yearly});
  const netPositive=operating.net>=0, incomeShare=operating.income?Math.min(100,operating.expense/operating.income*100):100;
+ const monthlyOperating={income:operating.income/12,expense:operating.expense/12,net:operating.net/12};
+ const monthlyNetPositive=monthlyOperating.net>=0;
  annualPerformanceDashboard.innerHTML=`
   <div class="operating-flow-card operating-income">
    <div class="operating-flow-icon">↗</div><div><small>ANNUAL INCOME</small><strong class="private">${fmt(operating.income)}</strong><p>Recurring clients × 12 months</p></div>
@@ -684,7 +686,15 @@ function renderProspect(){
    <strong class="private">${operating.net>=0?"+":""}${fmt(operating.net)}</strong>
    <p>Income − Expense · operating result per year</p>
   </div>
-  <div class="operating-readonly"><span>◉</span><p><b>Insight only.</b> Events, Credit, Stocks and History are excluded. This dashboard never changes Balance, Net Worth or Prospect.</p></div>`;
+  <div class="operating-net operating-monthly-net ${monthlyNetPositive?"profit":"loss"}">
+   <div class="operating-net-top"><span>${monthlyNetPositive?"▲ PROFIT":"▼ LOSS"}</span><small>MONTHLY NET</small></div>
+   <strong class="private">${monthlyOperating.net>=0?"+":""}${fmt(monthlyOperating.net)}</strong>
+   <div class="monthly-net-breakdown">
+    <span><small>INCOME</small><b class="private">${fmt(monthlyOperating.income)}</b></span>
+    <span><small>EXPENSE</small><b class="private">${fmt(monthlyOperating.expense)}</b></span>
+   </div>
+   <p>Monthly Income − Monthly Expense · read-only</p>
+  </div>`;
  yearGrid.innerHTML=pr.map(y=>{const ages=ageTriplet(y.year).join(", "),current=y.year===currentYear(),hasCredit=Number(y.expenses.credit)>0; return `<div class="year-card"><div class="year-head"><small>${y.year}</small><span class="age-triplet">${ages}</span></div><h4 class="private ${moneyClass(y.nw)}">${fmt(y.nw)}</h4><small class="year-equation">Opening Cash + Stocks + Income − Expenses</small><small class="year-split private"><span>Opening Cash <b class="${moneyClass(y.opening)}">${fmt(y.opening)}</b></span><span>Stocks <b class="${moneyClass(y.portfolio)}">${fmt(y.portfolio)}</b></span><span>${current?"Remaining recurring income":"Recurring income"} <b class="positive">+${fmt(y.incomeBreakdown.recurring)}</b></span>${y.incomeBreakdown.outstanding?`<span>Current receivables <b class="positive">+${fmt(y.incomeBreakdown.outstanding)}</b></span>`:""}${current?`<span>This month remaining <b class="negative">−${fmt(y.expenses.currentMonth)}</b></span>`:""}<span>Recurring expense <b class="negative">−${fmt(y.expenses.recurring)}</b></span><span>Yearly expense <b class="negative">−${fmt(y.expenses.yearly)}</b></span><span>Events <b class="negative">−${fmt(y.expenses.events)}</b></span>${hasCredit?`<span>Credit & PayLater <b class="negative">−${fmt(y.expenses.credit)}</b></span>`:""}</small></div>`;}).join("");
 }
 

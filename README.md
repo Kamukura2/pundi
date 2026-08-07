@@ -1,6 +1,6 @@
-# CVFinance v7.7.3
+# CVFinance v7.7.4
 
-v7.7.3 replaces the Prospect `Projection Sources` card with a read-only annual operating performance dashboard. It reports recurring-client income, monthly-plus-yearly budget expense, and annual net profit/loss without changing Balance, Net Worth, Cash, Prospect, or any saved financial data. Events, Credit/PayLater, Stocks, and History are explicitly excluded.
+v7.7.4 adds a read-only Monthly Net card beneath the annual operating performance dashboard. Monthly Income is recurring-client income, Monthly Expense is monthly budget plus one-twelfth of yearly budget, and Monthly Net is their difference. Neither dashboard changes Balance, Net Worth, Cash, Prospect, or any saved financial data. Events, Credit/PayLater, Stocks, and History are explicitly excluded.
 
 v7.7.2 removes fragile Google HTML scraping and reads the `IDR=X` quote from Yahoo Finance JSON with two-host fallback, safe-rate validation, and last-valid/manual fallback. It also highlights Yearly costs due this month, enlarges the Expense Perusahaan dashboard, brightens Fixed Monthly, and turns Transaction Budget/Channel tags into rounded toggle filters.
 
