@@ -13,6 +13,8 @@ radial-gradient(circle at top right, rgba(78,143,255,.09), transparent 22%),
 radial-gradient(circle at top left, rgba(127,102,255,.08), transparent 24%),
 var(--bg);color:var(--text);font-family:Manrope,"Plus Jakarta Sans","Segoe UI",sans-serif}
 button,input,select{font:inherit}
+input[type=number]{appearance:textfield;-moz-appearance:textfield}
+input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
 button{cursor:pointer}
 main{margin-left:232px;padding:28px 30px 110px;max-width:1750px}
 .sidebar{position:fixed;left:0;top:0;bottom:0;width:232px;padding:22px 16px;background:linear-gradient(180deg,var(--nav),#091121 46%,#060c18);border-right:1px solid rgba(255,255,255,.04);display:flex;flex-direction:column;z-index:30}
@@ -136,6 +138,8 @@ table{width:100%;border-collapse:collapse}
 th,td{padding:12px 10px;border-bottom:1px solid var(--line);font-size:13px;text-align:left;white-space:nowrap}
 thead th{position:sticky;top:0;background:var(--surface);z-index:2}
 td input,td select{width:100%;min-width:90px}
+.target-price-input{font-variant-numeric:tabular-nums;caret-color:var(--purple)}
+.target-price-input:focus{outline:2px solid color-mix(in srgb,var(--purple) 68%,transparent);border-color:transparent;box-shadow:0 0 0 5px color-mix(in srgb,var(--purple) 12%,transparent)}
 .price-state{display:block;width:max-content;padding:5px 8px;border-radius:999px;background:rgba(52,200,139,.12);color:var(--green);font-size:10px;font-weight:800;text-transform:uppercase}
 .price-state.stale{background:rgba(255,155,94,.14);color:var(--orange)}.price-time{display:block;margin-top:5px;color:var(--muted);white-space:nowrap}
 .mini-input{width:74px}
@@ -651,6 +655,7 @@ select,input,.search{width:100%;min-width:0;height:46px;padding:0 12px;border-ra
 .stock-cash-icon{width:48px;height:48px;display:grid;place-items:center;border-radius:15px;color:#fff;font-weight:950;background:linear-gradient(135deg,#20c58d,#168aac);box-shadow:0 10px 24px rgba(25,156,133,.24)}
 .wallet-card .stock-cash-icon{background:linear-gradient(135deg,#7f61ff,#2f9ee9);box-shadow:0 10px 24px rgba(76,91,220,.26)}
 .stock-cash-card small{display:block;color:var(--muted);font-size:9px;font-weight:900;letter-spacing:.08em}.stock-cash-card b{display:block;margin-top:4px}.stock-cash-card input{width:100%;min-width:0}.stock-cash-card em{text-align:right;font-style:normal;font-weight:900;overflow-wrap:anywhere}
+.stock-rate-pills{justify-content:flex-end;flex-wrap:wrap}.fx-rate{color:var(--text);font-variant-numeric:tabular-nums;background:linear-gradient(135deg,rgba(66,211,181,.13),rgba(64,142,255,.12))}
 .year-equation{display:block;margin:-4px 0 7px;color:var(--muted);font-size:9px;font-weight:800;letter-spacing:.02em}
 .year-card{min-height:285px}.year-split span:first-child{font-weight:800}
 .yearly-tile.due{background:linear-gradient(145deg,#d7efff,#adcdf7 56%,#9fb7ed)!important;border-color:rgba(49,112,195,.25)!important;color:#102343;box-shadow:0 15px 34px rgba(50,103,178,.13)}

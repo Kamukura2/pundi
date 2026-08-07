@@ -1,7 +1,7 @@
 import { createEmptyState, createId, createMvpSeed, readLegacyLocalStorage, YEARS } from "./src/data/default-data.js";
 import { annualExpenseBreakdown, buildMonthlyTimeline, buildProjection, getBudgetProgress, getClientOutstanding, getClientPaidThisMonth, getCurrentNetWorth, getEndingClients, getEntrustedDeduction, getFixedIncome, getReceivableClients, getRecurringClients, getTotalOutstanding, getTotalPaid, getYearlyProjectionTotal, monthKey, monthlyBudgetRemaining, remainingYearExpenseBreakdown, remainingYearIncomeBreakdown } from "./src/data/finance-model.js";
 import { SyncManager } from "./src/sync/sync-manager.js";
-import { fetchHoldingQuote, isPriceStale, validateHoldingSymbol } from "./src/stocks/client.js";
+import { fetchHoldingQuote, fetchUsdIdrRate, isPriceStale, validateHoldingSymbol } from "./src/stocks/client.js";
 import { normalizeStockMapping, quantityForDisplay, quantityForStorage, quantityUnit } from "./src/stocks/holding.js";
 import { getSupabase } from "./src/lib/supabase.js";
 
@@ -16,6 +16,7 @@ state.theme=localStorage.getItem("cvfinance-theme-cache")||"dark";
 state.language=localStorage.getItem("cvfinance-language-cache")||"en";
 let syncManager;
 let stockRefreshStarted=false;
+let fxRefreshTimer=null;
 const currentYear=()=>new Date().getFullYear();
 
 const fmt=(n,compact=false)=>{
@@ -33,6 +34,14 @@ const save=()=>syncManager?.persist(state);
 const saveSettings=()=>save();
 const q=(s)=>document.querySelector(s);
 const qa=(s)=>[...document.querySelectorAll(s)];
+const hasActiveEditor=()=>{
+ const active=document.activeElement;
+ return Boolean(active&&active.matches("input,select,textarea,[contenteditable=true]")&&!active.closest("#authGate"));
+};
+const plainNumber=value=>{
+ const number=Number(value||0);
+ return Number.isInteger(number)?String(number):String(Number(number.toFixed(6)));
+};
 const accountTotal=()=>state.accounts.reduce((a,b)=>a+Number(b.balance),0);
 const entrustedTotal=(source)=>getEntrustedDeduction(state.entrustedFunds,source);
 const netAccountTotal=()=>accountTotal()-entrustedTotal("cash");
@@ -511,6 +520,11 @@ function renderStocks(){
  stockWalletUsd.value=Number(state.stockExtras?.walletUsd||0)||"";
  stockNetcashValue.textContent=fmt(state.stockExtras?.netcashIdr||0);
  stockWalletValue.textContent=fmt(Number(state.stockExtras?.walletUsd||0)*Number(state.usdIdr||0));
+ if(typeof usdIdrRate!=="undefined"){
+  const meta=state.usdIdrMeta;
+  usdIdrRate.textContent=`1 USD = ${new Intl.NumberFormat("id-ID",{maximumFractionDigits:2}).format(Number(state.usdIdr||0))} IDR${meta?.status?` · ${String(meta.status).toUpperCase()}`:" · SAVED RATE"}`;
+  usdIdrRate.title=meta?.asOf?`Updated ${new Date(meta.asOf).toLocaleString("en-GB",{dateStyle:"medium",timeStyle:"short"})}`:"Last saved exchange rate";
+ }
  stockNetcashIdr.onchange=()=>{state.stockExtras ||= {netcashIdr:0,walletUsd:0};state.stockExtras.netcashIdr=Math.max(0,Number(stockNetcashIdr.value||0));save();renderAll();};
  stockWalletUsd.onchange=()=>{state.stockExtras ||= {netcashIdr:0,walletUsd:0};state.stockExtras.walletUsd=Math.max(0,Number(stockWalletUsd.value||0));save();renderAll();};
  holdingsBody.innerHTML=state.stocks.map((s,i)=>{
@@ -539,11 +553,21 @@ function renderTargetTable(mode,headEl,bodyEl){
  const useMode=mode==="base"?state.baseMode:state.optimisticMode;
  headEl.innerHTML=`<tr><th>Ticker</th>${YEARS.map(y=>`<th>${y===currentYear()?"Current":y}</th>`).join("")}</tr>`;
  bodyEl.innerHTML=state.stocks.map((s,i)=>`<tr><td><b>${s.ticker}</b></td>${YEARS.map(y=>{
-   if(y===currentYear()) return `<td>${Number(s.current).toFixed(2)}</td>`;
-   const val = useMode==="auto" ? Number(stockPrice(s,y,mode)).toFixed(2) : Number(s[mode][y]??s.current).toFixed(2);
-   return `<td><input type="number" step=".01" ${useMode==="auto"?"disabled":""} data-target="${mode}" data-stock="${i}" data-year="${y}" value="${val}"></td>`;
- }).join("")}</tr>`).join("");
- qa(`[data-target="${mode}"]`).forEach(el=>el.onchange=()=>{const i=Number(el.dataset.stock), y=Number(el.dataset.year); state.stocks[i][mode][y]=Number(el.value); save(); renderAll();});
+   if(y===currentYear()) return `<td>${plainNumber(s.current)}</td>`;
+   const val = useMode==="auto" ? stockPrice(s,y,mode) : Number(s[mode][y]??s.current);
+   return `<td><input class="target-price-input" type="text" inputmode="decimal" autocomplete="off" ${useMode==="auto"?"disabled":""} data-target="${mode}" data-stock="${i}" data-year="${y}" value="${plainNumber(val)}"></td>`;
+  }).join("")}</tr>`).join("");
+ qa(`[data-target="${mode}"]`).forEach(el=>{
+  const commit=()=>{
+   const i=Number(el.dataset.stock),y=Number(el.dataset.year),value=Number(String(el.value).replace(/,/g,""));
+   if(!Number.isFinite(value)||value<0){el.value=plainNumber(state.stocks[i][mode][y]??state.stocks[i].current);return;}
+   if(Number(state.stocks[i][mode][y])===value){el.value=plainNumber(value);return;}
+   state.stocks[i][mode][y]=value;el.value=plainNumber(value);save();
+   stockValueTrend.innerHTML=line(YEARS.map(year=>netPortfolio(year,"base")),YEARS.map(year=>String(year)),true);attachTips();
+  };
+  el.addEventListener("keydown",event=>{if(event.key==="Enter"){event.preventDefault();el.blur()}else if(event.key==="Escape"){el.value=plainNumber(state.stocks[Number(el.dataset.stock)][mode][Number(el.dataset.year)]);el.blur();}});
+  el.addEventListener("blur",commit);
+ });
 }
 function updateModeToggleLabels(){
  if(typeof baseModeToggle!=="undefined") baseModeToggle.textContent = state.baseMode === "auto" ? "Auto" : "Manual";
@@ -821,6 +845,33 @@ async function refreshStockPrices({silent=false}={}){
  if(!silent)toastMsg(`${updated} price${updated===1?"":"s"} updated${failed?`, ${failed} fallback`:""}`);
 }
 
+async function refreshExchangeRate({silent=false}={}){
+ if(!navigator.onLine)return false;
+ try{
+  const quote=await fetchUsdIdrRate();
+  const rate=Number(quote.rate);
+  if(!Number.isFinite(rate)||rate<=0)throw new Error("Invalid USD/IDR rate.");
+  const changed=Number(state.usdIdr)!==rate;
+  state.usdIdr=rate;
+  state.usdIdrMeta={provider:quote.provider,status:quote.status,asOf:quote.asOf};
+  if(changed)saveSettings();
+  if(!hasActiveEditor()){renderStocks();renderAccumulation();renderProspect();renderInsights();attachTips();applyLanguage();}
+  if(!silent)toastMsg(`USD/IDR updated · ${new Intl.NumberFormat("id-ID",{maximumFractionDigits:2}).format(rate)}`);
+  return true;
+ }catch(error){
+  state.usdIdrMeta={status:"saved fallback",error:error.message};
+  if(typeof usdIdrRate!=="undefined"){usdIdrRate.textContent=`1 USD = ${new Intl.NumberFormat("id-ID",{maximumFractionDigits:2}).format(Number(state.usdIdr||0))} IDR · SAVED FALLBACK`;usdIdrRate.title=error.message;}
+  if(!silent)toastMsg("Live USD/IDR unavailable · saved rate retained");
+  return false;
+ }
+}
+
+async function refreshMarkets({silent=false}={}){
+ await refreshExchangeRate({silent:true});
+ await refreshStockPrices({silent:true});
+ if(!silent)toastMsg("Market prices and USD/IDR updated");
+}
+
 async function validateStockSymbols(){
  if(!state.stocks.length)return;
  if(typeof validateSymbolsBtn!=="undefined")validateSymbolsBtn.disabled=true;
@@ -935,10 +986,24 @@ addElectricityBtn.onclick=()=>openSimple("Add Meter Reading",[
 ],o=>state.electricity.push({id:createId(),...o}));
 
 qa(".close-dialog").forEach(b=>b.onclick=()=>b.closest("dialog").close());
-qa("dialog").forEach(d=>d.addEventListener("click",e=>{if(e.target===d)d.close()}));
+qa("dialog").forEach(dialog=>{
+ let backdropPress=null;
+ dialog.addEventListener("pointerdown",event=>{
+  backdropPress=event.target===dialog?{id:event.pointerId,x:event.clientX,y:event.clientY}:null;
+ });
+ dialog.addEventListener("pointerup",event=>{
+  if(!backdropPress||backdropPress.id!==event.pointerId)return;
+  const moved=Math.hypot(event.clientX-backdropPress.x,event.clientY-backdropPress.y);
+  const shouldClose=event.target===dialog&&moved<7;
+  backdropPress=null;
+  if(shouldClose)dialog.close();
+ });
+ dialog.addEventListener("pointercancel",()=>{backdropPress=null;});
+});
 
 function applyCloudState(next,{preserveUi=false}={}){
- if(preserveUi){renderAll();return;}
+ if(preserveUi)return;
+ if(hasActiveEditor())return;
  const ui={page:state.page,privacy:state.privacy,filter:state.filter,sort:state.sort,expenseView:state.expenseView,txEdit:null,prospectMode:state.prospectMode};
  Object.assign(state,next,ui);
  document.documentElement.dataset.theme=state.theme;
@@ -966,7 +1031,11 @@ async function showSignedIn(user){
  accountEmail.textContent=user.email||"Private account";
  legacyImportBtn.hidden=!readLegacyLocalStorage();
  if(normalizeStockMappings())await save();
- if(!stockRefreshStarted){stockRefreshStarted=true;setTimeout(()=>refreshStockPrices({silent:true}),500);}
+ if(!stockRefreshStarted){
+  stockRefreshStarted=true;
+  setTimeout(()=>refreshMarkets({silent:true}),500);
+  fxRefreshTimer=setInterval(()=>refreshExchangeRate({silent:true}),5*60*1000);
+ }
 }
 
 async function boot(){
@@ -1010,8 +1079,8 @@ seedDataBtn.onclick=async()=>{
   await syncManager.handleRemoteChange();dataModal.close();toastMsg("MVP seed loaded");
  }catch(error){alert(error.message)}
 };
-logoutBtn.onclick=()=>syncManager.signOut();
-refreshStocksBtn.onclick=()=>refreshStockPrices();
+logoutBtn.onclick=()=>{if(fxRefreshTimer)clearInterval(fxRefreshTimer);syncManager.signOut();};
+refreshStocksBtn.onclick=()=>refreshMarkets();
 validateSymbolsBtn.onclick=()=>validateStockSymbols();
 
 let installPrompt=null;

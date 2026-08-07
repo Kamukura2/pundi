@@ -27,7 +27,7 @@ for (const key of ["FINNHUB_API_KEY","SUPABASE_URL","SUPABASE_ANON_KEY"]) assert
 const serviceWorker = read("public/sw.js");
 assert.match(serviceWorker, /pathname\.startsWith\("\/api\/"\)/);
 
-const jsFiles = ["app.js","api/config.js","api/_lib/rate-limit.js","api/stocks/quote.js","api/stocks/validate.js","api/cron/refresh-stocks.js","src/data/default-data.js","src/data/finance-model.js","src/data/repository.js","src/lib/idb.js","src/lib/supabase.js","src/stocks/client.js","src/stocks/holding.js","src/sync/sync-manager.js"];
+const jsFiles = ["app.js","api/config.js","api/_lib/rate-limit.js","api/stocks/fx.js","api/stocks/quote.js","api/stocks/validate.js","api/cron/refresh-stocks.js","src/data/default-data.js","src/data/finance-model.js","src/data/repository.js","src/lib/idb.js","src/lib/supabase.js","src/stocks/client.js","src/stocks/holding.js","src/sync/sync-manager.js"];
 for (const file of jsFiles) execFileSync(process.execPath, ["--check", resolve(root, file)], { stdio:"pipe" });
 
 for (const file of jsFiles.map(read)) {
@@ -114,7 +114,7 @@ assert.equal(quantityForStorage("NASDAQ", 2.8033875), 2.8033875);
 process.env.FINNHUB_API_KEY = "test";
 process.env.STOCK_SYMBOL_ALLOWLIST = "WDC,BMRI:IDX";
 const realFetch = globalThis.fetch;
-const { fetchQuote, validateMapping } = await import("../api/_lib/providers.js");
+const { fetchQuote, fetchUsdIdrQuote, validateMapping } = await import("../api/_lib/providers.js");
 validateMapping({provider:"finnhub",provider_symbol:"WDC",market:"NASDAQ"});
 validateMapping({provider:"yahoo",provider_symbol:"BMRI",market:"IDX"});
 globalThis.fetch = async () => new Response(JSON.stringify({c:123.45,t:Math.floor(Date.now()/1000)}), {status:200,headers:{"content-type":"application/json"}});
@@ -129,6 +129,21 @@ const idxQuote = await fetchQuote({provider:"yahoo",provider_symbol:"BMRI",marke
 assert.equal(idxQuote.price, 4220);
 assert.equal(idxQuote.provider, "yahoo");
 assert.equal(idxQuote.status, "delayed");
+globalThis.fetch = async url => {
+  assert.match(String(url), /forex\/rates\?base=USD/);
+  return new Response(JSON.stringify({base:"USD",quote:{IDR:16321.5}}), {status:200,headers:{"content-type":"application/json"}});
+};
+const fxQuote = await fetchUsdIdrQuote();
+assert.equal(fxQuote.rate, 16321.5);
+assert.equal(fxQuote.provider, "finnhub");
+globalThis.fetch = async url => {
+  if (String(url).includes("finnhub.io")) return new Response(JSON.stringify({error:"plan unavailable"}), {status:403,headers:{"content-type":"application/json"}});
+  assert.match(String(url), /\/IDR=X\?/);
+  return new Response(JSON.stringify({chart:{result:[{meta:{regularMarketPrice:16345.75,regularMarketTime:Math.floor(Date.now()/1000)}}],error:null}}), {status:200,headers:{"content-type":"application/json"}});
+};
+const fallbackFxQuote = await fetchUsdIdrQuote();
+assert.equal(fallbackFxQuote.rate, 16345.75);
+assert.equal(fallbackFxQuote.provider, "yahoo");
 globalThis.fetch = realFetch;
 
 await import("fake-indexeddb/auto");
@@ -147,4 +162,11 @@ await repository.queueOperation({table:"accounts",action:"delete",id,previousUpd
 queued = await mutationList();
 assert.equal(queued.length, 0);
 
-console.log("CVFinance checks passed: schema, RLS markers, PWA, 8 tabs, v7.6 auditable projection equations, one-time dated credit, optional stock cash assets, dynamic budget tags, archives, sorting invariants, stock provider abstraction, offline queue coalescing, environment template, and JavaScript syntax.");
+const appSource = read("app.js");
+assert.doesNotMatch(appSource, /<input[^>]*type=\"number\"[^>]*data-target=/, "Target-price editors must not use native number steppers");
+assert.match(appSource, /class=\"target-price-input\" type=\"text\" inputmode=\"decimal\"/, "Target-price inputs must preserve editable text drafts");
+assert.match(appSource, /backdropPress/, "Dialog dismissal must distinguish backdrop clicks from drag-selection gestures");
+assert.match(appSource, /fetchUsdIdrRate/, "USD\/IDR live refresh must be wired into the app");
+assert.match(appSource, /Number\(s\.quantity\)\*stockPrice[\s\S]*s\.currency===\"USD\"\?v\*state\.usdIdr:v/, "US holdings must convert shares times USD price using USD\/IDR");
+
+console.log("CVFinance checks passed: schema, RLS markers, PWA, 8 tabs, v7.6.1 stable target inputs, safe dialog dismissal, live USD/IDR fallback, auditable projections, one-time dated credit, optional stock cash assets, sorting invariants, stock provider abstraction, offline queue coalescing, and JavaScript syntax.");

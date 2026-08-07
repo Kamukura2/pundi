@@ -87,6 +87,45 @@ export async function fetchQuote(mapping) {
   return yahoo(mapping);
 }
 
+async function finnhubUsdIdr() {
+  if (!process.env.FINNHUB_API_KEY) throw new Error("Finnhub is not configured.");
+  const url = new URL("https://finnhub.io/api/v1/forex/rates");
+  url.searchParams.set("base", "USD");
+  const data = await fetchJson(url, { headers:{ "X-Finnhub-Token":process.env.FINNHUB_API_KEY } });
+  const rate = Number(data?.quote?.IDR);
+  if (!Number.isFinite(rate) || rate <= 0) throw new Error("Finnhub returned no USD/IDR rate.");
+  return { rate, asOf:new Date().toISOString(), status:"real-time", provider:"finnhub" };
+}
+
+async function yahooUsdIdr() {
+  const failures = [];
+  for (const host of ["https://query1.finance.yahoo.com", "https://query2.finance.yahoo.com"]) {
+    try {
+      const url = new URL("/v8/finance/chart/IDR=X", host);
+      url.searchParams.set("interval", "1m");
+      url.searchParams.set("range", "1d");
+      const data = await fetchJson(url, {
+        headers:{ Accept:"application/json,text/plain,*/*", "User-Agent":"Mozilla/5.0 (compatible; CVFinance/7.6; personal-use FX lookup)" }
+      });
+      const result = data?.chart?.result?.[0];
+      const rate = Number(result?.meta?.regularMarketPrice);
+      const timestamp = Number(result?.meta?.regularMarketTime || 0);
+      if (!Number.isFinite(rate) || rate <= 0) throw new Error("Yahoo Finance returned no USD/IDR rate.");
+      return { rate, asOf:timestamp ? new Date(timestamp * 1000).toISOString() : new Date().toISOString(), status:classify(timestamp, "real-time"), provider:"yahoo" };
+    } catch (error) {
+      failures.push(`${new URL(host).hostname}: ${error.message}`);
+    }
+  }
+  throw new Error(failures.join(" | "));
+}
+
+export async function fetchUsdIdrQuote() {
+  const failures = [];
+  try { return await finnhubUsdIdr(); } catch (error) { failures.push(`Finnhub: ${error.message}`); }
+  try { return await yahooUsdIdr(); } catch (error) { failures.push(`Yahoo: ${error.message}`); }
+  throw Object.assign(new Error(`USD/IDR rate unavailable. ${failures.join(" | ")}`), { code:"fx_unavailable", status:502 });
+}
+
 export function validateMapping(mapping) {
   assertMapping(mapping);
   if (mapping.market === "IDX" && mapping.provider !== "yahoo") throw Object.assign(new Error("IDX holdings must use Yahoo Finance delayed quotes in this release."), { code:"invalid_mapping", status:400 });
