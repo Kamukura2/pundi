@@ -14,6 +14,7 @@ const index = read("index.html");
 for (const tab of ["accumulation","cashflow","expenses","clients","stocks","electricity","prospect","insights"]) assert.match(index, new RegExp(`id="${tab}"`));
 assert.match(index, /manifest\.webmanifest/);
 assert.match(index, /authForm/);
+assert.match(index, /annualPerformanceDashboard/);
 
 const sql = read("supabase/migrations/001_initial_schema.sql");
 for (const table of ["profiles","accounts","transactions","monthly_budgets","yearly_expenses","planned_events","credit_facilities","credit_items","clients","stock_holdings","stock_price_targets","electricity_readings","app_settings"]) {
@@ -42,13 +43,14 @@ assert.equal(seed.stocks.find(row => row.ticker === "WDC").quantity, 2.8033875);
 assert.equal(seed.rateKwh, 1740);
 assert.ok(seed.budgets.some(row => row.category === "Food") && seed.budgets.some(row => row.category === "Coffee"));
 
-const { buildMonthlyTimeline, buildProjection, getBudgetProgress, getClientPaidThisMonth, getCurrentNetWorth, getEntrustedDeduction, getFixedIncome, getTotalOutstanding, remainingYearExpenseBreakdown, remainingYearIncomeBreakdown } = await import("../src/data/finance-model.js");
+const { annualOperatingPerformance, buildMonthlyTimeline, buildProjection, getBudgetProgress, getClientPaidThisMonth, getCurrentNetWorth, getEntrustedDeduction, getFixedIncome, getTotalOutstanding, remainingYearExpenseBreakdown, remainingYearIncomeBreakdown } = await import("../src/data/finance-model.js");
 const modelClients = [
   {monthly:1000000,paid:300000,carry:0,status:"pending",clientType:"recurring"},
   {monthly:2000000,paid:0,carry:0,status:"pending",clientType:"ending",endingPaid:false},
   {monthly:3000000,paid:3000000,carry:0,status:"paid",clientType:"ending",endingPaid:true}
 ];
 assert.equal(getFixedIncome(modelClients),1000000,"Ending clients must not enter recurring income");
+assert.deepEqual(annualOperatingPerformance({clients:modelClients,budgets:[{monthly:1000000},{monthly:-500000}],yearly:[{amount:2000000},{amount:-1000000}]}),{income:12000000,monthlyExpense:18000000,yearlyExpense:3000000,expense:21000000,net:-9000000},"Annual operating dashboard must use recurring income and absolute monthly/yearly budgets only");
 assert.equal(getTotalOutstanding(modelClients),2700000,"Unpaid ending balances remain receivables");
 assert.equal(getCurrentNetWorth(10000000,5000000),15000000,"Accumulation is current liquid plus stocks only");
 const entrusted=[{amount:1500000,source:"cash",settled:false},{amount:750000,source:"stocks",settled:false},{amount:900000,source:"cash",settled:true}];
@@ -187,4 +189,4 @@ assert.match(appSource, /meta\?\.provider==="yahoo"\?"YAHOO FINANCE"/, "The FX b
 assert.match(appSource, /due due-current/, "Yearly expenses due this month must receive the luminous current-month class");
 assert.match(appSource, /data-tx-tag-kind/, "Transaction category and channel chips must act as tag filters");
 
-console.log("CVFinance checks passed: schema, RLS markers, PWA, 8 tabs, v7.7.2 Yahoo FX validation, ledger-only History, dynamic Budget meters, toggleable Transaction tags, current-month Yearly styling, safe dialog dismissal, client status palette, auditable projections, one-time dated credit, optional stock cash assets, sorting invariants, stock provider abstraction, offline queue coalescing, and JavaScript syntax.");
+console.log("CVFinance checks passed: schema, RLS markers, PWA, 8 tabs, v7.7.3 annual operating dashboard isolation, Yahoo FX validation, ledger-only History, dynamic Budget meters, toggleable Transaction tags, current-month Yearly styling, safe dialog dismissal, client status palette, auditable projections, one-time dated credit, optional stock cash assets, sorting invariants, stock provider abstraction, offline queue coalescing, and JavaScript syntax.");

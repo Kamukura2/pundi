@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-  <title>CVFinance v7.7.2</title>
+  <title>CVFinance v7.7.3</title>
   <meta name="theme-color" content="#0b1120">
   <meta name="description" content="Private synchronized personal finance dashboard">
   <meta name="mobile-web-app-capable" content="yes">
@@ -447,9 +447,12 @@
           <div id="prospectChart" class="chart chart-hero"></div>
         </article>
 
-        <article class="panel">
-          <div class="panel-head"><div><p>Inputs</p><h3>Projection Sources</h3></div></div>
-          <div id="prospectSources" class="list"></div>
+        <article class="panel annual-performance-panel">
+          <div class="panel-head annual-performance-head">
+            <div><p>Annual View</p><h3>Operating Performance</h3></div>
+            <span class="operating-readonly-chip">READ-ONLY</span>
+          </div>
+          <div id="annualPerformanceDashboard" class="annual-performance-dashboard"></div>
         </article>
       </div>
 

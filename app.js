@@ -1,5 +1,5 @@
 import { createEmptyState, createId, createMvpSeed, readLegacyLocalStorage, YEARS } from "./src/data/default-data.js";
-import { annualExpenseBreakdown, buildMonthlyTimeline, buildProjection, getBudgetProgress, getClientOutstanding, getClientPaidThisMonth, getCurrentNetWorth, getEndingClients, getEntrustedDeduction, getFixedIncome, getReceivableClients, getRecurringClients, getTotalOutstanding, getTotalPaid, getYearlyProjectionTotal, monthKey, monthlyBudgetRemaining, recordedExpenseForBudget, remainingYearExpenseBreakdown, remainingYearIncomeBreakdown } from "./src/data/finance-model.js";
+import { annualExpenseBreakdown, annualOperatingPerformance, buildMonthlyTimeline, buildProjection, getBudgetProgress, getClientOutstanding, getClientPaidThisMonth, getCurrentNetWorth, getEndingClients, getEntrustedDeduction, getFixedIncome, getReceivableClients, getRecurringClients, getTotalOutstanding, getTotalPaid, getYearlyProjectionTotal, monthKey, monthlyBudgetRemaining, recordedExpenseForBudget, remainingYearExpenseBreakdown, remainingYearIncomeBreakdown } from "./src/data/finance-model.js";
 import { SyncManager } from "./src/sync/sync-manager.js";
 import { fetchHoldingQuote, fetchUsdIdrRate, isPriceStale, validateHoldingSymbol } from "./src/stocks/client.js";
 import { normalizeStockMapping, quantityForDisplay, quantityForStorage, quantityUnit } from "./src/stocks/holding.js";
@@ -113,7 +113,7 @@ const ID_TRANSLATIONS={
  "Fixed Yearly":"Tetap Tahunan","Expense Perusahaan":"Expense Perusahaan","Capital record only":"Pencatatan modal saja",
  "Total Portfolio Value":"Total Nilai Portofolio","Invested":"Modal","Unrealized":"Belum Direalisasi","Allocation":"Alokasi","Holdings":"Kepemilikan","Target prices":"Target harga","Budget":"Anggaran","Optional liquid assets":"Aset likuid opsional","Netcash & USD Wallet":"Netcash & Dompet USD","Included in total assets":"Masuk ke total aset",
  "Latest Meter Balance":"Sisa Token Terbaru","Average Daily Usage":"Rata-rata Harian","Estimated Monthly Cost":"Estimasi Biaya Bulanan","Meter Readings":"Catatan Meter",
- "Read-only projection":"Proyeksi hanya-baca","Projection Sources":"Sumber Proyeksi","Future Cash + Assets":"Kas + Aset Masa Depan","Cash Runway":"Daya Tahan Kas","Largest Expense":"Pengeluaran Terbesar","Largest Holding":"Saham Terbesar",
+ "Read-only projection":"Proyeksi hanya-baca","Annual View":"Tampilan Tahunan","Operating Performance":"Kinerja Operasional","Annual Income":"Pemasukan Tahunan","Annual Expense":"Pengeluaran Tahunan","Annual Net":"Net Tahunan","Future Cash + Assets":"Kas + Aset Masa Depan","Cash Runway":"Daya Tahan Kas","Largest Expense":"Pengeluaran Terbesar","Largest Holding":"Saham Terbesar",
  "Base vs Optimistic":"Dasar vs Optimistis","Money Story This Month":"Cerita Keuangan Bulan Ini","Quick Actions":"Aksi Cepat","Add Transaction":"Tambah Transaksi","Save":"Simpan","Editor":"Editor",
  "Data & Sync":"Data & Sinkronisasi","Signed in as":"Masuk sebagai","Sign out":"Keluar","Search...":"Cari...","Base":"Dasar","Optimistic":"Optimistis","Current":"Saat Ini","Yearly":"Tahunan","Monthly":"Bulanan"
 };
@@ -664,13 +664,27 @@ function renderProspect(){
  prospectGrowth.textContent=`${growth>=0?"+":""}${growth.toFixed(1)}% over 10 years`;
  prospectDesc.textContent=state.prospectMode==="base"?"Uses base stock targets":"Uses optimistic stock targets";
  prospectChart.innerHTML=line(pr.map(p=>p.nw),pr.map(p=>String(p.year).slice(2)),true);
- prospectSources.innerHTML=listRows([
-  {icon:"🏦",name:"Liquid balance",sub:"Cash + bank + wallets after entrusted funds",value:fmt(netAccountTotal())},
-  {icon:"🤝",name:"Remaining recurring income",sub:`${Math.max(0,11-new Date().getMonth())} full months after this month`,value:fmt(first.incomeBreakdown.recurring)},
-  {icon:"📨",name:"Current receivables",sub:"Recurring + ending clients",value:fmt(first.incomeBreakdown.outstanding)},
-  {icon:"🧾",name:"Remaining current-year expense",sub:"Monthly + yearly + events + credit",value:fmt(first.expenses.total)},
-  {icon:"📈",name:"Stock scenario",sub:`${state.prospectMode==="base"?"Base target prices":"Optimistic target prices"} after entrusted funds`,value:fmt(netPortfolio(last.year,state.prospectMode))}
- ]);
+ const operating=annualOperatingPerformance({clients:state.clients,budgets:state.budgets,yearly:state.yearly});
+ const netPositive=operating.net>=0, incomeShare=operating.income?Math.min(100,operating.expense/operating.income*100):100;
+ annualPerformanceDashboard.innerHTML=`
+  <div class="operating-flow-card operating-income">
+   <div class="operating-flow-icon">↗</div><div><small>ANNUAL INCOME</small><strong class="private">${fmt(operating.income)}</strong><p>Recurring clients × 12 months</p></div>
+  </div>
+  <div class="operating-connector"><span>MINUS</span></div>
+  <div class="operating-flow-card operating-expense">
+   <div class="operating-flow-icon">↘</div><div><small>ANNUAL EXPENSE</small><strong class="private">${fmt(operating.expense)}</strong><p>Monthly Budget × 12 + Yearly Budget</p></div>
+  </div>
+  <div class="operating-breakdown">
+   <span><small>MONTHLY BUDGET · 12×</small><b class="private">${fmt(operating.monthlyExpense)}</b></span>
+   <span><small>YEARLY BUDGET</small><b class="private">${fmt(operating.yearlyExpense)}</b></span>
+  </div>
+  <div class="operating-ratio" title="Annual expense as a share of recurring annual income"><i style="width:${incomeShare}%"></i></div>
+  <div class="operating-net ${netPositive?"profit":"loss"}">
+   <div class="operating-net-top"><span>${netPositive?"▲ PROFIT":"▼ LOSS"}</span><small>ANNUAL NET</small></div>
+   <strong class="private">${operating.net>=0?"+":""}${fmt(operating.net)}</strong>
+   <p>Income − Expense · operating result per year</p>
+  </div>
+  <div class="operating-readonly"><span>◉</span><p><b>Insight only.</b> Events, Credit, Stocks and History are excluded. This dashboard never changes Balance, Net Worth or Prospect.</p></div>`;
  yearGrid.innerHTML=pr.map(y=>{const ages=ageTriplet(y.year).join(", "),current=y.year===currentYear(),hasCredit=Number(y.expenses.credit)>0; return `<div class="year-card"><div class="year-head"><small>${y.year}</small><span class="age-triplet">${ages}</span></div><h4 class="private ${moneyClass(y.nw)}">${fmt(y.nw)}</h4><small class="year-equation">Opening Cash + Stocks + Income − Expenses</small><small class="year-split private"><span>Opening Cash <b class="${moneyClass(y.opening)}">${fmt(y.opening)}</b></span><span>Stocks <b class="${moneyClass(y.portfolio)}">${fmt(y.portfolio)}</b></span><span>${current?"Remaining recurring income":"Recurring income"} <b class="positive">+${fmt(y.incomeBreakdown.recurring)}</b></span>${y.incomeBreakdown.outstanding?`<span>Current receivables <b class="positive">+${fmt(y.incomeBreakdown.outstanding)}</b></span>`:""}${current?`<span>This month remaining <b class="negative">−${fmt(y.expenses.currentMonth)}</b></span>`:""}<span>Recurring expense <b class="negative">−${fmt(y.expenses.recurring)}</b></span><span>Yearly expense <b class="negative">−${fmt(y.expenses.yearly)}</b></span><span>Events <b class="negative">−${fmt(y.expenses.events)}</b></span>${hasCredit?`<span>Credit & PayLater <b class="negative">−${fmt(y.expenses.credit)}</b></span>`:""}</small></div>`;}).join("");
 }
 

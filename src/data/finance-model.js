@@ -39,6 +39,14 @@ export function getReceivableClients(clients, referenceDate = new Date()) {
 }
 
 export const getFixedIncome = clients => getRecurringClients(clients).reduce((sum, client) => sum + number(client.monthly), 0);
+
+export function annualOperatingPerformance({clients = [], budgets = [], yearly = []}) {
+  const income = getFixedIncome(clients) * 12;
+  const monthlyExpense = budgets.reduce((sum, item) => sum + expense(item.monthly), 0) * 12;
+  const yearlyExpense = yearly.reduce((sum, item) => sum + expense(item.amount), 0);
+  const totalExpense = monthlyExpense + yearlyExpense;
+  return {income, monthlyExpense, yearlyExpense, expense:totalExpense, net:income - totalExpense};
+}
 export const getTotalOutstanding = (clients, referenceDate = new Date()) => getReceivableClients(clients, referenceDate).reduce((sum, client) => sum + getClientOutstanding(client, referenceDate), 0);
 export const getTotalPaid = (clients, referenceDate = new Date()) => clients.reduce((sum, client) => sum + getClientPaidThisMonth(client, referenceDate), 0);
 

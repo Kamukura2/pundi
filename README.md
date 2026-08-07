@@ -1,4 +1,6 @@
-# CVFinance v7.7.2
+# CVFinance v7.7.3
+
+v7.7.3 replaces the Prospect `Projection Sources` card with a read-only annual operating performance dashboard. It reports recurring-client income, monthly-plus-yearly budget expense, and annual net profit/loss without changing Balance, Net Worth, Cash, Prospect, or any saved financial data. Events, Credit/PayLater, Stocks, and History are explicitly excluded.
 
 v7.7.2 removes fragile Google HTML scraping and reads the `IDR=X` quote from Yahoo Finance JSON with two-host fallback, safe-rate validation, and last-valid/manual fallback. It also highlights Yearly costs due this month, enlarges the Expense Perusahaan dashboard, brightens Fixed Monthly, and turns Transaction Budget/Channel tags into rounded toggle filters.
 
@@ -63,6 +65,7 @@ For local full-stack testing, use `vercel dev`; plain `npm run dev` does not emu
 - [Visual, sorting, and multi-user v7.5.2 patch](docs/PATCH_v7_5_2_VISUAL_SORT_MULTIUSER.md)
 - [Auditable projection and stock cash v7.6.0 patch](docs/PATCH_v7_6_0_AUDITABLE_PROJECTION.md)
 - [Google-only FX and dashboard v7.7.0 patch](docs/PATCH_v7_7_0_GOOGLE_STATUS_DASHBOARDS.md)
+- [Annual operating performance v7.7.3 patch](docs/PATCH_v7_7_3_ANNUAL_OPERATING_PERFORMANCE.md)
 - [Second account setup](docs/SECOND_ACCOUNT_SETUP.md)
 - [Manual actions](docs/MANUAL_ACTIONS.md)
 - [Test checklist](docs/TEST_CHECKLIST.md)

@@ -24,6 +24,7 @@ Implemented:
 - v7.6.0 adds migration `011`, optional Netcash/Wallet assets, exact visible Prospect equations, separated dated Credit, and two-dimensional grid sorting.
 - v7.7.0 requires no migration. It makes USD/IDR strictly Google Finance-only, adds the fixed History-only Expense Perusahaan dashboard, four client summary metrics, separate paid/unpaid client palettes, brighter Insight cards, and momentum guidance.
 - v7.7.2 requires no migration. It replaces Google HTML FX parsing with Yahoo Finance `IDR=X` JSON, rejects implausible/sudden quote changes, highlights current-month Yearly cards, expands the Expense Perusahaan dashboard, brightens Fixed Monthly, and adds toggleable Transaction tag filters.
+- v7.7.3 requires no migration. It replaces the Prospect source list with an isolated annual operating dashboard: recurring clients × 12 minus monthly budgets × 12 and yearly budgets. Events, Credit, Stocks, and History are excluded, and the result never writes into Balance, Net Worth, Cash, or Prospect.
 - Separate Supabase Auth users have isolated empty datasets through per-table RLS. The Telegram bot remains intentionally assigned to the single `CVFINANCE_OWNER_USER_ID` configured in Vercel.
 
 Not performed inside this package: creating third-party accounts/bots, entering private API keys, applying SQL to the user's Supabase project, pushing to the user's GitHub, registering the Telegram webhook, or deploying to the user's Vercel. Follow `docs/TELEGRAM_SETUP.md` for those credentialed steps.
