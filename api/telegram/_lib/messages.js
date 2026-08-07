@@ -13,7 +13,7 @@ Clients:
 /client Getlook
 /client Getlook paid
 /client Getlook 2jt
-/client Getlook freeze
+/client Getlook ending
 
 Credit:
 /credit

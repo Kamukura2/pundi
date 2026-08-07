@@ -1,4 +1,6 @@
-# CVFinance v7.3.0
+# CVFinance v7.4.0
+
+v7.4.0 rebuilds Accumulation and Prospect around a month-aware cash projection. The current month uses liquid balances, unpaid client receivables, additional History income, remaining monthly budgets, yearly dues, events, credit due dates, and current stocks. Later months and years carry closing cash forward without double-counting History expenses. It also adds monthly budget progress modes, sortable yearly costs, draggable recurring/ending clients, a single credit section under Events, a yearly expense recap, OLED black mode, red/green signed values, US/ID translation, and data-triggered illustrated Insights.
 
 v7.3.0 adds theme-aware vibrant surfaces and corrects the finance model requested after mobile testing. Accumulation now represents current liquid balances plus current stock value; future plans do not reduce it. Clients are separated into recurring, ending, and frozen lanes; only active recurring clients enter Prospect. Events reduce only their matching projection year, yearly costs track `DONE THIS YEAR`, credit items are editable with provider-specific SVG icons, and the mobile navigation now includes Clients and Electricity.
 
@@ -22,7 +24,7 @@ Deployment-ready continuation of CVFinance v6.3.1. The existing eight-tab UI and
 - Isolated `/api/telegram/cvfinance-webhook` route with deterministic Indonesian money/date parsing
 - Telegram quick transactions, balances, clients, credit, electricity, stocks, targets, and summary commands
 - Isolated phone/tablet breakpoints up to 1024 px; existing desktop rendering stays unchanged
-- Three client lifecycle lanes with recurring-income isolation
+- Two draggable client lifecycle sections with recurring-income isolation
 - Year-aware Events and annual payment completion tracking
 - Theme-aware vibrant cards without dark light-mode panels
 - Seven-button icon-only mobile navigation and compact stock editing cards
@@ -46,6 +48,7 @@ For local full-stack testing, use `vercel dev`; plain `npm run dev` does not emu
 - [Private Telegram bot setup](docs/TELEGRAM_SETUP.md)
 - [Mobile v7.2.0 patch](docs/PATCH_v7_2_0_MOBILE.md)
 - [Finance and UI v7.3.0 patch](docs/PATCH_v7_3_0_FINANCE_UI.md)
+- [Projection and Insight v7.4.0 patch](docs/PATCH_v7_4_0_PROJECTION_INSIGHTS.md)
 - [Manual actions](docs/MANUAL_ACTIONS.md)
 - [Test checklist](docs/TEST_CHECKLIST.md)
 - [Rollback](docs/ROLLBACK.md)

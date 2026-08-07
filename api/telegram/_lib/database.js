@@ -1,9 +1,11 @@
 import { createClient } from "@supabase/supabase-js";
-import { monthBounds, nextDueDate } from "./dates.js";
+import { jakartaParts, monthBounds, nextDueDate } from "./dates.js";
 import { logEvent } from "./log.js";
 import { normalizeSearch } from "./parser.js";
 
 const STATE_TTL_MINUTES = 20;
+const MONTH_INDEX={january:1,jan:1,januari:1,february:2,feb:2,februari:2,march:3,mar:3,maret:3,april:4,apr:4,may:5,mei:5,june:6,jun:6,juni:6,july:7,jul:7,juli:7,august:8,aug:8,agustus:8,september:9,sep:9,october:10,oct:10,oktober:10,november:11,nov:11,december:12,dec:12,desember:12};
+const paymentMonth=value=>MONTH_INDEX[String(value||"").trim().toLowerCase()]||MONTH_INDEX[String(value||"").trim().toLowerCase().slice(0,3)]||1;
 
 function dbError(error, code = "database_error", table = null) {
   return Object.assign(new Error(error?.message || "Database operation failed."), { code, status:500, database:true, table });
@@ -127,15 +129,16 @@ export class CVFinanceDatabase {
     let paid = Number(client.paid_this_month);
     let status = client.status;
     let endingPaid = Boolean(client.ending_paid);
+    let clientType = client.client_type === "ending" ? "ending" : "recurring";
     if (client.client_type === "ending") {
       if (action === "paid") { paid = totalDue; status = "paid"; endingPaid = true; }
       if (action === "amount") { paid = Number(amount); endingPaid = paid >= totalDue; status = endingPaid ? "paid" : "pending"; }
     }
-    if (action === "freeze") status = "freeze";
-    if (action === "unfreeze") status = paid >= totalDue ? "paid" : "pending";
+    if (action === "ending") { clientType = "ending"; endingPaid = paid >= totalDue; status = endingPaid ? "paid" : "pending"; }
+    if (action === "recurring") { clientType = "recurring"; endingPaid = false; status = paid >= totalDue ? "paid" : "pending"; }
     if (client.client_type !== "ending" && action === "paid") { paid = totalDue; status = "paid"; }
     if (client.client_type !== "ending" && action === "amount") { paid = Number(amount); status = paid >= totalDue ? "paid" : "pending"; }
-    const { data, error } = await this.client.from("clients").update({paid_this_month:paid,status,ending_paid:endingPaid})
+    const { data, error } = await this.client.from("clients").update({paid_this_month:paid,status,client_type:clientType,ending_paid:endingPaid})
       .eq("id", client.id).eq("user_id", this.ownerUserId)
       .select("id,name,monthly_retainer,paid_this_month,previous_outstanding,status,client_type,ending_paid").single();
     if (error) throw dbError(error, "client_write_failed", "clients");
@@ -221,27 +224,39 @@ export class CVFinanceDatabase {
 
   async summary(epochSeconds) {
     const {start,next} = monthBounds(epochSeconds);
-    const [accounts,clients,credit,stocksResult,budgetsResult,transactionsResult] = await Promise.all([
+    const now=jakartaParts(epochSeconds),activeMonth=start.slice(0,7);
+    const [accounts,clients,credit,stocksResult,budgetsResult,transactionsResult,yearlyResult,eventsResult] = await Promise.all([
       this.listAccounts(), this.listClients(), this.listUnpaidCredit(), this.stockSnapshot(),
-      this.client.from("monthly_budgets").select("monthly_amount").eq("user_id",this.ownerUserId),
-      this.client.from("transactions").select("transaction_type,amount").eq("user_id",this.ownerUserId)
-        .gte("transaction_date",start).lt("transaction_date",next)
+      this.client.from("monthly_budgets").select("category,monthly_amount,payment_status,paid_amount,tracking_month").eq("user_id",this.ownerUserId),
+      this.client.from("transactions").select("transaction_type,amount,category,transaction_date").eq("user_id",this.ownerUserId).gte("transaction_date",start).lt("transaction_date",next),
+      this.client.from("yearly_expenses").select("amount,payment_month,last_paid_year").eq("user_id",this.ownerUserId),
+      this.client.from("planned_events").select("amount,event_date").eq("user_id",this.ownerUserId).gte("event_date",start).lt("event_date",next)
     ]);
     if (budgetsResult.error) throw dbError(budgetsResult.error, "budgets_read_failed");
     if (transactionsResult.error) throw dbError(transactionsResult.error, "transactions_read_failed");
+    if (yearlyResult.error) throw dbError(yearlyResult.error, "yearly_read_failed");
+    if (eventsResult.error) throw dbError(eventsResult.error, "events_read_failed");
     const liquid = accounts.reduce((sum,row)=>sum+Number(row.balance),0);
-    const outstanding = clients.filter(row=>row.status!=="freeze" && !(row.client_type==="ending"&&row.ending_paid)).reduce((sum,row)=>sum+Math.max(0,Number(row.monthly_retainer)+Number(row.previous_outstanding)-Number(row.paid_this_month)),0);
-    const unpaidCredit = credit.reduce((sum,row)=>sum+Number(row.amount),0);
-    const monthlyBudget = (budgetsResult.data || []).reduce((sum,row)=>sum+Number(row.monthly_amount),0);
+    const outstanding = clients.filter(row=>!(row.client_type==="ending"&&row.ending_paid)).reduce((sum,row)=>sum+Math.max(0,Number(row.monthly_retainer)+Number(row.previous_outstanding)-Number(row.paid_this_month)),0);
+    const unpaidCredit = credit.filter(row=>String(row.due_date)<next).reduce((sum,row)=>sum+Number(row.amount),0);
     const transactions = transactionsResult.data || [];
     const income = transactions.filter(row=>row.transaction_type==="income").reduce((sum,row)=>sum+Number(row.amount),0);
     const expenses = transactions.filter(row=>row.transaction_type==="expense").reduce((sum,row)=>sum+Number(row.amount),0);
+    const remainingBudget=(budgetsResult.data||[]).reduce((sum,row)=>{
+      const tracked=row.tracking_month===activeMonth,mode=tracked?(row.payment_status||"auto"):"auto";
+      const autoPaid=transactions.filter(tx=>tx.transaction_type==="expense"&&String(tx.category).toLowerCase()===String(row.category).toLowerCase()).reduce((total,tx)=>total+Number(tx.amount),0);
+      const paid=mode==="done"?Number(row.monthly_amount):mode==="partial"?Number(row.paid_amount):autoPaid;
+      return sum+Math.max(0,Number(row.monthly_amount)-paid);
+    },0);
+    const yearlyDue=(yearlyResult.data||[]).filter(row=>Number(row.last_paid_year)!==now.year&&paymentMonth(row.payment_month)<=now.month).reduce((sum,row)=>sum+Number(row.amount),0);
+    const eventsDue=(eventsResult.data||[]).reduce((sum,row)=>sum+Number(row.amount),0);
     const portfolio = stocksResult.stocks.reduce((sum,row)=>{
       const price = Number(row.current_price || row.manual_current_price || 0);
       const value = Number(row.quantity) * price;
       return sum + (row.currency === "USD" ? value * stocksResult.usdIdr : value);
     },0);
-    return {liquid,income,expenses,outstanding,unpaidCredit,portfolio,projected:liquid+portfolio};
+    const projectedCash=liquid+outstanding+income-remainingBudget-yearlyDue-eventsDue-unpaidCredit;
+    return {liquid,income,expenses,outstanding,unpaidCredit,remainingBudget,yearlyDue,eventsDue,portfolio,projected:projectedCash+portfolio};
   }
 }
 

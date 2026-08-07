@@ -1,6 +1,6 @@
 # CVFinance v7 handoff
 
-Baseline: v6.3.1. This release keeps Accumulation, Cashflow, Expenses, Clients, Stocks, Electricity, Prospect, and Insights with the existing visual direction and calculation rules.
+Baseline: v6.3.1. v7.4.0 keeps all eight modules, renames Cashflow to History in the UI, and uses a month-aware projection engine for Accumulation and Prospect.
 
 Implemented:
 
@@ -18,5 +18,6 @@ Implemented:
 - Telegram writes flow through existing Supabase Realtime to the web/PWA; no PC process or long polling is used.
 - v7.2.0 isolates the redesigned phone/tablet shell at 1024 px and below, preserves the desktop UI, and keeps the five-button floating mobile navigation persistent.
 - Mobile switches every financial module to contained cards or internally scrollable tables, prevents page-level overflow, and scrolls to the top when changing sections.
+- v7.4.0 adds migration `007`, monthly budget progress, recurring/ending client drag sorting, dynamic projection years, OLED surfaces, bilingual US/ID UI, and illustrated data-driven Insights.
 
 Not performed inside this package: creating third-party accounts/bots, entering private API keys, applying SQL to the user's Supabase project, pushing to the user's GitHub, registering the Telegram webhook, or deploying to the user's Vercel. Follow `docs/TELEGRAM_SETUP.md` for those credentialed steps.

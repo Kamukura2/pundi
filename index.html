@@ -25,7 +25,7 @@
 
     <nav class="nav-list">
       <button class="nav active" data-page="accumulation"><span class="nav-ic i-money">💰</span><span>Accumulation</span></button>
-      <button class="nav" data-page="cashflow"><span class="nav-ic i-chart">📊</span><span>Cashflow</span></button>
+      <button class="nav" data-page="cashflow"><span class="nav-ic i-chart">📊</span><span>History</span></button>
       <button class="nav" data-page="expenses"><span class="nav-ic i-bill">🧾</span><span>Expenses</span></button>
       <button class="nav" data-page="clients"><span class="nav-ic i-client">🤝</span><span>Clients</span></button>
       <button class="nav" data-page="stocks"><span class="nav-ic i-stock">📈</span><span>Stocks</span></button>
@@ -41,7 +41,7 @@
         <span>Current net worth</span>
       </div>
       <div class="side-projection-future">
-        <small>Projected 2036</small>
+        <small id="sideFutureLabel">Projected 2036</small>
         <strong id="sideProjection">Rp0</strong>
         <span id="sideScenario">Base</span>
       </div>
@@ -61,6 +61,7 @@
         <button id="privacyBtn" class="icon-btn" title="Hide values">👁</button>
         <button id="themeBtn" class="icon-btn" title="Toggle theme">☾</button>
         <button id="dataBtn" class="avatar" title="Data & account">DA</button>
+        <button id="languageBtn" class="language-btn" title="Switch language"><span>US</span><span>ID</span></button>
       </div>
     </header>
 
@@ -72,7 +73,7 @@
           <div id="projectedCash" class="hero-value private">Rp0</div>
           <div class="hero-inline">
             <span id="cashHealth">Healthy buffer</span>
-            <span>Liquid balance + current stocks</span>
+            <span>Balance + receivables + extra income − remaining obligations + stocks</span>
           </div>
           <div id="accChart" class="chart chart-hero"></div>
         </article>
@@ -156,7 +157,7 @@
       <div class="grid-3 compact">
         <article class="metric-card tint-green"><small>Recorded Income</small><strong id="cashIncome" class="private">Rp0</strong></article>
         <article class="metric-card tint-red"><small>Recorded Expense</small><strong id="cashExpense" class="private">Rp0</strong></article>
-        <article class="metric-card tint-purple"><small>Net Cashflow</small><strong id="cashNet" class="private">Rp0</strong></article>
+        <article class="metric-card tint-purple"><small>Recorded Net</small><strong id="cashNet" class="private">Rp0</strong></article>
       </div>
 
       <div class="grid-2 gap-lg">
@@ -193,6 +194,15 @@
         <button class="expense-tab events" type="button" data-expense-view="events"><small>Events</small><strong id="eventExpenseTotal" class="private">Rp0</strong></button>
       </div>
 
+      <article class="annual-expense-summary">
+        <div><small>Estimated Expense This Year</small><strong id="annualExpenseGrandTotal" class="private">Rp0</strong><p>Planning indicator only. History expenses are never deducted twice.</p></div>
+        <div class="annual-expense-parts">
+          <span><small>Recurring × 12</small><b id="annualRecurringExpense" class="private">Rp0</b></span>
+          <span><small>Yearly</small><b id="annualYearlyExpense" class="private">Rp0</b></span>
+          <span><small>Events + Credit</small><b id="annualEventsExpense" class="private">Rp0</b></span>
+        </div>
+      </article>
+
       <div class="grid-2 gap-lg expense-view active" data-expense-panel="monthly">
         <article class="panel">
           <div class="panel-head">
@@ -228,28 +238,27 @@
             <div><p>Future spending</p><h3>Events</h3></div>
             <button class="ghost-btn" id="addEventBtn" title="Add">＋</button>
           </div>
-          <p class="section-note">Each event reduces Prospect only in its event year. It never reduces this month's Accumulation.</p>
+          <p class="section-note">Events and unpaid credit reduce only the month and year in which they are due.</p>
           <div id="eventGrid" class="tile-grid"></div>
         </article>
+        <article class="panel credit-events-panel">
+          <div class="panel-head">
+            <div><p>Credit</p><h3>Credit Card & PayLater</h3></div>
+            <button class="ghost-btn" id="addCreditBtn" title="Add">＋</button>
+          </div>
+          <div id="creditSummary" class="grid-3 compact"></div>
+          <div id="creditItems" class="credit-list"></div>
+          <div class="archive-box">
+            <div class="panel-head"><div><p>Archive</p><h3>Paid Items</h3></div></div>
+            <div id="creditArchive"></div>
+          </div>
+        </article>
       </div>
-
-      <article class="panel">
-        <div class="panel-head">
-          <div><p>Credit</p><h3>Credit Card & PayLater</h3></div>
-          <button class="ghost-btn" id="addCreditBtn" title="Add">＋</button>
-        </div>
-        <div id="creditSummary" class="grid-3 compact"></div>
-        <div id="creditItems" class="credit-list"></div>
-        <div class="archive-box">
-          <div class="panel-head"><div><p>Archive</p><h3>Paid Items</h3></div></div>
-          <div id="creditArchive"></div>
-        </div>
-      </article>
     </section>
 
     <section id="clients" class="page">
       <div class="toolbar">
-        <span class="pill">Retainers, receivables and frozen clients</span>
+        <span class="pill">Drag clients between recurring and ending sections</span>
         <button class="primary-btn" id="addClientBtn">＋ Client</button>
       </div>
 
@@ -262,15 +271,11 @@
       <div class="client-lanes">
         <article class="panel client-lane recurring-lane">
           <div class="panel-head"><div><p>Projected income</p><h3>Recurring Clients</h3></div><span id="recurringClientCount" class="lane-count">0</span></div>
-          <div id="recurringClientGrid" class="client-grid"></div>
+          <div id="recurringClientGrid" class="client-grid" data-client-type="recurring"></div>
         </article>
         <article class="panel client-lane ending-lane">
           <div class="panel-head"><div><p>Final payment only</p><h3>Ending Clients</h3></div><span id="endingClientCount" class="lane-count">0</span></div>
-          <div id="endingClientGrid" class="client-grid"></div>
-        </article>
-        <article class="panel client-lane frozen-lane">
-          <div class="panel-head"><div><p>Not projected</p><h3>Frozen Clients</h3></div><span id="frozenClientCount" class="lane-count">0</span></div>
-          <div id="frozenClientGrid" class="client-grid"></div>
+          <div id="endingClientGrid" class="client-grid" data-client-type="ending"></div>
         </article>
       </div>
     </section>
@@ -377,7 +382,7 @@
       <div class="hero-grid">
         <article class="hero-card hero-prospect">
           <div class="hero-chip" id="prospectBadge">BASE</div>
-          <small>Projected Net Worth in 2036</small>
+          <small id="prospectHorizonLabel">Projected Net Worth in 2036</small>
           <div id="prospectValue" class="hero-value private">Rp0</div>
           <div class="hero-inline">
             <span id="prospectGrowth">0%</span>
@@ -437,7 +442,7 @@
     <button class="active" data-page="accumulation" type="button" aria-label="Accumulation" title="Accumulation">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7.5h14v11H5zM8 7.5V5.8A1.8 1.8 0 0 1 9.8 4h4.4A1.8 1.8 0 0 1 16 5.8v1.7M5 11h14M9 14.5h6"/></svg>
     </button>
-    <button data-page="cashflow" type="button" aria-label="Cashflow" title="Cashflow">
+    <button data-page="cashflow" type="button" aria-label="History" title="History">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V9m7 10V5m7 14v-7M3 19.5h18"/></svg>
     </button>
     <button data-page="clients" type="button" aria-label="Clients" title="Clients">
@@ -475,6 +480,12 @@
         <option>Essentials</option>
         <option>Food</option>
         <option>Coffee</option>
+        <option>Electricity</option>
+        <option>IPL</option>
+        <option>PAM</option>
+        <option>Internet</option>
+        <option>Needs</option>
+        <option>Subscriptions</option>
         <option>Others</option>
       </select>
     </label>

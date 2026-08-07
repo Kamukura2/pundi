@@ -24,12 +24,12 @@ function rowsToState(rows) {
   const state = createEmptyState();
   state.accounts = rows.accounts.map(row => ({id:row.id,name:row.name,type:row.account_type,balance:Number(row.balance),...meta(row)}));
   state.transactions = rows.transactions.map(row => ({id:row.id,type:row.transaction_type,amount:Number(row.amount),description:row.description,category:row.category,channel:row.channel,date:row.transaction_date,...meta(row)}));
-  state.budgets = rows.monthly_budgets.map(row => ({id:row.id,category:row.category,monthly:Number(row.monthly_amount),...meta(row)}));
-  state.yearly = rows.yearly_expenses.map(row => ({id:row.id,name:row.name,amount:Number(row.amount),month:row.payment_month,category:row.category,lastPaidYear:row.last_paid_year == null ? null : Number(row.last_paid_year),...meta(row)}));
+  state.budgets = rows.monthly_budgets.map(row => ({id:row.id,category:row.category,monthly:Number(row.monthly_amount),paymentStatus:row.payment_status||"auto",paidAmount:Number(row.paid_amount||0),trackingMonth:row.tracking_month||null,...meta(row)}));
+  state.yearly = rows.yearly_expenses.map((row,index) => ({id:row.id,name:row.name,amount:Number(row.amount),month:row.payment_month,category:row.category,lastPaidYear:row.last_paid_year == null ? null : Number(row.last_paid_year),sortOrder:Number(row.sort_order??index),...meta(row)}));
   state.events = rows.planned_events.map(row => ({id:row.id,name:row.name,amount:Number(row.amount),date:row.event_date,category:row.category,...meta(row)}));
   state.creditFacilities = rows.credit_facilities.map(row => ({id:row.id,source:row.source,limit:Number(row.limit_amount),...meta(row)}));
   state.credit = rows.credit_items.map(row => ({id:row.id,facilityId:row.facility_id,source:row.source,description:row.description,amount:Number(row.amount),due:row.due_date,paid:row.is_paid,...meta(row)}));
-  state.clients = rows.clients.map(row => ({id:row.id,name:row.name,monthly:Number(row.monthly_retainer),paid:Number(row.paid_this_month),carry:Number(row.previous_outstanding),status:row.status,clientType:row.client_type || "recurring",endingPaid:Boolean(row.ending_paid),...meta(row)}));
+  state.clients = rows.clients.map((row,index) => ({id:row.id,name:row.name,monthly:Number(row.monthly_retainer),paid:Number(row.paid_this_month),carry:Number(row.previous_outstanding),status:row.status==="freeze"?"pending":row.status,clientType:row.client_type || "recurring",endingPaid:Boolean(row.ending_paid),sortOrder:Number(row.sort_order??index),...meta(row)}));
   const targetsByHolding = new Map();
   rows.stock_price_targets.forEach(row => {
     if (!targetsByHolding.has(row.holding_id)) targetsByHolding.set(row.holding_id, {base:{},optimistic:{},ids:{base:{},optimistic:{}}});
@@ -53,6 +53,7 @@ function rowsToState(rows) {
   if (settings) {
     state.settingsId = settings.id;
     state.theme = settings.theme;
+    state.language = settings.language || "en";
     state.baseMode = settings.base_mode;
     state.optimisticMode = settings.optimistic_mode;
     state.baseGrowth = Number(settings.base_growth);
@@ -85,12 +86,12 @@ function stateToRows(state, userId) {
   return {
     accounts: state.accounts.map(row => owned({id:row.id,name:row.name,account_type:row.type,balance:Number(row.balance),...stamp(row)})),
     transactions: state.transactions.map(row => owned({id:row.id,transaction_type:row.type,amount:Number(row.amount),description:row.description,category:row.category,channel:row.channel,transaction_date:row.date,...stamp(row)})),
-    monthly_budgets: state.budgets.map(row => owned({id:row.id,category:row.category,monthly_amount:Number(row.monthly),...stamp(row)})),
-    yearly_expenses: state.yearly.map(row => owned({id:row.id,name:row.name,amount:Number(row.amount),payment_month:row.month,category:row.category,last_paid_year:row.lastPaidYear ?? null,...stamp(row)})),
+    monthly_budgets: state.budgets.map(row => owned({id:row.id,category:row.category,monthly_amount:Number(row.monthly),payment_status:row.paymentStatus||"auto",paid_amount:Number(row.paidAmount||0),tracking_month:row.trackingMonth||null,...stamp(row)})),
+    yearly_expenses: state.yearly.map((row,index) => owned({id:row.id,name:row.name,amount:Number(row.amount),payment_month:row.month,category:row.category,last_paid_year:row.lastPaidYear ?? null,sort_order:Number(row.sortOrder??index),...stamp(row)})),
     planned_events: state.events.map(row => owned({id:row.id,name:row.name,amount:Number(row.amount),event_date:row.date,category:row.category,...stamp(row)})),
     credit_facilities: state.creditFacilities.map(row => owned({id:row.id,source:row.source,limit_amount:Number(row.limit),...stamp(row)})),
     credit_items: state.credit.map(row => owned({id:row.id,facility_id:row.facilityId || facilityBySource.get(row.source) || null,source:row.source,description:row.description,amount:Number(row.amount),due_date:row.due,is_paid:Boolean(row.paid),...stamp(row)})),
-    clients: state.clients.map(row => owned({id:row.id,name:row.name,monthly_retainer:Number(row.monthly),paid_this_month:Number(row.paid),previous_outstanding:Number(row.carry),status:row.status,client_type:row.clientType || "recurring",ending_paid:Boolean(row.endingPaid),...stamp(row)})),
+    clients: state.clients.map((row,index) => owned({id:row.id,name:row.name,monthly_retainer:Number(row.monthly),paid_this_month:Number(row.paid),previous_outstanding:Number(row.carry),status:row.status==="freeze"?"pending":row.status,client_type:row.clientType || "recurring",ending_paid:Boolean(row.endingPaid),sort_order:Number(row.sortOrder??index),...stamp(row)})),
     stock_holdings: state.stocks.map(row => owned({
       id:row.id,display_symbol:row.displaySymbol || row.ticker,market:row.market,provider:row.provider,
       provider_symbol:row.providerSymbol || row.ticker,currency:row.currency,quantity:Number(row.quantity),
@@ -101,7 +102,7 @@ function stateToRows(state, userId) {
     stock_price_targets: targets,
     electricity_readings: state.electricity.map(row => owned({id:row.id,reading_date:row.date,reading_time:row.time,remaining_kwh:Number(row.remaining),...stamp(row)})),
     app_settings: [owned({
-      id:state.settingsId,theme:state.theme,base_mode:state.baseMode,optimistic_mode:state.optimisticMode,
+      id:state.settingsId,theme:state.theme,language:state.language||"en",base_mode:state.baseMode,optimistic_mode:state.optimisticMode,
       base_growth:Number(state.baseGrowth),optimistic_growth:Number(state.optimisticGrowth),usd_idr:Number(state.usdIdr),
       rate_kwh:Number(state.rateKwh),legacy_import_completed:true,updated_at:state.settingsUpdatedAt
     })]

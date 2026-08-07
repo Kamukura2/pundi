@@ -174,7 +174,7 @@ async function handleClient(context, args) {
     });
     return context.telegram.sendMessage(context.chatId, `Clients\n${lines.join("\n") || "No clients."}`);
   }
-  let match = args.match(/^(.+?)\s+(freeze|unfreeze)$/i);
+  let match = args.match(/^(.+?)\s+(recurring|ending)$/i);
   if (match) return updateClient(context, match[1], match[2].toLowerCase());
   match = args.match(/^(.+?)\s+paid(?:\s+([0-9][0-9.,]*(?:\s*(?:k|rb|ribu|jt|juta|m))?))?$/i);
   if (match) return match[2] ? updateClient(context, match[1], "amount", parseMoney(match[2],{allowZero:true})) : updateClient(context, match[1], "paid");
@@ -288,7 +288,7 @@ async function handleTarget(context, args) {
 
 async function showSummary(context) {
   const summary = await context.db.summary(context.messageTimestamp);
-  const text = `CVFinance Summary\nLiquid balance: ${formatIdr(summary.liquid)}\nIncome this month: ${formatIdr(summary.income)}\nExpenses this month: ${formatIdr(summary.expenses)}\nClient outstanding: ${formatIdr(summary.outstanding)}\nUnpaid credit: ${formatIdr(summary.unpaidCredit)}\nStock portfolio: ${formatIdr(summary.portfolio)}\nCurrent net worth: ${formatIdr(summary.projected)}`;
+  const text = `CVFinance Summary\nLiquid balance: ${formatIdr(summary.liquid)}\nAdditional income this month: ${formatIdr(summary.income)}\nHistory expense (tracking only): ${formatIdr(summary.expenses)}\nClient outstanding: ${formatIdr(summary.outstanding)}\nRemaining monthly budget: ${formatIdr(summary.remainingBudget)}\nYearly + events due: ${formatIdr(summary.yearlyDue+summary.eventsDue)}\nUnpaid credit due: ${formatIdr(summary.unpaidCredit)}\nStock portfolio: ${formatIdr(summary.portfolio)}\nProjected month-end net worth: ${formatIdr(summary.projected)}`;
   return context.telegram.sendMessage(context.chatId, text);
 }
 

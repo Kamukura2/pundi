@@ -1,10 +1,12 @@
-export const YEARS = Array.from({ length: 11 }, (_, index) => 2026 + index);
+const ACTIVE_YEAR = new Date().getFullYear();
+export const YEARS = Array.from({ length: 11 }, (_, index) => ACTIVE_YEAR + index);
 
 export const createId = () => crypto.randomUUID();
 
 export function createEmptyState() {
   return {
     theme: "dark",
+    language: "en",
     page: "accumulation",
     privacy: false,
     filter: "all",
@@ -59,10 +61,10 @@ export function createMvpSeed() {
       {id:createId(),name:"SeaBank",type:"Bank",balance:52000}
     ],
     clients: [
-      {id:createId(),name:"Getlook",monthly:4000000,paid:2000000,status:"pending",carry:0,clientType:"recurring",endingPaid:false},
-      {id:createId(),name:"Client B",monthly:2500000,paid:1200000,status:"pending",carry:500000,clientType:"recurring",endingPaid:false},
-      {id:createId(),name:"New Client C",monthly:1800000,paid:0,status:"pending",carry:0,clientType:"recurring",endingPaid:false},
-      {id:createId(),name:"Paused Client",monthly:2200000,paid:0,status:"freeze",carry:0,clientType:"recurring",endingPaid:false}
+      {id:createId(),name:"Getlook",monthly:4000000,paid:2000000,status:"pending",carry:0,clientType:"recurring",endingPaid:false,sortOrder:0},
+      {id:createId(),name:"Client B",monthly:2500000,paid:1200000,status:"pending",carry:500000,clientType:"recurring",endingPaid:false,sortOrder:1},
+      {id:createId(),name:"New Client C",monthly:1800000,paid:0,status:"pending",carry:0,clientType:"recurring",endingPaid:false,sortOrder:2},
+      {id:createId(),name:"Paused Client",monthly:2200000,paid:0,status:"pending",carry:0,clientType:"recurring",endingPaid:false,sortOrder:3}
     ],
     transactions: [
       {id:createId(),type:"expense",amount:240000,description:"Internet bill",category:"Essentials",channel:"Transfer",date:"2026-08-06"},
@@ -71,14 +73,18 @@ export function createMvpSeed() {
       {id:createId(),type:"income",amount:500000,description:"Bonus sales",category:"Others",channel:"Transfer",date:"2026-08-05"}
     ],
     budgets: [
-      {id:createId(),category:"Food",monthly:3000000},{id:createId(),category:"Coffee",monthly:800000},
-      {id:createId(),category:"Electricity",monthly:2000000},{id:createId(),category:"IPL",monthly:227500},
-      {id:createId(),category:"Internet",monthly:296667},{id:createId(),category:"Needs",monthly:1800000},
-      {id:createId(),category:"Subscriptions",monthly:260000},{id:createId(),category:"Others",monthly:1000000}
+      {id:createId(),category:"Food",monthly:3000000,paymentStatus:"auto",paidAmount:0,trackingMonth:null},
+      {id:createId(),category:"Coffee",monthly:800000,paymentStatus:"auto",paidAmount:0,trackingMonth:null},
+      {id:createId(),category:"Electricity",monthly:2000000,paymentStatus:"auto",paidAmount:0,trackingMonth:null},
+      {id:createId(),category:"IPL",monthly:227500,paymentStatus:"auto",paidAmount:0,trackingMonth:null},
+      {id:createId(),category:"Internet",monthly:296667,paymentStatus:"auto",paidAmount:0,trackingMonth:null},
+      {id:createId(),category:"Needs",monthly:1800000,paymentStatus:"auto",paidAmount:0,trackingMonth:null},
+      {id:createId(),category:"Subscriptions",monthly:260000,paymentStatus:"auto",paidAmount:0,trackingMonth:null},
+      {id:createId(),category:"Others",monthly:1000000,paymentStatus:"auto",paidAmount:0,trackingMonth:null}
     ],
     yearly: [
-      {id:createId(),name:"Annual Insurance",amount:6000000,month:"December",category:"Insurance",lastPaidYear:null},
-      {id:createId(),name:"Vehicle Tax",amount:2500000,month:"March",category:"Tax",lastPaidYear:null}
+      {id:createId(),name:"Annual Insurance",amount:6000000,month:"December",category:"Insurance",lastPaidYear:null,sortOrder:0},
+      {id:createId(),name:"Vehicle Tax",amount:2500000,month:"March",category:"Tax",lastPaidYear:null,sortOrder:1}
     ],
     events: [
       {id:createId(),name:"Child Vaccine",amount:1950000,date:"2027-07-01",category:"Health"},
@@ -129,9 +135,9 @@ export function readLegacyLocalStorage() {
     optimisticMode: settings.optimisticMode === "auto" ? "auto" : "manual",
     baseGrowth: Number(settings.baseGrowth ?? 8), optimisticGrowth: Number(settings.optimisticGrowth ?? 14),
     usdIdr: Number(settings.usdIdr ?? 16250), rateKwh: Number(settings.rateKwh ?? 1740),
-    accounts: withIds(read("v6-accounts")), clients: withIds(read("v6-clients")).map(client=>({...client,clientType:"recurring",endingPaid:false})),
-    transactions: withIds(read("v6-tx")), budgets: withIds(read("v6-budgets")),
-    yearly: withIds(read("v6-yearly")).map(item=>({...item,lastPaidYear:null})), events: withIds(read("v6-events")),
+    accounts: withIds(read("v6-accounts")), clients: withIds(read("v6-clients")).map((client,index)=>({...client,status:client.status==="freeze"?"pending":client.status,clientType:"recurring",endingPaid:false,sortOrder:index})),
+    transactions: withIds(read("v6-tx")), budgets: withIds(read("v6-budgets")).map(item=>({...item,paymentStatus:"auto",paidAmount:0,trackingMonth:null})),
+    yearly: withIds(read("v6-yearly")).map((item,index)=>({...item,lastPaidYear:null,sortOrder:index})), events: withIds(read("v6-events")),
     creditFacilities: createMvpSeed().creditFacilities,
     credit: withIds(read("v6-credit")), stocks, electricity: withIds(read("v6-electric"))
   };

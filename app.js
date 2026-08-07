@@ -1,5 +1,5 @@
 import { createEmptyState, createId, createMvpSeed, readLegacyLocalStorage, YEARS } from "./src/data/default-data.js";
-import { buildProjection, getClientOutstanding, getCurrentNetWorth, getEndingClients, getFixedIncome, getFrozenClients, getReceivableClients, getRecurringClients, getTotalOutstanding, getTotalPaid, getYearlyProjectionTotal } from "./src/data/finance-model.js";
+import { annualExpenseBreakdown, buildMonthlyTimeline, buildProjection, getBudgetProgress, getClientOutstanding, getCurrentNetWorth, getEndingClients, getFixedIncome, getReceivableClients, getRecurringClients, getTotalOutstanding, getTotalPaid, getYearlyProjectionTotal, monthKey, monthlyBudgetRemaining } from "./src/data/finance-model.js";
 import { SyncManager } from "./src/sync/sync-manager.js";
 import { fetchHoldingQuote, isPriceStale, validateHoldingSymbol } from "./src/stocks/client.js";
 import { normalizeStockMapping, quantityForDisplay, quantityForStorage, quantityUnit } from "./src/stocks/holding.js";
@@ -13,6 +13,7 @@ const todayISO=()=>{
 
 const state=createEmptyState();
 state.theme=localStorage.getItem("cvfinance-theme-cache")||"dark";
+state.language=localStorage.getItem("cvfinance-language-cache")||"en";
 let syncManager;
 let stockRefreshStarted=false;
 const currentYear=()=>new Date().getFullYear();
@@ -26,7 +27,7 @@ const fmt=(n,compact=false)=>{
   if(a>=1e6) return `Rp${(n/1e6).toFixed(1)}M`;
   if(a>=1e3) return `Rp${(n/1e3).toFixed(1)}K`;
  }
- return new Intl.NumberFormat("en-US",{style:"currency",currency:"IDR",maximumFractionDigits:0}).format(n);
+ return new Intl.NumberFormat(state.language==="id"?"id-ID":"en-US",{style:"currency",currency:"IDR",maximumFractionDigits:0}).format(n);
 };
 const save=()=>syncManager?.persist(state);
 const saveSettings=()=>save();
@@ -35,7 +36,6 @@ const qa=(s)=>[...document.querySelectorAll(s)];
 const accountTotal=()=>state.accounts.reduce((a,b)=>a+Number(b.balance),0);
 const recurringClients=()=>getRecurringClients(state.clients);
 const endingClients=()=>getEndingClients(state.clients);
-const frozenClients=()=>getFrozenClients(state.clients);
 const fixedIncome=()=>getFixedIncome(state.clients);
 const clientOutstanding=(c)=>getClientOutstanding(c);
 const receivableClients=()=>getReceivableClients(state.clients);
@@ -43,25 +43,28 @@ const totalOutstanding=()=>getTotalOutstanding(state.clients);
 const totalPaid=()=>getTotalPaid(state.clients);
 const txTotals=()=>state.transactions.reduce((a,t)=>(a[t.type]+=Number(t.amount),a),{income:0,expense:0});
 const monthlyBudget=()=>state.budgets.reduce((a,b)=>a+Number(b.monthly),0);
+const budgetRemaining=()=>monthlyBudgetRemaining(state.budgets,state.transactions,new Date());
 const yearlyTotal=()=>state.yearly.reduce((a,b)=>a+Number(b.amount),0);
 const yearlyProjectionTotal=(year)=>getYearlyProjectionTotal(state.yearly,year,currentYear());
 const eventTotal=()=>state.events.reduce((a,b)=>a+Number(b.amount),0);
 const unpaidCreditTotal=()=>state.credit.filter(x=>!x.paid).reduce((a,b)=>a+Number(b.amount),0);
-const spentExact=(cat)=>state.transactions.filter(t=>t.type==="expense"&&t.category===cat).reduce((a,b)=>a+Number(b.amount),0);
-const foodSpent=()=>state.transactions.filter(t=>t.type==="expense"&&(t.category==="Food"||t.category==="Coffee")).reduce((a,b)=>a+Number(b.amount),0);
-const essentialsSpent=()=>state.transactions.filter(t=>t.type==="expense"&&t.category==="Essentials").reduce((a,b)=>a+Number(b.amount),0);
-const othersSpent=()=>state.transactions.filter(t=>t.type==="expense"&&t.category==="Others").reduce((a,b)=>a+Number(b.amount),0);
+const isCurrentMonthTx=t=>String(t.date).startsWith(monthKey(new Date()));
+const spentExact=(cat)=>state.transactions.filter(t=>t.type==="expense"&&t.category===cat&&isCurrentMonthTx(t)).reduce((a,b)=>a+Number(b.amount),0);
+const coffeeSpentForInsight=()=>state.transactions.filter(t=>t.type==="expense"&&String(t.category).toLowerCase()==="coffee"&&String(t.date).startsWith(monthKey(new Date()))).reduce((a,b)=>a+Number(b.amount),0);
+const foodSpent=()=>state.transactions.filter(t=>t.type==="expense"&&isCurrentMonthTx(t)&&(t.category==="Food"||t.category==="Coffee")).reduce((a,b)=>a+Number(b.amount),0);
+const essentialsSpent=()=>state.transactions.filter(t=>t.type==="expense"&&isCurrentMonthTx(t)&&["Essentials","Electricity","IPL","PAM","Internet","Needs","Subscriptions"].includes(t.category)).reduce((a,b)=>a+Number(b.amount),0);
+const othersSpent=()=>state.transactions.filter(t=>t.type==="expense"&&isCurrentMonthTx(t)&&t.category==="Others").reduce((a,b)=>a+Number(b.amount),0);
 const foodBudget=()=>state.budgets.filter(b=>["Food","Coffee"].includes(b.category)).reduce((a,b)=>a+Number(b.monthly),0);
 const essentialsBudget=()=>state.budgets.filter(b=>["Electricity","IPL","Internet","Needs","Subscriptions"].includes(b.category)).reduce((a,b)=>a+Number(b.monthly),0);
 const othersBudget=()=>state.budgets.filter(b=>b.category==="Others").reduce((a,b)=>a+Number(b.monthly),0);
 const stockPrice=(s,y,mode)=>{
- if(y===2026) return Number(s.current);
+ if(y===currentYear()) return Number(s.current);
  const useMode=mode==="base"?state.baseMode:state.optimisticMode;
  const g=mode==="base"?Number(state.baseGrowth):Number(state.optimisticGrowth);
- if(useMode==="auto") return Number(s.current)*Math.pow(1+g/100,y-2026);
+ if(useMode==="auto") return Number(s.current)*Math.pow(1+g/100,y-currentYear());
  return Number(s[mode][y]??s.current);
 };
-const stockValue=(s,y=2026,mode="base")=>{
+const stockValue=(s,y=currentYear(),mode="base")=>{
  let v=Number(s.quantity)*stockPrice(s,y,mode);
  return s.currency==="USD"?v*state.usdIdr:v;
 };
@@ -69,11 +72,62 @@ const invested=(s)=>{
  let v=Number(s.quantity)*Number(s.avg);
  return s.currency==="USD"?v*state.usdIdr:v;
 };
-const portfolio=(y=2026,mode="base")=>state.stocks.reduce((a,s)=>a+stockValue(s,y,mode),0);
+const portfolio=(y=currentYear(),mode="base")=>state.stocks.reduce((a,s)=>a+stockValue(s,y,mode),0);
 const currentNW=()=>getCurrentNetWorth(accountTotal(),portfolio());
 const AGE_BASE=[33,30,0];
 const ageTriplet=(year)=>AGE_BASE.map(v=>v+(year-2026));
 const moneyClass=(n)=>Number(n)<0?"negative":"";
+const ID_TRANSLATIONS={
+ "Accumulation":"Akumulasi","History":"Riwayat","Expenses":"Pengeluaran","Clients":"Klien","Stocks":"Saham","Electricity":"Listrik","Prospect":"Proyeksi","Insights":"Insight",
+ "Available Balance":"Saldo Tersedia","Outstanding Client Income":"Piutang Klien","Balances":"Saldo","Cash, Bank & Wallets":"Tunai, Bank & Dompet","Payment Status":"Status Pembayaran",
+ "Pending Expenses":"Kewajiban Mendatang","Where the Money Sits":"Distribusi Aset","Planned vs Actual":"Rencana vs Aktual","All":"Semua","Expense":"Pengeluaran","Income":"Pemasukan",
+ "Newest":"Terbaru","Category":"Kategori","Amount":"Nominal","Recorded Income":"Pemasukan Tercatat","Recorded Expense":"Pengeluaran Tercatat","Recorded Net":"Net Tercatat",
+ "Expense Categories":"Kategori Pengeluaran","Budget Pace":"Laju Anggaran","Transactions":"Transaksi","Monthly Budget":"Anggaran Bulanan","Yearly Expense":"Pengeluaran Tahunan","Events":"Acara",
+ "Estimated Expense This Year":"Estimasi Pengeluaran Tahun Ini","Planning indicator only. History expenses are never deducted twice.":"Hanya indikator perencanaan. Pengeluaran di Riwayat tidak pernah dikurangi dua kali.",
+ "Recurring × 12":"Berulang × 12","Events + Credit":"Acara + Kredit","Editable Budgets":"Anggaran yang Dapat Diedit","Category Breakdown":"Rincian Kategori","Credit Card & PayLater":"Kartu Kredit & PayLater",
+ "Paid Items":"Item Lunas","Paid This Month":"Dibayar Bulan Ini","Outstanding":"Belum Dibayar","Fixed Monthly":"Tetap Bulanan","Recurring Clients":"Klien Berulang","Ending Clients":"Klien Berakhir",
+ "Total Portfolio Value":"Total Nilai Portofolio","Invested":"Modal","Unrealized":"Belum Direalisasi","Allocation":"Alokasi","Holdings":"Kepemilikan","Target prices":"Target harga",
+ "Latest Meter Balance":"Sisa Token Terbaru","Average Daily Usage":"Rata-rata Harian","Estimated Monthly Cost":"Estimasi Biaya Bulanan","Meter Readings":"Catatan Meter",
+ "Read-only projection":"Proyeksi hanya-baca","Projection Sources":"Sumber Proyeksi","Future Cash + Assets":"Kas + Aset Masa Depan","Cash Runway":"Daya Tahan Kas","Largest Expense":"Pengeluaran Terbesar","Largest Holding":"Saham Terbesar",
+ "Base vs Optimistic":"Dasar vs Optimistis","Money Story This Month":"Cerita Keuangan Bulan Ini","Quick Actions":"Aksi Cepat","Add Transaction":"Tambah Transaksi","Save":"Simpan","Editor":"Editor",
+ "Data & Sync":"Data & Sinkronisasi","Signed in as":"Masuk sebagai","Sign out":"Keluar","Search...":"Cari...","Base":"Dasar","Optimistic":"Optimistis","Current":"Saat Ini","Yearly":"Tahunan","Monthly":"Bulanan"
+};
+const ID_REPLACEMENTS=[
+ ["Healthy projected net worth","Proyeksi net worth sehat"],["Positive projected net worth","Proyeksi net worth positif"],["Negative projected net worth","Proyeksi net worth negatif"],
+ ["Only the unpaid portion this month","Hanya bagian yang belum dibayar bulan ini"],["Due or overdue this month","Jatuh tempo atau terlambat bulan ini"],["Only items due this month","Hanya item jatuh tempo bulan ini"],
+ ["Cash, bank & wallets","Tunai, bank & dompet"],["Recurring + ending, unpaid only","Berulang + berakhir, hanya yang belum dibayar"],["Income recorded in History","Pemasukan tercatat di Riwayat"],["Monthly + yearly + events + credit","Bulanan + tahunan + acara + kredit"],["Cash after obligations + stocks","Kas setelah kewajiban + saham"],
+ ["months of runway","bulan daya tahan kas"],["Current liquid balance is","Saldo likuid saat ini"],["remaining monthly obligations are","sisa kewajiban bulanan"],["collected","tertagih"],["All client payments are collected. Good job!","Semua pembayaran klien sudah tertagih. Bagus!"],["is still outstanding from recurring and ending clients.","masih belum dibayar oleh klien berulang dan berakhir."],
+ ["Coffee spending is controlled","Pengeluaran kopi terkendali"],["Coffee is getting expensive","Pengeluaran kopi mulai mahal"],["Coffee is over budget","Pengeluaran kopi melebihi anggaran"],["Coffee usage is","Pemakaian anggaran kopi"],["of its default monthly budget.","dari anggaran bulanan default."],
+ ["Electricity is decreasing — good job!","Pemakaian listrik menurun — bagus!"],["Electricity usage is rising","Pemakaian listrik meningkat"],["Electricity is stable","Pemakaian listrik stabil"],["More readings needed","Perlu lebih banyak pencatatan"],["Latest pace is","Laju terbaru"],["versus the prior interval","dibanding interval sebelumnya"],["Add at least two readings to unlock a usage trend.","Tambahkan minimal dua catatan untuk melihat tren pemakaian."],
+ ["Recorded expense","Pengeluaran tercatat"],["Expense baseline is building","Baseline pengeluaran sedang terbentuk"],["History recorded","Riwayat mencatat"],["this month. It updates pacing only and is not deducted twice.","bulan ini. Data hanya memperbarui progress dan tidak dikurangi dua kali."],
+ ["Portfolio P/L","Untung/Rugi Portofolio"],["Current portfolio is","Portofolio saat ini"],["against","dibanding"],["invested.","modal."],["Up ","Naik "],["Down ","Turun "],
+ ["Cash runway","Daya tahan kas"],["Client collection","Penagihan klien"],["Coffee check","Cek kopi"],["Electricity trend","Tren listrik"],["History trend","Tren riwayat"],
+ ["Projected month-end net worth","Proyeksi net worth akhir bulan"],["Remaining monthly budget","Sisa anggaran bulanan"],["Outstanding clients","Piutang klien"],["Additional income","Pemasukan tambahan"],["Remaining expenses","Sisa pengeluaran"],
+ ["Starting balance","Saldo awal"],["Current market value","Nilai pasar saat ini"],["Recurring monthly","Berulang bulanan"],["Final payment","Pembayaran terakhir"],["Previous:","Sebelumnya:"],["Outstanding:","Belum dibayar:"],["Remaining:","Sisa:"],
+ ["Paid ","Dibayar "],["Unpaid","Belum dibayar"],["Done this year","Lunas tahun ini"],["Undo done","Batalkan lunas"],["DUE ","JATUH TEMPO "],["DONE ","LUNAS "],
+ ["Projected ","Proyeksi "],["Cash ","Kas "],["Recurring expense","Pengeluaran berulang"],["Yearly expense","Pengeluaran tahunan"],["Events + credit","Acara + kredit"],
+ ["Add ","Tambah "],["Edit ","Edit "],["Remove","Hapus"],["No ","Tidak ada "],["This Month","Bulan Ini"],["This Year","Tahun Ini"],["Current year","Tahun berjalan"]
+];
+function translateText(value){
+ const text=String(value||"");if(state.language!=="id")return text;
+ const trimmed=text.trim();if(ID_TRANSLATIONS[trimmed])return text.replace(trimmed,ID_TRANSLATIONS[trimmed]);
+ let out=text;ID_REPLACEMENTS.forEach(([from,to])=>{out=out.replaceAll(from,to)});return out;
+}
+function applyLanguage(){
+ document.documentElement.lang=state.language==="id"?"id":"en";
+ languageBtn.dataset.language=state.language;
+ const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
+ let node;while((node=walker.nextNode())){
+  if(!node.parentElement||node.parentElement.closest("#languageBtn,script,style"))continue;
+  if(node.__english===undefined)node.__english=node.nodeValue;
+  node.nodeValue=state.language==="id"?translateText(node.__english):node.__english;
+ }
+ qa("[placeholder],[title],[aria-label]").forEach(el=>["placeholder","title","aria-label"].forEach(attr=>{
+  if(!el.hasAttribute(attr)||el.closest("#languageBtn"))return;const key=`i18n${attr.replace("-","")}`;
+  if(el.dataset[key]===undefined)el.dataset[key]=el.getAttribute(attr);el.setAttribute(attr,state.language==="id"?translateText(el.dataset[key]):el.dataset[key]);
+ }));
+ localStorage.setItem("cvfinance-language-cache",state.language);
+}
 
 function normalizeStockMappings() {
  let changed=false;
@@ -83,9 +137,12 @@ function normalizeStockMappings() {
 
 function projection(mode="base"){
  return buildProjection({
-  years:YEARS,accountTotal:accountTotal(),clients:state.clients,monthlyBudget:monthlyBudget(),yearly:state.yearly,
-  events:state.events,unpaidCredit:unpaidCreditTotal(),portfolioForYear:year=>portfolio(year,mode),activeYear:currentYear()
+  years:YEARS,referenceDate:new Date(),accountTotal:accountTotal(),clients:state.clients,budgets:state.budgets,yearly:state.yearly,
+  events:state.events,credit:state.credit,transactions:state.transactions,portfolioForYear:year=>portfolio(year,mode)
  });
+}
+function monthlyTimeline(mode="base"){
+ return buildMonthlyTimeline({referenceDate:new Date(),accountTotal:accountTotal(),clients:state.clients,budgets:state.budgets,yearly:state.yearly,events:state.events,credit:state.credit,transactions:state.transactions,portfolioForYear:year=>portfolio(year,mode)});
 }
 
 function donut(entries,label){
@@ -145,31 +202,36 @@ function switchPage(p){
  state.page=p;
  qa(".page").forEach(x=>x.classList.toggle("active",x.id===p));
  qa("[data-page]").forEach(x=>x.classList.toggle("active",x.dataset.page===p));
- const map={accumulation:["FINANCIAL COMMAND CENTER","Accumulation"],cashflow:["ACTUAL TRANSACTION LEDGER","Cashflow"],expenses:["EDITABLE BUDGET & COSTS","Expenses"],clients:["RETAINERS & RECEIVABLES","Clients"],stocks:["PORTFOLIO & TARGETS","Stocks"],electricity:["UTILITY COST MONITOR","Electricity"],prospect:["READ-ONLY FUTURE PROJECTION","Prospect"],insights:["INFOGRAPHIC SUMMARY","Insights"]};
+ const map={accumulation:["FINANCIAL COMMAND CENTER","Accumulation"],cashflow:["HISTORICAL RECORD","History"],expenses:["EDITABLE BUDGET & COSTS","Expenses"],clients:["RETAINERS & RECEIVABLES","Clients"],stocks:["PORTFOLIO & TARGETS","Stocks"],electricity:["UTILITY COST MONITOR","Electricity"],prospect:["READ-ONLY FUTURE PROJECTION","Prospect"],insights:["INFOGRAPHIC SUMMARY","Insights"]};
  kicker.textContent=map[p][0]; title.textContent=map[p][1];
+ applyLanguage();
  if(window.matchMedia("(max-width:1024px)").matches)window.scrollTo({top:0,left:0,behavior:"auto"});
 }
 
 function renderAccumulation(){
- const projected=currentNW();
+ const timeline=monthlyTimeline("base"), current=timeline[0]||{nw:currentNW(),cash:accountTotal(),income:0,extraIncome:0,recurringExpense:0,yearlyExpense:0,eventExpense:0,creditExpense:0};
+ const projected=current.nw;
  projectedCash.textContent=fmt(projected);
  availableBalance.textContent=fmt(accountTotal());
  outstandingIncome.textContent=fmt(totalOutstanding());
- cashHealth.textContent=projected>monthlyBudget()*2?"Healthy net worth":projected>0?"Positive net worth":"Negative net worth";
- accChart.innerHTML=line([projected*.82,projected*.87,projected*.91,projected*.95,projected*.98,projected],[],true);
+ cashHealth.textContent=projected>monthlyBudget()*2?"Healthy projected net worth":projected>0?"Positive projected net worth":"Negative projected net worth";
+ accChart.innerHTML=line(timeline.map(row=>row.nw),timeline.map(row=>new Intl.DateTimeFormat(state.language==="id"?"id-ID":"en-US",{month:"short"}).format(new Date(row.year,row.month,1))),true);
  accountList.innerHTML=listRows(state.accounts.map(a=>({icon:a.type==="Cash"?"💵":a.type==="Bank"?"🏦":"📱",name:a.name,sub:a.type,value:fmt(a.balance)})));
  paymentSummary.innerHTML=listRows(receivableClients().map(c=>({icon:c.clientType==="ending"?"🏁":c.status==="paid"?"✅":"⏳",name:c.name,sub:c.clientType==="ending"?"Ending client":`Paid ${fmt(c.paid)}`,value:fmt(clientOutstanding(c)),cls:clientOutstanding(c)===0?"positive":""})));
  pendingSummary.innerHTML=listRows([
-  ...state.events.slice(0,3).map(e=>({icon:"📌",name:e.name,sub:e.date,value:fmt(e.amount)})),
-  {icon:"💳",name:"Credit / PayLater",sub:`${state.credit.filter(x=>!x.paid).length} active items`,value:fmt(unpaidCreditTotal())}
+  {icon:"🧾",name:"Remaining monthly budget",sub:"Only the unpaid portion this month",value:fmt(current.recurringExpense)},
+  {icon:"📅",name:"Yearly due",sub:"Due or overdue this month",value:fmt(current.yearlyExpense)},
+  {icon:"📌",name:"Events + credit due",sub:"Only items due this month",value:fmt(current.eventExpense+current.creditExpense)}
  ]);
  balanceDonut.innerHTML=donut(state.accounts.map(a=>[a.name,Number(a.balance)]),fmt(accountTotal(),true));
  balanceLegend.innerHTML=legend(state.accounts.map(a=>[a.name,Number(a.balance)]));
  monthModel.innerHTML=listRows([
-  {icon:"🏦",name:"Liquid",sub:"Cash, bank & wallets",value:fmt(accountTotal()),cls:"positive"},
-  {icon:"📈",name:"Stocks",sub:"Current market value",value:fmt(portfolio()),cls:"positive"},
-  {icon:"📥",name:"Receivables",sub:"Shown separately; not yet owned",value:fmt(totalOutstanding())},
-  {icon:"✨",name:"Net worth",sub:"Liquid + stocks",value:fmt(projected),cls:projected<0?"negative":"positive"}
+  {icon:"🏦",name:"Starting balance",sub:"Cash, bank & wallets",value:fmt(accountTotal()),cls:"positive"},
+  {icon:"📥",name:"Outstanding clients",sub:"Recurring + ending, unpaid only",value:fmt(current.income),cls:"positive"},
+  {icon:"✨",name:"Additional income",sub:"Income recorded in History",value:fmt(current.extraIncome),cls:"positive"},
+  {icon:"🧾",name:"Remaining expenses",sub:"Monthly + yearly + events + credit",value:`−${fmt(current.expenses)}`,cls:"negative"},
+  {icon:"📈",name:"Stocks",sub:"Current market value",value:fmt(current.portfolio),cls:"positive"},
+  {icon:"💎",name:"Projected month-end net worth",sub:"Cash after obligations + stocks",value:fmt(projected),cls:projected<0?"negative":"positive"}
  ]);
 }
 
@@ -197,24 +259,35 @@ function renderCashflow(){
 }
 
 function renderExpenses(){
+ const annual=annualExpenseBreakdown({year:currentYear(),budgets:state.budgets,yearly:state.yearly,events:state.events,credit:state.credit,activeYear:currentYear()});
  monthlyExpenseTotal.textContent=fmt(monthlyBudget());
  yearlyExpenseTotal.textContent=fmt(yearlyTotal());
- eventExpenseTotal.textContent=fmt(eventTotal());
+ eventExpenseTotal.textContent=fmt(annual.events);
+ annualExpenseGrandTotal.textContent=fmt(annual.total);
+ annualRecurringExpense.textContent=fmt(annual.recurring);
+ annualYearlyExpense.textContent=fmt(annual.yearly);
+ annualEventsExpense.textContent=fmt(annual.events);
  qa("[data-expense-view]").forEach(button=>button.classList.toggle("active",button.dataset.expenseView===state.expenseView));
  qa("[data-expense-panel]").forEach(panel=>panel.classList.toggle("active",panel.dataset.expensePanel===state.expenseView));
  budgetRows.innerHTML=state.budgets.map((b,i)=>{
-  const spent=spentExact(b.category);
-  const pct=b.monthly?spent/b.monthly*100:0, cls=pct>100?"over":pct>80?"warn":"";
-  return `<div class="progress-row"><div class="progress-top"><b>${b.category}</b><small class="private">${fmt(spent)} / ${fmt(b.monthly)}</small></div><div class="progress ${cls}"><span style="width:${Math.min(100,pct)}%"></span></div><div class="tile-actions"><button class="icon-mini" data-edit-budget="${i}" title="Edit">✎</button><button class="icon-mini" data-remove-budget="${i}" title="Remove">🗑</button></div></div>`;
+  const progress=getBudgetProgress(b,state.transactions,new Date());
+  const pct=b.monthly?progress.paid/b.monthly*100:0, cls=pct>=100?"done":pct>80?"warn":"";
+  const status=progress.status==="done"?"DONE THIS MONTH":progress.status==="partial"?"PARTIAL":"AUTO FROM HISTORY";
+  return `<div class="progress-row budget-progress ${cls}"><div class="progress-top"><b>${b.category}</b><span class="budget-status ${progress.status}">${status}</span></div><div class="progress ${cls}"><span style="width:${Math.min(100,pct)}%"></span></div><div class="budget-numbers private"><small>Paid ${fmt(progress.paid)}</small><b>Remaining ${fmt(progress.remaining)}</b><small>Default ${fmt(b.monthly)}</small></div><div class="tile-actions"><button class="icon-mini" data-edit-budget="${i}" title="Edit">✎</button><button class="icon-mini" data-remove-budget="${i}" title="Remove">🗑</button></div></div>`;
  }).join("");
  qa("[data-edit-budget]").forEach(b=>b.onclick=()=>editMonthly(Number(b.dataset.editBudget)));
  qa("[data-remove-budget]").forEach(b=>b.onclick=()=>{state.budgets.splice(Number(b.dataset.removeBudget),1); save(); renderAll();});
  const budgetEntries=state.budgets.map(b=>[b.category,Number(b.monthly)]).sort((a,b)=>b[1]-a[1]);
  expenseDonut.innerHTML=donut(budgetEntries,fmt(monthlyBudget(),true));
  expenseLegend.innerHTML=legend(budgetEntries);
- yearlyExpenseGrid.innerHTML=state.yearly.map((y,i)=>{
+ const orderedYearly=[...state.yearly].sort((a,b)=>{
+  const doneA=Number(a.lastPaidYear)===currentYear(),doneB=Number(b.lastPaidYear)===currentYear();
+  return Number(doneA)-Number(doneB)||Number(a.sortOrder||0)-Number(b.sortOrder||0);
+ });
+ yearlyExpenseGrid.innerHTML=orderedYearly.map(y=>{
+  const i=state.yearly.indexOf(y);
   const done=Number(y.lastPaidYear)===currentYear();
-  return `<div class="tile yearly-tile ${done?"done":"due"}"><span class="payment-badge ${done?"done":"due"}">${done?`DONE ${currentYear()}`:`DUE ${currentYear()}`}</span><h4>${y.name}</h4><small>${y.month} · ${y.category}</small><strong class="private">${fmt(y.amount)}</strong><div class="tile-actions"><button class="year-paid-toggle ${done?"done":""}" data-paid-yearly="${i}">${done?"Undo done":"Done this year"}</button><button class="icon-mini" data-edit-yearly="${i}" title="Edit">✎</button><button class="icon-mini" data-remove-yearly="${i}" title="Remove">🗑</button></div></div>`;
+  return `<div class="tile yearly-tile ${done?"done":"due"}" data-yearly-id="${y.id}"><span class="drag-handle" title="Drag to reorder">⋮⋮</span><span class="payment-badge ${done?"done":"due"}">${done?`DONE ${currentYear()}`:`DUE ${currentYear()}`}</span><h4>${y.name}</h4><small>${y.month} · ${y.category}</small><strong class="private">${fmt(y.amount)}</strong><div class="tile-actions"><button class="year-paid-toggle ${done?"done":""}" data-paid-yearly="${i}">${done?"Undo done":"Done this year"}</button><button class="icon-mini" data-edit-yearly="${i}" title="Edit">✎</button><button class="icon-mini" data-remove-yearly="${i}" title="Remove">🗑</button></div></div>`;
  }).join("") || `<div class="list-row"><div class="list-ic">ℹ</div><div class="list-meta"><b>No yearly expenses</b></div></div>`;
  eventGrid.innerHTML=state.events.map((e,i)=>`<div class="tile event-tile"><span class="event-year">${new Date(`${e.date}T00:00:00`).getFullYear()}</span><h4>${e.name}</h4><small>${e.date} · ${e.category}</small><strong class="private">${fmt(e.amount)}</strong><div class="tile-actions"><button class="icon-mini" data-edit-event="${i}" title="Edit">✎</button><button class="icon-mini" data-remove-event="${i}" title="Remove">🗑</button></div></div>`).join("") || `<div class="list-row"><div class="list-ic">ℹ</div><div class="list-meta"><b>No events</b></div></div>`;
  qa("[data-edit-yearly]").forEach(b=>b.onclick=()=>editYearly(Number(b.dataset.editYearly)));
@@ -222,6 +295,7 @@ function renderExpenses(){
  qa("[data-paid-yearly]").forEach(b=>b.onclick=()=>{const item=state.yearly[Number(b.dataset.paidYearly)];item.lastPaidYear=Number(item.lastPaidYear)===currentYear()?null:currentYear();save();renderAll();});
  qa("[data-edit-event]").forEach(b=>b.onclick=()=>editEvent(Number(b.dataset.editEvent)));
  qa("[data-remove-event]").forEach(b=>b.onclick=()=>{state.events.splice(Number(b.dataset.removeEvent),1); save(); renderAll();});
+ enableYearlyDrag();
  renderCredit();
 }
 
@@ -235,6 +309,58 @@ function creditIcon(source){
 }
 function emptyLane(label){
  return `<div class="lane-empty"><span>＋</span><small>${label}</small></div>`;
+}
+
+function bindPointerSort(cardSelector,laneSelector,onCommit){
+ qa(`${cardSelector} .drag-handle`).forEach(handle=>{
+  handle.onpointerdown=event=>{
+   if(event.pointerType==="mouse")return;
+   event.preventDefault();
+   const card=handle.closest(cardSelector);
+   if(!card)return;
+   card.classList.add("is-dragging");
+   const move=e=>{
+    card.style.pointerEvents="none";
+    const under=document.elementFromPoint(e.clientX,e.clientY);
+    card.style.pointerEvents="";
+    const lane=under?.closest(laneSelector);
+    if(!lane)return;
+    const target=under.closest(cardSelector);
+    if(target&&target!==card){
+     const box=target.getBoundingClientRect();
+     lane.insertBefore(card,e.clientY<box.top+box.height/2?target:target.nextSibling);
+    }else if(!target)lane.append(card);
+   };
+   const end=()=>{
+    card.classList.remove("is-dragging");card.style.pointerEvents="";
+    document.removeEventListener("pointermove",move,true);document.removeEventListener("pointerup",end,true);document.removeEventListener("pointercancel",end,true);
+    onCommit();
+   };
+   document.addEventListener("pointermove",move,true);document.addEventListener("pointerup",end,true);document.addEventListener("pointercancel",end,true);
+  };
+ });
+}
+function bindNativeSort(cardSelector,laneSelector,onCommit){
+ let dragged=null;
+ qa(cardSelector).forEach(card=>{
+  card.draggable=true;
+  card.ondragstart=event=>{dragged=card;card.classList.add("is-dragging");event.dataTransfer.effectAllowed="move";event.dataTransfer.setData("text/plain",card.dataset.clientId||card.dataset.yearlyId||"");};
+  card.ondragend=()=>{card.classList.remove("is-dragging");dragged=null;};
+ });
+ qa(laneSelector).forEach(lane=>{
+  lane.ondragover=event=>{event.preventDefault();if(!dragged)return;const target=event.target.closest(cardSelector);if(target&&target!==dragged){const box=target.getBoundingClientRect();lane.insertBefore(dragged,event.clientY<box.top+box.height/2?target:target.nextSibling)}else if(!target)lane.append(dragged);};
+  lane.ondrop=event=>{event.preventDefault();if(!dragged)return;onCommit();};
+ });
+}
+
+function enableYearlyDrag(){
+ const commit=()=>{
+  [...yearlyExpenseGrid.querySelectorAll("[data-yearly-id]")].forEach((card,index)=>{
+   const item=state.yearly.find(row=>row.id===card.dataset.yearlyId);if(item)item.sortOrder=index;
+  });
+  save();renderAll();toastMsg("Order saved");
+ };
+ bindPointerSort(".yearly-tile","#yearlyExpenseGrid",commit);bindNativeSort(".yearly-tile","#yearlyExpenseGrid",commit);
 }
 
 function renderCredit(){
@@ -253,15 +379,27 @@ function renderClients(){
  fixedIncomeTotal.textContent=fmt(fixedIncome());
  clientOutstandingTotal.textContent=fmt(totalOutstanding());
  clientPaidTotal.textContent=fmt(totalPaid());
- const card=(c)=>{const i=state.clients.indexOf(c),ending=c.clientType==="ending",status=ending?(c.endingPaid?"paid":"pending"):c.status,statusIcon=status==="freeze"?"❄":status==="paid"?"✓":"⏳";return `<div class="client-card ${status} ${ending?"ending":"recurring"}"><div class="status-icon ${status}" title="${status}">${statusIcon}</div>${status==="freeze"?'<div class="freeze-ribbon">FROZEN</div>':''}<h4>${c.name}</h4><small>${ending?"Final payment":"Recurring monthly"} · ${fmt(c.monthly)}</small><strong class="private">${ending?(c.endingPaid?"Paid":"Unpaid"):`${fmt(c.paid)} paid`}</strong><small>${ending?`Remaining: ${fmt(clientOutstanding(c))}`:`Previous: ${fmt(c.carry)}<br>Outstanding: ${fmt(clientOutstanding(c))}`}</small><div class="client-actions"><button class="icon-mini" data-edit-client="${i}" title="Edit">✎</button><button class="icon-mini" data-status-client="${i}" title="Status">◉</button><button class="icon-mini" data-remove-client="${i}" title="Remove">🗑</button></div></div>`;};
- const recurring=recurringClients(),ending=endingClients(),frozen=frozenClients();
- recurringClientCount.textContent=recurring.length;endingClientCount.textContent=ending.length;frozenClientCount.textContent=frozen.length;
+ const card=(c)=>{const i=state.clients.indexOf(c),ending=c.clientType==="ending",status=ending?(c.endingPaid?"paid":"pending"):(c.status==="paid"?"paid":"pending"),statusIcon=status==="paid"?"✓":"⏳";return `<div class="client-card ${status} ${ending?"ending":"recurring"}" data-client-id="${c.id}"><span class="drag-handle" title="Drag between sections">⋮⋮</span><div class="status-icon ${status}" title="${status}">${statusIcon}</div><h4>${c.name}</h4><small>${ending?"Final payment":"Recurring monthly"} · ${fmt(c.monthly)}</small><strong class="private">${ending?(c.endingPaid?"Paid":"Unpaid"):`${fmt(c.paid)} paid`}</strong><small>${ending?`Remaining: ${fmt(clientOutstanding(c))}`:`Previous: ${fmt(c.carry)}<br>Outstanding: ${fmt(clientOutstanding(c))}`}</small><div class="client-actions"><button class="icon-mini" data-edit-client="${i}" title="Edit">✎</button><button class="icon-mini" data-status-client="${i}" title="Status">◉</button><button class="icon-mini" data-remove-client="${i}" title="Remove">🗑</button></div></div>`;};
+ const recurring=[...recurringClients()].sort((a,b)=>Number(a.sortOrder||0)-Number(b.sortOrder||0)),ending=[...endingClients()].sort((a,b)=>Number(a.sortOrder||0)-Number(b.sortOrder||0));
+ recurringClientCount.textContent=recurring.length;endingClientCount.textContent=ending.length;
  recurringClientGrid.innerHTML=recurring.map(card).join("")||emptyLane("No recurring clients");
  endingClientGrid.innerHTML=ending.map(card).join("")||emptyLane("No ending clients");
- frozenClientGrid.innerHTML=frozen.map(card).join("")||emptyLane("No frozen clients");
  qa("[data-edit-client]").forEach(b=>b.onclick=()=>editClient(Number(b.dataset.editClient)));
  qa("[data-status-client]").forEach(b=>b.onclick=()=>changeClientStatus(Number(b.dataset.statusClient)));
  qa("[data-remove-client]").forEach(b=>b.onclick=()=>{state.clients.splice(Number(b.dataset.removeClient),1); save(); renderAll();});
+ const commitClients=()=>{
+  [recurringClientGrid,endingClientGrid].forEach((grid)=>{
+   const type=grid.dataset.clientType;
+   [...grid.querySelectorAll("[data-client-id]")].forEach((node,index)=>{
+    const client=state.clients.find(row=>row.id===node.dataset.clientId);if(!client)return;
+    client.clientType=type;client.sortOrder=index;client.status=client.status==="paid"?"paid":"pending";
+    if(type==="recurring")client.endingPaid=false;
+    else client.endingPaid=client.status==="paid"&&clientOutstanding(client)===0;
+   });
+  });
+  save();renderAll();toastMsg("Client moved");
+ };
+ bindPointerSort(".client-card",".client-grid",commitClients);bindNativeSort(".client-card",".client-grid",commitClients);
 }
 
 function renderStocks(){
@@ -269,6 +407,7 @@ function renderStocks(){
  portfolioValue.textContent=fmt(p);
  portfolioInvested.textContent=fmt(inv);
  portfolioPL.textContent=fmt(p-inv);
+ portfolioPL.className=`private ${p-inv<0?"negative":p-inv>0?"positive":""}`;
  const entries=state.stocks.map(s=>[s.ticker,stockValue(s)]);
  stockDonut.innerHTML=donut(entries,fmt(p,true));
  stockLegend.innerHTML=legend(entries);
@@ -276,7 +415,8 @@ function renderStocks(){
   const stale=isPriceStale(s), status=s.priceStatus||"manual", stamp=s.priceAsOf?new Date(s.priceAsOf).toLocaleString("en-GB",{dateStyle:"medium",timeStyle:"short"}):"Never";
   const statusLabel=status==="manual"?"MANUAL FALLBACK":status;
   const qty=quantityForDisplay(s), unit=quantityUnit(s.market);
-  return `<tr><td data-label="Ticker"><input data-stock="${i}" data-field="ticker" value="${s.ticker}"></td><td data-label="Market"><select data-stock="${i}" data-field="market"><option ${s.market==="IDX"?"selected":""}>IDX</option><option ${s.market==="NASDAQ"?"selected":""}>NASDAQ</option><option ${s.market==="NYSE"?"selected":""}>NYSE</option></select></td><td data-label="Provider"><input value="${s.provider==="yahoo"?"Yahoo (Delayed)":"Finnhub"}" title="Selected automatically from market" disabled></td><td data-label="Provider Symbol"><input data-stock="${i}" data-field="providerSymbol" value="${s.providerSymbol||s.ticker}"></td><td data-label="Currency"><input value="${s.currency}" title="Selected automatically from market" disabled></td><td data-label="Quantity"><div class="quantity-field"><input data-stock="${i}" data-field="quantity" type="number" min="0" step=".000001" value="${qty}"><small>${unit}</small></div></td><td data-label="Average / Share"><input data-stock="${i}" data-field="avg" type="number" step=".01" value="${s.avg}"></td><td data-label="Current / Fallback"><input data-stock="${i}" data-field="current" type="number" step=".01" value="${s.current}" title="Latest price. Edit only to set a manual fallback."></td><td data-label="Price State"><span class="price-state ${stale?'stale':''}">${stale?'STALE · ':''}${statusLabel}</span><small class="price-time">${stamp}</small></td><td data-label="Value" class="private">${fmt(stockValue(s))}</td><td data-label="Profit / Loss" class="private">${fmt(stockValue(s)-invested(s))}</td><td class="stock-remove"><button class="icon-mini" data-del-stock="${i}" title="Remove" aria-label="Remove ${s.ticker}">🗑</button></td></tr>`;
+  const pl=stockValue(s)-invested(s);
+  return `<tr><td data-label="Ticker"><input data-stock="${i}" data-field="ticker" value="${s.ticker}"></td><td data-label="Market"><select data-stock="${i}" data-field="market"><option ${s.market==="IDX"?"selected":""}>IDX</option><option ${s.market==="NASDAQ"?"selected":""}>NASDAQ</option><option ${s.market==="NYSE"?"selected":""}>NYSE</option></select></td><td data-label="Provider"><input value="${s.provider==="yahoo"?"Yahoo (Delayed)":"Finnhub"}" title="Selected automatically from market" disabled></td><td data-label="Provider Symbol"><input data-stock="${i}" data-field="providerSymbol" value="${s.providerSymbol||s.ticker}"></td><td data-label="Currency"><input value="${s.currency}" title="Selected automatically from market" disabled></td><td data-label="Quantity"><div class="quantity-field"><input data-stock="${i}" data-field="quantity" type="number" min="0" step=".000001" value="${qty}"><small>${unit}</small></div></td><td data-label="Average / Share"><input data-stock="${i}" data-field="avg" type="number" step=".01" value="${s.avg}"></td><td data-label="Current / Fallback"><input data-stock="${i}" data-field="current" type="number" step=".01" value="${s.current}" title="Latest price. Edit only to set a manual fallback."></td><td data-label="Price State"><span class="price-state ${stale?'stale':''}">${stale?'STALE · ':''}${statusLabel}</span><small class="price-time">${stamp}</small></td><td data-label="Value" class="private">${fmt(stockValue(s))}</td><td data-label="Profit / Loss" class="private ${pl<0?"negative":pl>0?"positive":""}">${fmt(pl)}</td><td class="stock-remove"><button class="icon-mini" data-del-stock="${i}" title="Remove" aria-label="Remove ${s.ticker}">🗑</button></td></tr>`;
  }).join("");
  qa("[data-stock]").forEach(el=>el.onchange=()=>{
   const i=Number(el.dataset.stock),f=el.dataset.field,s=state.stocks[i];
@@ -295,9 +435,9 @@ function renderStocks(){
 
 function renderTargetTable(mode,headEl,bodyEl){
  const useMode=mode==="base"?state.baseMode:state.optimisticMode;
- headEl.innerHTML=`<tr><th>Ticker</th>${YEARS.map(y=>`<th>${y===2026?"Current":y}</th>`).join("")}</tr>`;
+ headEl.innerHTML=`<tr><th>Ticker</th>${YEARS.map(y=>`<th>${y===currentYear()?"Current":y}</th>`).join("")}</tr>`;
  bodyEl.innerHTML=state.stocks.map((s,i)=>`<tr><td><b>${s.ticker}</b></td>${YEARS.map(y=>{
-   if(y===2026) return `<td>${Number(s.current).toFixed(2)}</td>`;
+   if(y===currentYear()) return `<td>${Number(s.current).toFixed(2)}</td>`;
    const val = useMode==="auto" ? Number(stockPrice(s,y,mode)).toFixed(2) : Number(s[mode][y]??s.current).toFixed(2);
    return `<td><input type="number" step=".01" ${useMode==="auto"?"disabled":""} data-target="${mode}" data-stock="${i}" data-year="${y}" value="${val}"></td>`;
  }).join("")}</tr>`).join("");
@@ -352,10 +492,12 @@ function renderElectricity(){
 }
 
 function renderProspect(){
- const pr=projection(state.prospectMode), last=pr.at(-1), growth=currentNW()?((last.nw/currentNW()-1)*100):0;
+ const pr=projection(state.prospectMode), first=pr[0],last=pr.at(-1), growth=currentNW()?((last.nw/currentNW()-1)*100):0;
  prospectValue.textContent=fmt(last.nw);
  sideCurrentLabel.textContent=`Projected ${currentYear()}`;
- sideCurrentProjection.textContent=fmt(currentNW(),true);
+ sideCurrentProjection.textContent=fmt(first.nw,true);
+ sideFutureLabel.textContent=`Projected ${last.year}`;
+ prospectHorizonLabel.textContent=`Projected Net Worth in ${last.year}`;
  sideProjection.textContent=fmt(last.nw,true);
  sideScenario.textContent=state.prospectMode==="base"?"Base":"Optimistic";
  prospectBadge.textContent=state.prospectMode.toUpperCase();
@@ -365,10 +507,10 @@ function renderProspect(){
  prospectSources.innerHTML=listRows([
   {icon:"🏦",name:"Liquid balance",sub:"Cash + bank + wallets",value:fmt(accountTotal())},
   {icon:"🤝",name:"Recurring income",sub:"Fixed clients / year",value:fmt(fixedIncome()*12)},
-  {icon:"🧾",name:"Yearly outflow",sub:"Monthly budgets + unpaid yearly costs",value:fmt(monthlyBudget()*12+yearlyProjectionTotal(currentYear()))},
-  {icon:"📈",name:"Stock scenario",sub:state.prospectMode==="base"?"Base target prices":"Optimistic target prices",value:fmt(portfolio(2036,state.prospectMode))}
+  {icon:"🧾",name:"Remaining current-year expense",sub:"Monthly + yearly + events + credit",value:fmt(first.expenses.total)},
+  {icon:"📈",name:"Stock scenario",sub:state.prospectMode==="base"?"Base target prices":"Optimistic target prices",value:fmt(portfolio(last.year,state.prospectMode))}
  ]);
- yearGrid.innerHTML=pr.map(y=>{const ages=ageTriplet(y.year).join(", "); return `<div class="year-card"><div class="year-head"><small>${y.year}</small><span class="age-triplet">${ages}</span></div><h4 class="private ${moneyClass(y.nw)}">${fmt(y.nw)}</h4><small class="year-split private"><span>Cash <b class="${moneyClass(y.closing)}">${fmt(y.closing)}</b></span><span>Stocks <b class="${moneyClass(y.portfolio)}">${fmt(y.portfolio)}</b></span></small></div>`;}).join("");
+ yearGrid.innerHTML=pr.map(y=>{const ages=ageTriplet(y.year).join(", "); return `<div class="year-card"><div class="year-head"><small>${y.year}</small><span class="age-triplet">${ages}</span></div><h4 class="private ${moneyClass(y.nw)}">${fmt(y.nw)}</h4><small class="year-split private"><span>Cash <b class="${moneyClass(y.closing)}">${fmt(y.closing)}</b></span><span>Stocks <b class="${moneyClass(y.portfolio)}">${fmt(y.portfolio)}</b></span><span>Recurring expense <b class="negative">−${fmt(y.expenses.recurring)}</b></span><span>Yearly expense <b class="negative">−${fmt(y.expenses.yearly)}</b></span><span>Events + credit <b class="negative">−${fmt(y.expenses.events)}</b></span></small></div>`;}).join("");
 }
 
 function renderInsights(){
@@ -382,19 +524,23 @@ function renderInsights(){
   {vals:projection("base").map(x=>x.nw),color:COLORS[0]},
   {vals:projection("optimistic").map(x=>x.nw),color:COLORS[2]}
  ]);
- insightCards.innerHTML=[
-  {title:"Monthly balance health",text:`${fmt(accountTotal())} liquid balance versus ${fmt(monthlyBudget())} monthly budget gives a runway of ${runway.toFixed(1)} months.`},
-  {title:"Client collection pressure",text:`${fmt(totalOutstanding())} is still pending from active clients. This is the fastest lever for improving short-term cash.`},
-  {title:"Budget pressure",text:`Food pace is ${foodBudget()?((foodSpent()/foodBudget())*100).toFixed(1):0}% and essentials pace is ${essentialsBudget()?((essentialsSpent()/essentialsBudget())*100).toFixed(1):0}% of budget.`}
- ].map(x=>`<div class="brief-item"><b>${x.title}</b><p>${x.text}</p></div>`).join("");
- insightLong.innerHTML=[
-  {ic:"💡",title:"Cash action",text:`Collecting pending client balances of ${fmt(totalOutstanding())} will improve the buffer faster than cutting small day-to-day expenses.`},
-  {ic:"🍽",title:"Food cluster",text:`Food and coffee are separated in the ledger for visibility, but should be reviewed as a combined lifestyle spending bucket.`},
-  {ic:"🧱",title:"Essentials",text:`Essentials includes IPL, internet, subscriptions, electricity, and household basics. Watch the budget pace widget for early overspend.`},
-  {ic:"📈",title:"Portfolio",text:`Live provider prices are used when available. Manual current prices remain available when a provider is unavailable or stale.`},
-  {ic:"⚡",title:"Electricity",text:`The more frequently you log meter readings, the more accurate the daily usage and monthly cost estimate will become.`},
-  {ic:"🗂",title:"Prospect",text:`Base and Optimistic tabs differ only by stock targets, so future cashflow assumptions remain clean and easy to audit.`}
- ].map(x=>`<div class="signal-item"><div class="signal-ic">${x.ic}</div><div><b>${x.title}</b><p>${x.text}</p></div></div>`).join("");
+ const now=new Date(),prev=new Date(now.getFullYear(),now.getMonth()-1,1);
+ const expenseIn=(date)=>state.transactions.filter(row=>row.type==="expense"&&String(row.date).startsWith(`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}`)).reduce((sum,row)=>sum+Number(row.amount),0);
+ const thisExpense=expenseIn(now),previousExpense=expenseIn(prev),expenseDelta=previousExpense?((thisExpense-previousExpense)/previousExpense*100):0;
+ const periods=electricityPeriods(),latestElectric=periods.at(-1),previousElectric=periods.at(-2),electricDelta=previousElectric?.daily?((latestElectric.daily-previousElectric.daily)/previousElectric.daily*100):0;
+ const coffeePct=foodBudget()?coffeeSpentForInsight()/Math.max(1,state.budgets.find(b=>String(b.category).toLowerCase()==="coffee")?.monthly||foodBudget())*100:0;
+ const collected=totalPaid()+totalOutstanding()?totalPaid()/(totalPaid()+totalOutstanding())*100:100;
+ const pl=portfolio()-state.stocks.reduce((sum,row)=>sum+invested(row),0);
+ const insightData=[
+  {asset:"wallet",tone:runway>=6?"green":runway>=3?"yellow":"red",eyebrow:"Cash runway",title:`${runway.toFixed(1)} months of runway`,text:`Current liquid balance is ${fmt(accountTotal())}; remaining monthly obligations are ${fmt(budgetRemaining())}.`},
+  {asset:"clients",tone:collected>=80?"green":collected>=50?"yellow":"red",eyebrow:"Client collection",title:`${collected.toFixed(0)}% collected`,text:totalOutstanding()?`${fmt(totalOutstanding())} is still outstanding from recurring and ending clients.`:"All client payments are collected. Good job!"},
+  {asset:"coffee",tone:coffeePct>100?"red":coffeePct>75?"yellow":"green",eyebrow:"Coffee check",title:coffeePct>100?"Coffee is over budget":coffeePct>75?"Coffee is getting expensive":"Coffee spending is controlled",text:`Coffee usage is ${coffeePct.toFixed(0)}% of its default monthly budget.`},
+  {asset:"electricity",tone:electricDelta>5?"red":electricDelta<-5?"green":"blue",eyebrow:"Electricity trend",title:!latestElectric?"More readings needed":electricDelta<-5?"Electricity is decreasing — good job!":electricDelta>5?"Electricity usage is rising":"Electricity is stable",text:latestElectric?`Latest pace is ${latestElectric.daily.toFixed(1)} kWh/day (${electricDelta>=0?"+":""}${electricDelta.toFixed(1)}% versus the prior interval).`:"Add at least two readings to unlock a usage trend."},
+  {asset:"calendar",tone:expenseDelta>5?"red":expenseDelta<-5?"green":"orange",eyebrow:"History trend",title:previousExpense?`Recorded expense ${expenseDelta>=0?"rose":"fell"} ${Math.abs(expenseDelta).toFixed(0)}%`:"Expense baseline is building",text:`History recorded ${fmt(thisExpense)} this month. It updates pacing only and is not deducted twice.`},
+  {asset:"stocks",tone:pl<0?"red":"green",eyebrow:"Portfolio P/L",title:`${pl<0?"Down":"Up"} ${fmt(Math.abs(pl))}`,text:`Current portfolio is ${fmt(portfolio())} against ${fmt(state.stocks.reduce((sum,row)=>sum+invested(row),0))} invested.`}
+ ];
+ insightCards.innerHTML=insightData.map(x=>`<article class="story-card ${x.tone}"><img src="/assets/insights/${x.asset}.png" alt="" loading="lazy"><div><small>${x.eyebrow}</small><h3>${x.title}</h3><p>${x.text}</p></div></article>`).join("");
+ insightLong.innerHTML=insightData.map(x=>`<div class="signal-item ${x.tone}"><div class="signal-ic"><img src="/assets/insights/${x.asset}.png" alt=""></div><div><b>${x.title}</b><p>${x.text}</p></div></div>`).join("");
 }
 
 function renderAll(){
@@ -407,6 +553,7 @@ function renderAll(){
  renderProspect();
  renderInsights();
  attachTips();
+ applyLanguage();
 }
 
 function openSimple(title,fields,callback){
@@ -449,8 +596,10 @@ function editMonthly(i){
  const x=state.budgets[i];
  openSimple("Edit Monthly Budget",[
   {key:"category",label:"Category",value:x.category},
-  {key:"monthly",label:"Monthly Budget",type:"number",value:x.monthly}
- ],o=>state.budgets[i]={...x,...o});
+  {key:"monthly",label:"Default Monthly Budget",type:"number",value:x.monthly},
+  {key:"paymentStatus",label:"This Month Status",options:["auto","partial","done"],value:x.trackingMonth===monthKey(new Date())?(x.paymentStatus||"auto"):"auto"},
+  {key:"paidAmount",label:"Paid Amount (used for partial)",type:"number",value:x.trackingMonth===monthKey(new Date())?Number(x.paidAmount||0):0}
+ ],o=>state.budgets[i]={...x,...o,trackingMonth:monthKey(new Date())});
 }
 function editYearly(i){
  const x=state.yearly[i];
@@ -483,7 +632,7 @@ function editClient(i){
   if(o.clientType==="ending"){
    state.clients[i].endingPaid=Boolean(x.endingPaid)&&o.paid>=o.monthly+o.carry;
    state.clients[i].status=state.clients[i].endingPaid?"paid":"pending";
-  }else if(state.clients[i].status!=="freeze"){
+  }else{
    state.clients[i].endingPaid=false;
    state.clients[i].status = o.paid >= o.monthly + o.carry ? "paid" : "pending";
   }
@@ -498,7 +647,7 @@ function changeClientStatus(i){
   return;
  }
  openSimple("Update Client Status",[
-  {key:"status",label:"Status",options:["paid","pending","freeze"],value:x.status},
+  {key:"status",label:"Status",options:["paid","pending"],value:x.status},
   {key:"paid",label:"Paid This Month",type:"number",value:x.paid}
  ],o=>state.clients[i]={...x,status:o.status,paid:o.paid});
 }
@@ -557,6 +706,7 @@ qa("[data-page]").forEach(b=>b.onclick=()=>switchPage(b.dataset.page));
 qa(".mobile-more [data-page]").forEach(b=>b.addEventListener("click",()=>dataModal.close()));
 qa("[data-go]").forEach(b=>b.onclick=()=>switchPage(b.dataset.go));
 themeBtn.onclick=()=>setTheme(state.theme==="dark"?"light":"dark");
+languageBtn.onclick=()=>{state.language=state.language==="en"?"id":"en";applyLanguage();saveSettings();renderAll();switchPage(state.page);};
 privacyBtn.onclick=()=>{state.privacy=!state.privacy; document.body.classList.toggle("private-hidden",state.privacy); privacyBtn.textContent=state.privacy?"🙈":"👁"; renderAll();};
 qa("#cashFilter button").forEach(b=>b.onclick=()=>{qa("#cashFilter button").forEach(x=>x.classList.remove("active")); b.classList.add("active"); state.filter=b.dataset.filter; renderCashflow();});
 cashSort.onchange=()=>{state.sort=cashSort.value; renderCashflow();};
@@ -599,14 +749,16 @@ manageAccountsBtn.onclick=()=>{
 
 addMonthlyBtn.onclick=()=>openSimple("Add Monthly Budget",[
  {key:"category",label:"Category"},
- {key:"monthly",label:"Monthly Budget",type:"number"}
-],o=>state.budgets.push({id:createId(),...o}));
+ {key:"monthly",label:"Monthly Budget",type:"number"},
+ {key:"paymentStatus",label:"This Month Status",options:["auto","partial","done"],value:"auto"},
+ {key:"paidAmount",label:"Paid Amount (used for partial)",type:"number",value:0}
+],o=>state.budgets.push({id:createId(),...o,trackingMonth:monthKey(new Date())}));
 addYearlyBtn.onclick=()=>openSimple("Add Yearly Expense",[
  {key:"name",label:"Name"},
  {key:"amount",label:"Amount",type:"number"},
  {key:"month",label:"Payment Month"},
  {key:"category",label:"Category"}
-],o=>state.yearly.push({id:createId(),...o,lastPaidYear:null}));
+],o=>state.yearly.push({id:createId(),...o,lastPaidYear:null,sortOrder:state.yearly.length}));
 addEventBtn.onclick=addEventBtnTop.onclick=()=>openSimple("Add Event",[
  {key:"name",label:"Name"},
  {key:"amount",label:"Amount",type:"number"},
@@ -630,8 +782,8 @@ addClientBtn.onclick=()=>openSimple("Add Client",[
  {key:"monthly",label:"Monthly Retainer / Final Amount",type:"number"},
  {key:"paid",label:"Paid This Month",type:"number",value:0},
  {key:"carry",label:"Previous Outstanding",type:"number",value:0},
- {key:"status",label:"Status",options:["paid","pending","freeze"],value:"pending"}
-],o=>state.clients.push({id:createId(),...o,endingPaid:o.clientType==="ending"&&o.status==="paid",status:o.clientType==="ending"?(o.status==="paid"?"paid":"pending"):o.status}));
+ {key:"status",label:"Status",options:["paid","pending"],value:"pending"}
+],o=>state.clients.push({id:createId(),...o,sortOrder:state.clients.filter(row=>(row.clientType||"recurring")===o.clientType).length,endingPaid:o.clientType==="ending"&&o.status==="paid",status:o.status==="paid"?"paid":"pending"}));
 addTickerBtn.onclick=()=>openSimple("Add Ticker",[
  {key:"ticker",label:"Ticker"},
  {key:"market",label:"Market",options:["IDX","NASDAQ","NYSE"],value:"NASDAQ"},
@@ -655,6 +807,7 @@ function applyCloudState(next,{preserveUi=false}={}){
  Object.assign(state,next,ui);
  document.documentElement.dataset.theme=state.theme;
  localStorage.setItem("cvfinance-theme-cache",state.theme);
+ localStorage.setItem("cvfinance-language-cache",state.language||"en");
  themeBtn.textContent=state.theme==="dark"?"☀":"☾";
  baseGrowth.value=state.baseGrowth;optimisticGrowth.value=state.optimisticGrowth;
  updateModeToggleLabels();renderAll();switchPage(state.page);
@@ -683,7 +836,7 @@ async function showSignedIn(user){
 async function boot(){
  document.documentElement.dataset.theme=state.theme;themeBtn.textContent=state.theme==="dark"?"☀":"☾";
  privacyBtn.textContent="👁";txDate.value=todayISO();updateModeToggleLabels();
- baseGrowth.value=state.baseGrowth;optimisticGrowth.value=state.optimisticGrowth;renderAll();
+ baseGrowth.value=state.baseGrowth;optimisticGrowth.value=state.optimisticGrowth;renderAll();applyLanguage();
  if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{});
  try{
   const user=await syncManager.connect();

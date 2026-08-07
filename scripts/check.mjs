@@ -37,31 +37,41 @@ for (const file of jsFiles.map(read)) {
 const { createMvpSeed } = await import("../src/data/default-data.js");
 const seed = createMvpSeed();
 assert.equal(seed.accounts.reduce((sum, row) => sum + row.balance, 0), 14007953);
-assert.equal(seed.clients.filter(row => row.status !== "freeze").reduce((sum, row) => sum + row.monthly, 0), 8300000);
+assert.equal(seed.clients.reduce((sum, row) => sum + row.monthly, 0), 10500000);
 assert.equal(seed.stocks.find(row => row.ticker === "WDC").quantity, 2.8033875);
 assert.equal(seed.rateKwh, 1740);
 assert.ok(seed.budgets.some(row => row.category === "Food") && seed.budgets.some(row => row.category === "Coffee"));
 
-const { buildProjection, getCurrentNetWorth, getFixedIncome, getTotalOutstanding } = await import("../src/data/finance-model.js");
+const { buildMonthlyTimeline, buildProjection, getBudgetProgress, getCurrentNetWorth, getFixedIncome, getTotalOutstanding } = await import("../src/data/finance-model.js");
 const modelClients = [
   {monthly:1000000,paid:300000,carry:0,status:"pending",clientType:"recurring"},
   {monthly:2000000,paid:0,carry:0,status:"pending",clientType:"ending",endingPaid:false},
-  {monthly:3000000,paid:3000000,carry:0,status:"paid",clientType:"ending",endingPaid:true},
-  {monthly:9000000,paid:0,carry:0,status:"freeze",clientType:"recurring"}
+  {monthly:3000000,paid:3000000,carry:0,status:"paid",clientType:"ending",endingPaid:true}
 ];
-assert.equal(getFixedIncome(modelClients),1000000,"Ending and frozen clients must not enter recurring income");
+assert.equal(getFixedIncome(modelClients),1000000,"Ending clients must not enter recurring income");
 assert.equal(getTotalOutstanding(modelClients),2700000,"Unpaid ending balances remain receivables");
 assert.equal(getCurrentNetWorth(10000000,5000000),15000000,"Accumulation is current liquid plus stocks only");
+const referenceDate=new Date("2026-08-07T12:00:00+07:00");
+const modelBudgets=[{category:"Food",monthly:1000000,paymentStatus:"partial",paidAmount:400000,trackingMonth:"2026-08"}];
+const modelYearly=[{amount:1000000,month:"August",lastPaidYear:null},{amount:2000000,month:"October",lastPaidYear:null},{amount:3000000,month:"June",lastPaidYear:2026}];
+const modelEvents=[{date:"2026-08-20",amount:500000},{date:"2028-07-01",amount:5000000}];
+const modelCredit=[{due:"2026-08-26",amount:100000,paid:false},{due:"2026-09-26",amount:200000,paid:false},{due:"2027-04-26",amount:300000,paid:false}];
+const modelTransactions=[{type:"income",amount:400000,date:"2026-08-05"},{type:"expense",amount:900000,date:"2026-08-05",category:"Food"}];
+assert.deepEqual(getBudgetProgress(modelBudgets[0],modelTransactions,referenceDate),{status:"partial",paid:400000,remaining:600000,autoPaid:900000,trackingMonth:"2026-08"},"Manual partial progress must override History without changing the default budget");
+const monthly=buildMonthlyTimeline({referenceDate,accountTotal:10000000,clients:modelClients,budgets:modelBudgets,yearly:modelYearly,events:modelEvents,credit:modelCredit,transactions:modelTransactions,portfolioForYear:()=>0});
+assert.deepEqual(monthly.map(row=>row.cash),[10900000,10700000,8700000,8700000,8700000],"Current month uses outstanding and remaining obligations; future months use recurring income and dated expenses");
 const modelProjection = buildProjection({
-  years:[2026,2027,2028],accountTotal:10000000,clients:modelClients,monthlyBudget:0,
-  yearly:[{amount:1000000,lastPaidYear:2026}],events:[{date:"2028-07-01",amount:5000000}],unpaidCredit:0,
-  portfolioForYear:()=>0,activeYear:2026
+  years:[2026,2027,2028],referenceDate,accountTotal:10000000,clients:modelClients,budgets:modelBudgets,
+  yearly:modelYearly,events:modelEvents,credit:modelCredit,transactions:modelTransactions,portfolioForYear:()=>0
 });
-assert.deepEqual(modelProjection.map(row=>row.closing),[22000000,33000000,39000000],"Events must reduce only their matching year and paid yearly costs must not be charged twice in the active year");
+assert.deepEqual(modelProjection.map(row=>row.closing),[8700000,2400000,-8600000],"Projection must carry closing cash forward and deduct obligations only in their matching year");
 
 const migration006 = read("supabase/migrations/006_client_types_yearly_status.sql");
 for (const marker of ["client_type","ending_paid","last_paid_year"]) assert.match(migration006,new RegExp(marker));
 assert.doesNotMatch(migration006,/drop\s+table|truncate\s+|delete\s+from/i);
+const migration007 = read("supabase/migrations/007_projection_budget_sort_language.sql");
+for (const marker of ["payment_status","paid_amount","tracking_month","sort_order","language"]) assert.match(migration007,new RegExp(marker));
+assert.doesNotMatch(migration007,/drop\s+table|truncate\s+|delete\s+from/i);
 
 const { normalizeStockMapping, quantityForDisplay, quantityForStorage } = await import("../src/stocks/holding.js");
 const idxHolding = {ticker:"BMRI",market:"IDX",provider:"finnhub",providerSymbol:"BMRI",currency:"IDR",quantity:10000};
@@ -107,4 +117,4 @@ await repository.queueOperation({table:"accounts",action:"delete",id,previousUpd
 queued = await mutationList();
 assert.equal(queued.length, 0);
 
-console.log("CVFinance checks passed: schema, RLS markers, PWA, 8 tabs, v7.3 accumulation/client/event/yearly invariants, stock provider abstraction, offline queue coalescing, environment template, and JavaScript syntax.");
+console.log("CVFinance checks passed: schema, RLS markers, PWA, 8 tabs, v7.4 monthly/projection/client/event/yearly invariants, stock provider abstraction, offline queue coalescing, environment template, and JavaScript syntax.");
