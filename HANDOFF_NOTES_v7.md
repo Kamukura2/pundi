@@ -13,5 +13,10 @@ Implemented:
 - Vercel hosts the Vite PWA and server-side stock routes.
 - Finnhub covers US symbols; Yahoo Finance provides delayed `.JK` quotes for personal, low-volume IDX tracking.
 - Optional Vercel Cron refresh uses a server-only service-role key.
+- v7.1.0 adds an isolated private Telegram webhook at `/api/telegram/cvfinance-webhook`.
+- The bot uses its own token/secret/allowlist variables, deterministic parsing, persistent expiring state, and the same Supabase owner UUID for every query.
+- Telegram writes flow through existing Supabase Realtime to the web/PWA; no PC process or long polling is used.
+- v7.2.0 isolates the redesigned phone/tablet shell at 1024 px and below, preserves the desktop UI, and keeps the five-button floating mobile navigation persistent.
+- Mobile switches every financial module to contained cards or internally scrollable tables, prevents page-level overflow, and scrolls to the top when changing sections.
 
-Not performed inside this package: creating third-party accounts, entering private API keys, applying SQL to the user's Supabase project, pushing to the user's GitHub, or deploying to the user's Vercel. Follow `docs/MANUAL_ACTIONS.md` for those credentialed steps.
+Not performed inside this package: creating third-party accounts/bots, entering private API keys, applying SQL to the user's Supabase project, pushing to the user's GitHub, registering the Telegram webhook, or deploying to the user's Vercel. Follow `docs/TELEGRAM_SETUP.md` for those credentialed steps.

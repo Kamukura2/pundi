@@ -5,6 +5,12 @@
 - [ ] All eight tabs open on Windows desktop, Windows laptop, and Android.
 - [ ] Dark/light mode, privacy mode, and mobile bottom navigation remain correct.
 - [ ] Android layout uses the full viewport and respects the safe-area inset.
+- [ ] At 360 px, 412 px, and 768 px there is no page-level horizontal overflow and no currency value escapes its card.
+- [ ] Mobile floating navigation stays visible on Accumulation, Cashflow, Stocks, Prospect, and internally opened sections; it contains icons only.
+- [ ] Switching from a long page to a shorter page returns to the top instead of showing an empty viewport.
+- [ ] Mobile transaction and generic editor dialogs fit within the dynamic viewport and scroll internally when the keyboard reduces available height.
+- [ ] Holdings become touch-friendly cards on phones; target-price tables scroll only inside their panel.
+- [ ] Above 1024 px the established desktop sidebar, grids, typography, and flow remain unchanged.
 - [ ] Editing an Android balance appears on PC/laptop without refresh.
 - [ ] A new transaction updates Cashflow, Accumulation, Expenses, Prospect, and Insights.
 - [ ] Client payment/status updates outstanding income and Prospect; Freeze stays excluded.
@@ -19,3 +25,10 @@
 - [ ] JSON export downloads; import restores the same records.
 - [ ] PWA installs on Android and its offline shell opens without caching private API responses.
 - [ ] `npm run build` and `npm run check` pass.
+- [ ] An unauthorized Telegram user/chat receives no financial data and creates no rows.
+- [ ] `-50k grocery`, `-85k coffee grab`, and `+4jt client payment` create exactly one transaction each.
+- [ ] Re-delivering the same Telegram `update_id` does not create a duplicate transaction.
+- [ ] A two-step `-50000` conversation survives a fresh Vercel instance and expires when abandoned.
+- [ ] `/balance`, `/client`, `/credit`, `/electricity`, `/stocks`, `/target`, and `/summary` read/write the same Supabase rows shown in the PWA.
+- [ ] Telegram changes appear in an already-open browser/PWA through Supabase Realtime.
+- [ ] Vercel logs contain structured event names but no bot token, webhook secret, service-role key, or full finance payload.

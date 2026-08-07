@@ -2,7 +2,7 @@
 
 1. Create accounts: **GitHub**, **Vercel**, **Supabase**, and **Finnhub**.
 2. Create one Supabase project.
-3. Run all four SQL migration files in numeric order.
+3. Run all five SQL migration files in numeric order. For an existing v7.0.2 deployment, run only `005_telegram_cvfinance.sql`.
 4. Disable public sign-ups and manually create one confirmed Auth user.
 5. Create a private GitHub repository and push this project.
 6. Import that repository into Vercel.
@@ -13,3 +13,4 @@
 11. Open the same Vercel URL on desktop, laptop, and Android; sign in with the same private account.
 12. Test every stock mapping. IDX should show `Yahoo (Delayed)` and US holdings should show `Finnhub`.
 13. Install the PWA on Android.
+14. Follow [TELEGRAM_SETUP.md](TELEGRAM_SETUP.md) to create a new dedicated bot, add the six server-only environment variables, deploy, set BotFather commands, and register the webhook.

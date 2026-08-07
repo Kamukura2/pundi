@@ -2,10 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
   <title>CVFinance</title>
   <meta name="theme-color" content="#0b1120">
   <meta name="description" content="Private synchronized personal finance dashboard">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="CVFinance">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/icons/icon-192.png">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
@@ -408,12 +412,22 @@
     </section>
   </main>
 
-  <nav class="mobile-nav">
-    <button class="active" data-page="accumulation">💰<small>Accum</small></button>
-    <button data-page="cashflow">📊<small>Cash</small></button>
-    <button class="plus" data-open-tx>＋</button>
-    <button data-page="stocks">📈<small>Stock</small></button>
-    <button data-page="prospect">🚀<small>Future</small></button>
+  <nav class="mobile-nav" aria-label="Primary mobile navigation">
+    <button class="active" data-page="accumulation" type="button" aria-label="Accumulation" title="Accumulation">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7.5h14v11H5zM8 7.5V5.8A1.8 1.8 0 0 1 9.8 4h4.4A1.8 1.8 0 0 1 16 5.8v1.7M5 11h14M9 14.5h6"/></svg>
+    </button>
+    <button data-page="cashflow" type="button" aria-label="Cashflow" title="Cashflow">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V9m7 10V5m7 14v-7M3 19.5h18"/></svg>
+    </button>
+    <button class="plus" data-open-tx type="button" aria-label="Add transaction" title="Add transaction">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+    <button data-page="stocks" type="button" aria-label="Stocks" title="Stocks">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 17 5-5 3 3 7-8M15 7h4v4"/></svg>
+    </button>
+    <button data-page="prospect" type="button" aria-label="Future projection" title="Future projection">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.2 5.1c2.2-.8 4.1-.9 5.1-.8.1 1-.1 2.9-.9 5.1-1.1 2.8-3.2 5.1-6.2 6.4l-4-4c1.1-3.1 3.3-5.5 6-6.7ZM8.5 15.5 5 19m9-8.5h.01"/></svg>
+    </button>
   </nav>
 </div>
 
@@ -450,6 +464,15 @@
       <button type="button" class="ghost-btn close-dialog">×</button>
     </div>
     <div class="account-line"><span>Signed in as</span><b id="accountEmail">—</b></div>
+    <div class="mobile-more">
+      <p>More sections</p>
+      <div class="mobile-more-grid">
+        <button class="ghost-btn" type="button" data-page="expenses"><span>🧾</span>Expenses</button>
+        <button class="ghost-btn" type="button" data-page="clients"><span>🤝</span>Clients</button>
+        <button class="ghost-btn" type="button" data-page="electricity"><span>⚡</span>Electricity</button>
+        <button class="ghost-btn" type="button" data-page="insights"><span>✨</span>Insights</button>
+      </div>
+    </div>
     <div class="data-actions">
       <button id="exportBackupBtn" class="ghost-btn" type="button">Export JSON backup</button>
       <button id="importBackupBtn" class="ghost-btn" type="button">Import JSON backup</button>

@@ -149,6 +149,7 @@ function switchPage(p){
  qa("[data-page]").forEach(x=>x.classList.toggle("active",x.dataset.page===p));
  const map={accumulation:["FINANCIAL COMMAND CENTER","Accumulation"],cashflow:["ACTUAL TRANSACTION LEDGER","Cashflow"],expenses:["EDITABLE BUDGET & COSTS","Expenses"],clients:["RETAINERS & RECEIVABLES","Clients"],stocks:["PORTFOLIO & TARGETS","Stocks"],electricity:["UTILITY COST MONITOR","Electricity"],prospect:["READ-ONLY FUTURE PROJECTION","Prospect"],insights:["INFOGRAPHIC SUMMARY","Insights"]};
  kicker.textContent=map[p][0]; title.textContent=map[p][1];
+ if(window.matchMedia("(max-width:1024px)").matches)window.scrollTo({top:0,left:0,behavior:"auto"});
 }
 
 function renderAccumulation(){
@@ -256,7 +257,7 @@ function renderStocks(){
   const stale=isPriceStale(s), status=s.priceStatus||"manual", stamp=s.priceAsOf?new Date(s.priceAsOf).toLocaleString("en-GB",{dateStyle:"medium",timeStyle:"short"}):"Never";
   const statusLabel=status==="manual"?"MANUAL FALLBACK":status;
   const qty=quantityForDisplay(s), unit=quantityUnit(s.market);
-  return `<tr><td><input data-stock="${i}" data-field="ticker" value="${s.ticker}"></td><td><select data-stock="${i}" data-field="market"><option ${s.market==="IDX"?"selected":""}>IDX</option><option ${s.market==="NASDAQ"?"selected":""}>NASDAQ</option><option ${s.market==="NYSE"?"selected":""}>NYSE</option></select></td><td><input value="${s.provider==="yahoo"?"Yahoo (Delayed)":"Finnhub"}" title="Selected automatically from market" disabled></td><td><input data-stock="${i}" data-field="providerSymbol" value="${s.providerSymbol||s.ticker}"></td><td><input value="${s.currency}" title="Selected automatically from market" disabled></td><td><div class="quantity-field"><input data-stock="${i}" data-field="quantity" type="number" min="0" step=".000001" value="${qty}"><small>${unit}</small></div></td><td><input data-stock="${i}" data-field="avg" type="number" step=".01" value="${s.avg}"></td><td><input data-stock="${i}" data-field="current" type="number" step=".01" value="${s.current}" title="Latest price. Edit only to set a manual fallback."></td><td><span class="price-state ${stale?'stale':''}">${stale?'STALE · ':''}${statusLabel}</span><small class="price-time">${stamp}</small></td><td class="private">${fmt(stockValue(s))}</td><td class="private">${fmt(stockValue(s)-invested(s))}</td><td><button class="icon-mini" data-del-stock="${i}" title="Remove">🗑</button></td></tr>`;
+  return `<tr><td data-label="Ticker"><input data-stock="${i}" data-field="ticker" value="${s.ticker}"></td><td data-label="Market"><select data-stock="${i}" data-field="market"><option ${s.market==="IDX"?"selected":""}>IDX</option><option ${s.market==="NASDAQ"?"selected":""}>NASDAQ</option><option ${s.market==="NYSE"?"selected":""}>NYSE</option></select></td><td data-label="Provider"><input value="${s.provider==="yahoo"?"Yahoo (Delayed)":"Finnhub"}" title="Selected automatically from market" disabled></td><td data-label="Provider Symbol"><input data-stock="${i}" data-field="providerSymbol" value="${s.providerSymbol||s.ticker}"></td><td data-label="Currency"><input value="${s.currency}" title="Selected automatically from market" disabled></td><td data-label="Quantity"><div class="quantity-field"><input data-stock="${i}" data-field="quantity" type="number" min="0" step=".000001" value="${qty}"><small>${unit}</small></div></td><td data-label="Average / Share"><input data-stock="${i}" data-field="avg" type="number" step=".01" value="${s.avg}"></td><td data-label="Current / Fallback"><input data-stock="${i}" data-field="current" type="number" step=".01" value="${s.current}" title="Latest price. Edit only to set a manual fallback."></td><td data-label="Price State"><span class="price-state ${stale?'stale':''}">${stale?'STALE · ':''}${statusLabel}</span><small class="price-time">${stamp}</small></td><td data-label="Value" class="private">${fmt(stockValue(s))}</td><td data-label="Profit / Loss" class="private">${fmt(stockValue(s)-invested(s))}</td><td class="stock-remove"><button class="icon-mini" data-del-stock="${i}" title="Remove" aria-label="Remove ${s.ticker}">🗑</button></td></tr>`;
  }).join("");
  qa("[data-stock]").forEach(el=>el.onchange=()=>{
   const i=Number(el.dataset.stock),f=el.dataset.field,s=state.stocks[i];
@@ -392,7 +393,7 @@ function openSimple(title,fields,callback){
  simpleFields.innerHTML=fields.map(f=>{
   const input=f.options
    ? `<select id="sf_${f.key}">${f.options.map(o=>`<option ${String(o)===String(f.value)?'selected':''}>${o}</option>`).join("")}</select>`
-   : `<input id="sf_${f.key}" type="${f.type||'text'}" ${f.step?`step="${f.step}"`:''} ${f.value!==undefined?`value="${f.value}"`:''} required>`;
+   : `<input id="sf_${f.key}" type="${f.type||'text'}" ${f.step?`step="${f.step}"`:''} ${f.value!==undefined?`value="${f.value}"`:''} ${f.required===false?'':'required'}>`;
   return `<label>${f.label}${input}</label>`;
  }).join("");
  simpleForm.onsubmit=(e)=>{
@@ -510,6 +511,7 @@ async function validateStockSymbols(){
 }
 
 qa("[data-page]").forEach(b=>b.onclick=()=>switchPage(b.dataset.page));
+qa(".mobile-more [data-page]").forEach(b=>b.addEventListener("click",()=>dataModal.close()));
 qa("[data-go]").forEach(b=>b.onclick=()=>switchPage(b.dataset.go));
 themeBtn.onclick=()=>setTheme(state.theme==="dark"?"light":"dark");
 privacyBtn.onclick=()=>{state.privacy=!state.privacy; document.body.classList.toggle("private-hidden",state.privacy); privacyBtn.textContent=state.privacy?"🙈":"👁"; renderAll();};
@@ -588,7 +590,7 @@ addClientBtn.onclick=()=>openSimple("Add Client",[
 addTickerBtn.onclick=()=>openSimple("Add Ticker",[
  {key:"ticker",label:"Ticker"},
  {key:"market",label:"Market",options:["IDX","NASDAQ","NYSE"],value:"NASDAQ"},
- {key:"providerSymbol",label:"Provider Symbol (leave blank to use ticker)"},
+ {key:"providerSymbol",label:"Provider Symbol (leave blank to use ticker)",required:false},
  {key:"quantity",label:"Quantity (IDX = lots · US = shares)",type:"number",step:".000001"},
  {key:"avg",label:"Average Price / Share",type:"number",step:".01"},
  {key:"current",label:"Manual Fallback Price / Share",type:"number",step:".01",value:0}

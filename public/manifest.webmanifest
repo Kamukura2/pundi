@@ -6,7 +6,9 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
   "orientation": "any",
+  "categories": ["finance", "productivity"],
   "background_color": "#070d18",
   "theme_color": "#0b1120",
   "icons": [
