@@ -15,6 +15,8 @@ for (const tab of ["accumulation","cashflow","expenses","clients","stocks","elec
 assert.match(index, /manifest\.webmanifest/);
 assert.match(index, /authForm/);
 assert.match(index, /annualPerformanceDashboard/);
+assert.match(index, /Decision Metrics/);
+assert.match(index, /target-table-scroll/);
 
 const sql = read("supabase/migrations/001_initial_schema.sql");
 for (const table of ["profiles","accounts","transactions","monthly_budgets","yearly_expenses","planned_events","credit_facilities","credit_items","clients","stock_holdings","stock_price_targets","electricity_readings","app_settings"]) {
@@ -189,4 +191,9 @@ assert.match(appSource, /meta\?\.provider==="yahoo"\?"YAHOO FINANCE"/, "The FX b
 assert.match(appSource, /due due-current/, "Yearly expenses due this month must receive the luminous current-month class");
 assert.match(appSource, /data-tx-tag-kind/, "Transaction category and channel chips must act as tag filters");
 
-console.log("CVFinance checks passed: schema, RLS markers, PWA, 8 tabs, v7.7.4 annual and monthly operating dashboard isolation, Yahoo FX validation, ledger-only History, dynamic Budget meters, toggleable Transaction tags, current-month Yearly styling, safe dialog dismissal, client status palette, auditable projections, one-time dated credit, optional stock cash assets, sorting invariants, stock provider abstraction, offline queue coalescing, and JavaScript syntax.");
+const app = read("app.js");
+assert.match(app, /portfolioPL\.textContent=`\$\{fmt\(pl\)\} · \$\{percent\(pl,inv\)\}`/);
+assert.match(app, /const decisionMetrics=/);
+assert.match(app, /state\.stocks\.flatMap/);
+
+console.log("CVFinance checks passed: schema, RLS markers, PWA, 8 tabs, v7.7.5 P/L percentages, vertical target prices, unique Decision Metrics, brighter OLED grids, annual and monthly operating dashboard isolation, Yahoo FX validation, ledger-only History, dynamic Budget meters, toggleable Transaction tags, current-month Yearly styling, safe dialog dismissal, client status palette, auditable projections, one-time dated credit, optional stock cash assets, sorting invariants, stock provider abstraction, offline queue coalescing, and JavaScript syntax.");

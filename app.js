@@ -43,6 +43,12 @@ const fmt=(n,compact=false)=>{
  }
  return new Intl.NumberFormat(state.language==="id"?"id-ID":"en-US",{style:"currency",currency:"IDR",maximumFractionDigits:0}).format(n);
 };
+const percent=(value,base,{absolute=false}={})=>{
+ const ratio=Number(base)?Number(value)/Math.abs(Number(base))*100:0;
+ const normalized=Object.is(ratio,-0)?0:ratio;
+ const shown=absolute?Math.abs(normalized):normalized;
+ return `${shown>0&&!absolute?"+":""}${shown.toFixed(2)}%`;
+};
 const save=()=>syncManager?.persist(state);
 const saveSettings=()=>save();
 const q=(s)=>document.querySelector(s);
@@ -114,7 +120,7 @@ const ID_TRANSLATIONS={
  "Total Portfolio Value":"Total Nilai Portofolio","Invested":"Modal","Unrealized":"Belum Direalisasi","Allocation":"Alokasi","Holdings":"Kepemilikan","Target prices":"Target harga","Budget":"Anggaran","Optional liquid assets":"Aset likuid opsional","Netcash & USD Wallet":"Netcash & Dompet USD","Included in total assets":"Masuk ke total aset",
  "Latest Meter Balance":"Sisa Token Terbaru","Average Daily Usage":"Rata-rata Harian","Estimated Monthly Cost":"Estimasi Biaya Bulanan","Meter Readings":"Catatan Meter",
  "Read-only projection":"Proyeksi hanya-baca","Annual View":"Tampilan Tahunan","Operating Performance":"Kinerja Operasional","Annual Income":"Pemasukan Tahunan","Annual Expense":"Pengeluaran Tahunan","Annual Net":"Net Tahunan","Future Cash + Assets":"Kas + Aset Masa Depan","Cash Runway":"Daya Tahan Kas","Largest Expense":"Pengeluaran Terbesar","Largest Holding":"Saham Terbesar",
- "Base vs Optimistic":"Dasar vs Optimistis","Money Story This Month":"Cerita Keuangan Bulan Ini","Quick Actions":"Aksi Cepat","Add Transaction":"Tambah Transaksi","Save":"Simpan","Editor":"Editor",
+ "Base vs Optimistic":"Dasar vs Optimistis","Money Story This Month":"Cerita Keuangan Bulan Ini","Decision Metrics":"Metrik Keputusan","Add Transaction":"Tambah Transaksi","Save":"Simpan","Editor":"Editor",
  "Data & Sync":"Data & Sinkronisasi","Signed in as":"Masuk sebagai","Sign out":"Keluar","Search...":"Cari...","Base":"Dasar","Optimistic":"Optimistis","Current":"Saat Ini","Yearly":"Tahunan","Monthly":"Bulanan"
 };
 const ID_REPLACEMENTS=[
@@ -539,7 +545,7 @@ function renderStocks(){
  const grossHoldings=holdingsPortfolio(),gross=portfolio(),p=netPortfolio(), inv=state.stocks.reduce((a,s)=>a+invested(s),0),pl=grossHoldings-inv;
  portfolioValue.textContent=fmt(p);
  portfolioInvested.textContent=fmt(inv);
- portfolioPL.textContent=fmt(pl);
+ portfolioPL.textContent=`${fmt(pl)} · ${percent(pl,inv)}`;
  portfolioPL.className=`private ${pl<0?"negative":pl>0?"positive":""}`;
  const entries=state.stocks.map(s=>[s.ticker,stockValue(s)]);
  if(Number(state.stockExtras?.netcashIdr||0)>0)entries.push(["Netcash",Number(state.stockExtras.netcashIdr)]);
@@ -564,7 +570,7 @@ function renderStocks(){
   const statusLabel=status==="manual"?"MANUAL FALLBACK":status;
   const qty=quantityForDisplay(s), unit=quantityUnit(s.market);
   const pl=stockValue(s)-invested(s);
-  return `<tr><td data-label="Ticker"><input data-stock="${i}" data-field="ticker" value="${s.ticker}"></td><td data-label="Market"><select data-stock="${i}" data-field="market"><option ${s.market==="IDX"?"selected":""}>IDX</option><option ${s.market==="NASDAQ"?"selected":""}>NASDAQ</option><option ${s.market==="NYSE"?"selected":""}>NYSE</option></select></td><td data-label="Provider Symbol"><input data-stock="${i}" data-field="providerSymbol" value="${s.providerSymbol||s.ticker}"></td><td data-label="Currency"><input value="${s.currency}" title="Selected automatically from market" disabled></td><td data-label="Quantity"><div class="quantity-field"><input data-stock="${i}" data-field="quantity" type="number" min="0" step=".000001" value="${qty}"><small>${unit}</small></div></td><td data-label="Average / Share"><input data-stock="${i}" data-field="avg" type="number" step=".01" value="${s.avg}"></td><td data-label="Current / Fallback"><input data-stock="${i}" data-field="current" type="number" step=".01" value="${s.current}" title="Latest price. Edit only to set a manual fallback."></td><td data-label="Price State"><span class="price-state ${stale?'stale':''}">${stale?'STALE · ':''}${statusLabel}</span><small class="price-time">${stamp}</small></td><td data-label="Value" class="private">${fmt(stockValue(s))}</td><td data-label="Profit / Loss" class="private ${pl<0?"negative":pl>0?"positive":""}">${fmt(pl)}</td><td class="stock-remove"><button class="icon-mini" data-del-stock="${i}" title="Remove" aria-label="Remove ${s.ticker}">🗑</button></td></tr>`;
+  return `<tr><td data-label="Ticker"><input data-stock="${i}" data-field="ticker" value="${s.ticker}"></td><td data-label="Market"><select data-stock="${i}" data-field="market"><option ${s.market==="IDX"?"selected":""}>IDX</option><option ${s.market==="NASDAQ"?"selected":""}>NASDAQ</option><option ${s.market==="NYSE"?"selected":""}>NYSE</option></select></td><td data-label="Provider Symbol"><input data-stock="${i}" data-field="providerSymbol" value="${s.providerSymbol||s.ticker}"></td><td data-label="Currency"><input value="${s.currency}" title="Selected automatically from market" disabled></td><td data-label="Quantity"><div class="quantity-field"><input data-stock="${i}" data-field="quantity" type="number" min="0" step=".000001" value="${qty}"><small>${unit}</small></div></td><td data-label="Average / Share"><input data-stock="${i}" data-field="avg" type="number" step=".01" value="${s.avg}"></td><td data-label="Current / Fallback"><input data-stock="${i}" data-field="current" type="number" step=".01" value="${s.current}" title="Latest price. Edit only to set a manual fallback."></td><td data-label="Price State"><span class="price-state ${stale?'stale':''}">${stale?'STALE · ':''}${statusLabel}</span><small class="price-time">${stamp}</small></td><td data-label="Value" class="private">${fmt(stockValue(s))}</td><td data-label="Profit / Loss" class="private holding-pl ${pl<0?"negative":pl>0?"positive":""}"><b>${fmt(pl)}</b><small>${percent(pl,invested(s))}</small></td><td class="stock-remove"><button class="icon-mini" data-del-stock="${i}" title="Remove" aria-label="Remove ${s.ticker}">🗑</button></td></tr>`;
  }).join("");
  qa("[data-stock]").forEach(el=>el.onchange=()=>{
   const i=Number(el.dataset.stock),f=el.dataset.field,s=state.stocks[i];
@@ -583,12 +589,11 @@ function renderStocks(){
 
 function renderTargetTable(mode,headEl,bodyEl){
  const useMode=mode==="base"?state.baseMode:state.optimisticMode;
- headEl.innerHTML=`<tr><th>Ticker</th>${YEARS.map(y=>`<th>${y===currentYear()?"Current":y}</th>`).join("")}</tr>`;
- bodyEl.innerHTML=state.stocks.map((s,i)=>`<tr><td><b>${s.ticker}</b></td>${YEARS.map(y=>{
-   if(y===currentYear()) return `<td>${plainNumber(s.current)}</td>`;
-   const val = useMode==="auto" ? stockPrice(s,y,mode) : Number(s[mode][y]??s.current);
-   return `<td><input class="target-price-input" type="text" inputmode="decimal" autocomplete="off" ${useMode==="auto"?"disabled":""} data-target="${mode}" data-stock="${i}" data-year="${y}" value="${plainNumber(val)}"></td>`;
-  }).join("")}</tr>`).join("");
+ headEl.innerHTML=`<tr><th>Ticker</th><th>Current</th><th>Year</th><th>Target</th></tr>`;
+ bodyEl.innerHTML=state.stocks.flatMap((s,i)=>YEARS.filter(y=>y!==currentYear()).map((y,rowIndex)=>{
+  const val=useMode==="auto"?stockPrice(s,y,mode):Number(s[mode][y]??s.current);
+  return `<tr class="target-price-row ${rowIndex===0?"ticker-start":""}"><td data-label="Ticker"><b>${rowIndex===0?escapeHtml(s.ticker):""}</b></td><td data-label="Current" class="target-current">${rowIndex===0?plainNumber(s.current):""}</td><td data-label="Year"><b>${y}</b></td><td data-label="Target"><input class="target-price-input" type="text" inputmode="decimal" autocomplete="off" ${useMode==="auto"?"disabled":""} data-target="${mode}" data-stock="${i}" data-year="${y}" value="${plainNumber(val)}"></td></tr>`;
+ })).join("");
  qa(`[data-target="${mode}"]`).forEach(el=>{
   const commit=()=>{
    const i=Number(el.dataset.stock),y=Number(el.dataset.year),value=Number(String(el.value).replace(/,/g,""));
@@ -724,17 +729,34 @@ function renderInsights(){
  const periods=electricityPeriods(),latestElectric=periods.at(-1),previousElectric=periods.at(-2),electricDelta=previousElectric?.daily?((latestElectric.daily-previousElectric.daily)/previousElectric.daily*100):0;
  const coffeePct=foodBudget()?coffeeSpentForInsight()/Math.max(1,state.budgets.find(b=>String(b.category).toLowerCase()==="coffee")?.monthly||foodBudget())*100:0;
  const collected=totalPaid()+totalOutstanding()?totalPaid()/(totalPaid()+totalOutstanding())*100:100;
- const pl=holdingsPortfolio()-state.stocks.reduce((sum,row)=>sum+invested(row),0);
+ const holdingsInvested=state.stocks.reduce((sum,row)=>sum+invested(row),0);
+ const pl=holdingsPortfolio()-holdingsInvested;
  const insightData=[
   {asset:"wallet",tone:runway>=6?"green":runway>=3?"yellow":"red",eyebrow:"Cash runway",title:`${runway.toFixed(1)} months of runway`,text:`Current liquid balance after entrusted funds is ${fmt(netAccountTotal())}; remaining monthly obligations are ${fmt(budgetRemaining())}.`},
   {asset:"clients",tone:collected>=80?"green":collected>=50?"yellow":"red",eyebrow:"Client collection",title:`${collected.toFixed(0)}% collected`,text:totalOutstanding()?`${fmt(totalOutstanding())} is still outstanding from recurring and ending clients.`:"All client payments are collected. Good job!"},
   {asset:"coffee",tone:coffeePct>100?"red":coffeePct>75?"yellow":"green",eyebrow:"Coffee check",title:coffeePct>100?"Coffee is over budget":coffeePct>75?"Coffee is getting expensive":"Coffee spending is controlled",text:`Coffee usage is ${coffeePct.toFixed(0)}% of its default monthly budget.`},
   {asset:"electricity",tone:electricDelta>5?"red":electricDelta<-5?"green":"blue",eyebrow:"Electricity trend",title:!latestElectric?"More readings needed":electricDelta<-5?"Electricity is decreasing — good job!":electricDelta>5?"Electricity usage is rising":"Electricity is stable",text:latestElectric?`Latest pace is ${latestElectric.daily.toFixed(1)} kWh/day (${electricDelta>=0?"+":""}${electricDelta.toFixed(1)}% versus the prior interval).`:"Add at least two readings to unlock a usage trend."},
   {asset:"calendar",tone:expenseDelta>5?"red":expenseDelta<-5?"green":"orange",eyebrow:"History trend",title:previousExpense?`Recorded expense ${expenseDelta>=0?"rose":"fell"} ${Math.abs(expenseDelta).toFixed(0)}%`:"Expense baseline is building",text:`History recorded ${fmt(thisExpense)} this month. It updates pacing only and is not deducted twice.`},
-  {asset:"stocks",tone:pl<0?"red":"green",eyebrow:"Portfolio P/L",title:`${pl<0?"Down":"Up"} ${fmt(Math.abs(pl))}`,text:`Current holdings are ${fmt(holdingsPortfolio())} against ${fmt(state.stocks.reduce((sum,row)=>sum+invested(row),0))} invested. Optional Netcash and Wallet are assets, not P/L.`}
+  {asset:"stocks",tone:pl<0?"red":"green",eyebrow:"Portfolio P/L",title:`${pl<0?"Down":"Up"} ${fmt(Math.abs(pl))} · ${percent(pl,holdingsInvested,{absolute:true})}`,text:`Current holdings are ${fmt(holdingsPortfolio())} against ${fmt(holdingsInvested)} invested. Optional Netcash and Wallet are assets, not P/L.`}
  ];
  insightCards.innerHTML=insightData.map(x=>`<article class="story-card ${x.tone} insight-${x.asset}"><img src="/assets/insights/${x.asset}.png" alt="" loading="lazy"><div><small>${x.eyebrow}</small><h3>${x.title}</h3><p>${x.text}</p></div></article>`).join("");
- insightLong.innerHTML=insightData.map(x=>`<div class="signal-item ${x.tone} insight-${x.asset}"><div class="signal-ic"><img src="/assets/insights/${x.asset}.png" alt=""></div><div><b>${x.title}</b><p>${x.text}</p></div></div>`).join("");
+ const operating=annualOperatingPerformance({clients:state.clients,budgets:state.budgets,yearly:state.yearly});
+ const monthlyNet=operating.net/12,operatingMargin=operating.income?operating.net/operating.income*100:0;
+ const usedBudget=state.budgets.reduce((sum,item)=>sum+recordedExpenseForBudget(item,state.transactions,now),0);
+ const budgetUsedPct=monthlyBudget()?usedBudget/monthlyBudget()*100:0;
+ const recurring=recurringClients(),largestClient=recurring.reduce((max,row)=>Number(row.monthly)>Number(max?.monthly||0)?row:max,null);
+ const clientConcentration=fixedIncome()&&largestClient?Number(largestClient.monthly)/fixedIncome()*100:0;
+ const usdAssets=state.stocks.filter(row=>row.currency==="USD").reduce((sum,row)=>sum+stockValue(row),0)+Number(state.stockExtras?.walletUsd||0)*Number(state.usdIdr||0);
+ const usdExposure=portfolio()?usdAssets/portfolio()*100:0;
+ const decisionMetrics=[
+  {icon:"↗",tone:monthlyNet>=0?"green":"red",label:"Monthly Net",value:`${monthlyNet>=0?"+":""}${fmt(monthlyNet)}`,text:"Recurring client income minus monthly budget and one-twelfth of yearly budget."},
+  {icon:"◎",tone:operating.net>=0?"green":"red",label:"Annual Net",value:`${operating.net>=0?"+":""}${fmt(operating.net)}`,text:"Full-year recurring income minus monthly budget × 12 and yearly budget."},
+  {icon:"%",tone:operatingMargin>=0?"green":"red",label:"Operating Margin",value:`${operatingMargin>=0?"+":""}${operatingMargin.toFixed(1)}%`,text:"Annual operating net divided by annual recurring-client income."},
+  {icon:"◔",tone:budgetUsedPct>100?"red":budgetUsedPct>75?"orange":"blue",label:"Budget Used",value:`${budgetUsedPct.toFixed(1)}%`,text:`${fmt(usedBudget)} recorded against ${fmt(monthlyBudget())} of monthly budget.`},
+  {icon:"◇",tone:clientConcentration>50?"orange":"blue",label:"Client Concentration",value:`${clientConcentration.toFixed(1)}%`,text:largestClient?`${escapeHtml(largestClient.name)} is the largest share of recurring monthly income.`:"Add recurring clients to calculate concentration."},
+  {icon:"$",tone:usdExposure>60?"orange":"blue",label:"USD Exposure",value:`${usdExposure.toFixed(1)}%`,text:"Share of portfolio assets held in USD stocks and USD Wallet."}
+ ];
+ insightLong.innerHTML=decisionMetrics.map(x=>`<article class="signal-item metric-signal ${x.tone}"><div class="signal-ic"><span class="metric-symbol">${x.icon}</span></div><div><small>${x.label}</small><b class="private">${x.value}</b><p>${x.text}</p></div></article>`).join("");
 }
 
 function renderAll(){

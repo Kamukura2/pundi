@@ -3,15 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-  <title>CVFinance v7.7.4</title>
-  <meta name="theme-color" content="#0b1120">
+  <title>CVFinance v7.7.5</title>
+  <meta name="theme-color" content="#d6249f">
   <meta name="description" content="Private synchronized personal finance dashboard">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="CVFinance">
   <link rel="manifest" href="/manifest.webmanifest">
-  <link rel="icon" href="/icons/icon-192.png">
+  <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -373,7 +374,7 @@
               <input id="baseGrowth" class="mini-input" type="number" value="8" step=".1"><span>%</span>
             </div>
           </div>
-          <div class="table-wrap"><table><thead id="baseHead"></thead><tbody id="baseBody"></tbody></table></div>
+          <div class="table-wrap target-table-scroll"><table class="target-price-table"><thead id="baseHead"></thead><tbody id="baseBody"></tbody></table></div>
         </article>
 
         <article class="panel">
@@ -384,7 +385,7 @@
               <input id="optimisticGrowth" class="mini-input" type="number" value="14" step=".1"><span>%</span>
             </div>
           </div>
-          <div class="table-wrap"><table><thead id="optimisticHead"></thead><tbody id="optimisticBody"></tbody></table></div>
+          <div class="table-wrap target-table-scroll"><table class="target-price-table"><thead id="optimisticHead"></thead><tbody id="optimisticBody"></tbody></table></div>
         </article>
       </div>
     </section>
@@ -493,7 +494,7 @@
       </div>
 
       <article class="panel">
-        <div class="panel-head"><div><p>Signals</p><h3>Quick Actions</h3></div></div>
+        <div class="panel-head"><div><p>Signals</p><h3>Decision Metrics</h3></div></div>
         <div id="insightLong" class="signal-grid"></div>
       </article>
     </section>
