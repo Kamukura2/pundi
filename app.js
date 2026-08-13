@@ -121,6 +121,7 @@ const ID_TRANSLATIONS={
  "Latest Meter Balance":"Sisa Token Terbaru","Average Daily Usage":"Rata-rata Harian","Estimated Monthly Cost":"Estimasi Biaya Bulanan","Meter Readings":"Catatan Meter",
  "Read-only projection":"Proyeksi hanya-baca","Annual View":"Tampilan Tahunan","Operating Performance":"Kinerja Operasional","Annual Income":"Pemasukan Tahunan","Annual Expense":"Pengeluaran Tahunan","Annual Net":"Net Tahunan","Future Cash + Assets":"Kas + Aset Masa Depan","Cash Runway":"Daya Tahan Kas","Largest Expense":"Pengeluaran Terbesar","Largest Holding":"Saham Terbesar",
  "Base vs Optimistic":"Dasar vs Optimistis","Money Story This Month":"Cerita Keuangan Bulan Ini","Decision Metrics":"Metrik Keputusan","Add Transaction":"Tambah Transaksi","Save":"Simpan","Editor":"Editor",
+ "Financial Action Plan":"Rencana Aksi Keuangan","Next Moves":"Langkah Berikutnya","Operating Balance":"Keseimbangan Operasional","Client Follow-up":"Tindak Lanjut Klien","Cash Buffer":"Cadangan Kas",
  "Data & Sync":"Data & Sinkronisasi","Signed in as":"Masuk sebagai","Sign out":"Keluar","Search...":"Cari...","Base":"Dasar","Optimistic":"Optimistis","Current":"Saat Ini","Yearly":"Tahunan","Monthly":"Bulanan"
 };
 const ID_REPLACEMENTS=[
@@ -589,10 +590,12 @@ function renderStocks(){
 
 function renderTargetTable(mode,headEl,bodyEl){
  const useMode=mode==="base"?state.baseMode:state.optimisticMode;
+ const targetYears=YEARS.filter(y=>y!==currentYear());
  headEl.innerHTML=`<tr><th>Ticker</th><th>Current</th><th>Year</th><th>Target</th></tr>`;
- bodyEl.innerHTML=state.stocks.flatMap((s,i)=>YEARS.filter(y=>y!==currentYear()).map((y,rowIndex)=>{
+ bodyEl.innerHTML=state.stocks.flatMap((s,i)=>targetYears.map((y,rowIndex)=>{
   const val=useMode==="auto"?stockPrice(s,y,mode):Number(s[mode][y]??s.current);
-  return `<tr class="target-price-row ${rowIndex===0?"ticker-start":""}"><td data-label="Ticker"><b>${rowIndex===0?escapeHtml(s.ticker):""}</b></td><td data-label="Current" class="target-current">${rowIndex===0?plainNumber(s.current):""}</td><td data-label="Year"><b>${y}</b></td><td data-label="Target"><input class="target-price-input" type="text" inputmode="decimal" autocomplete="off" ${useMode==="auto"?"disabled":""} data-target="${mode}" data-stock="${i}" data-year="${y}" value="${plainNumber(val)}"></td></tr>`;
+  const stockCells=rowIndex===0?`<td data-label="Ticker" rowspan="${targetYears.length}" class="target-stock-cell"><div class="target-static-box"><small>Ticker</small><strong>${escapeHtml(s.ticker)}</strong></div></td><td data-label="Current" rowspan="${targetYears.length}" class="target-stock-cell target-current"><div class="target-static-box"><small>Current</small><strong>${plainNumber(s.current)}</strong></div></td>`:"";
+  return `<tr class="target-price-row ${rowIndex===0?"ticker-start":""}">${stockCells}<td data-label="Year"><span class="target-year-box">${y}</span></td><td data-label="Target"><input class="target-price-input" type="text" inputmode="decimal" autocomplete="off" ${useMode==="auto"?"disabled":""} data-target="${mode}" data-stock="${i}" data-year="${y}" value="${plainNumber(val)}"></td></tr>`;
  })).join("");
  qa(`[data-target="${mode}"]`).forEach(el=>{
   const commit=()=>{
@@ -723,6 +726,18 @@ function renderInsights(){
  const coachTitle=baseLast.nw>=currentNW()?"Consistency is compounding":"The model is a signal, not a verdict";
  const coachText=baseLast.nw>=currentNW()?`${positiveYears} of ${yearlyMomentum.length} projected years improve or hold net worth. Keep income visible, protect runway, and review targets regularly.`:`Your base path needs an adjustment. Closing the income–expense gap now has more impact than waiting for a perfect market year.`;
  insightCoach.innerHTML=`<div class="coach-message"><span>✦</span><div><small>MOMENTUM NOTE</small><h3>${coachTitle}</h3><p>${coachText}</p></div></div><div class="momentum-strip" aria-label="Year-over-year net worth momentum">${yearlyMomentum.map((value,index)=>`<span title="${baseProjection[index].year}: ${value>=0?"+":""}${fmt(value)}"><i class="${value<0?"down":"up"}" style="height:${Math.max(8,Math.abs(value)/momentumPeak*100)}%"></i><small>${String(baseProjection[index].year).slice(2)}</small></span>`).join("")}</div>`;
+ const operating=annualOperatingPerformance({clients:state.clients,budgets:state.budgets,yearly:state.yearly});
+ const monthlyNet=operating.net/12,monthlyExpense=operating.expense/12,monthlyGap=Math.max(0,-monthlyNet);
+ const collectionBase=totalPaid()+totalOutstanding(),collectionPct=collectionBase?totalPaid()/collectionBase*100:100;
+ const bufferTarget=monthlyBudget()*3,bufferGap=Math.max(0,bufferTarget-netAccountTotal()),bufferPct=bufferTarget?netAccountTotal()/bufferTarget*100:100;
+ const operatingCoverage=monthlyExpense?fixedIncome()/monthlyExpense*100:100;
+ const priorities=[
+  {icon:monthlyGap?"↗":"✓",tone:monthlyGap?"red":"green",label:"OPERATING BALANCE",title:monthlyGap?`Close ${fmt(monthlyGap)} monthly gap`:`Protect ${fmt(monthlyNet)} monthly surplus`,text:monthlyGap?"Increase recurring income or trim planned budgets until monthly net reaches zero.":"The operating model is profitable. Keep the surplus visible and intentional.",progress:Math.min(100,operatingCoverage)},
+  {icon:totalOutstanding()?"◎":"✓",tone:totalOutstanding()?"orange":"green",label:"CLIENT FOLLOW-UP",title:totalOutstanding()?`Collect ${fmt(totalOutstanding())}`:"All client income collected",text:totalOutstanding()?"Prioritize outstanding recurring and ending-client payments.":"No open client receivables remain this month.",progress:Math.min(100,collectionPct)},
+  {icon:bufferGap?"◒":"✓",tone:bufferGap?"blue":"green",label:"CASH BUFFER",title:bufferGap?`Build ${fmt(bufferGap)} more`:`3-month buffer secured`,text:bufferGap?`Target liquid reserve: ${fmt(bufferTarget)} based on three months of budget.`:"Liquid balance already covers at least three months of planned budget.",progress:Math.min(100,bufferPct)}
+ ];
+ const firstOpen=priorities.find(item=>item.progress<100);
+ insightActionPlan.innerHTML=`<div class="action-plan-head"><div><small>NEXT MOVES</small><h3>Financial Action Plan</h3></div><span>${firstOpen?"FOCUS MODE":"ON TRACK"}</span></div><div class="action-plan-list">${priorities.map(item=>`<article class="action-plan-item ${item.tone}"><div class="action-plan-icon">${item.icon}</div><div class="action-plan-copy"><small>${item.label}</small><b class="private">${item.title}</b><p>${item.text}</p><div class="action-plan-progress"><i style="width:${item.progress.toFixed(1)}%"></i></div></div><strong>${item.progress.toFixed(0)}%</strong></article>`).join("")}</div><div class="action-plan-footer"><span>✦</span><p><b>Next milestone:</b> <span class="private">${firstOpen?firstOpen.title:"Maintain the current plan and review it monthly."}</span></p></div>`;
  const now=new Date(),prev=new Date(now.getFullYear(),now.getMonth()-1,1);
  const expenseIn=(date)=>state.transactions.filter(row=>row.type==="expense"&&String(row.date).startsWith(`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}`)).reduce((sum,row)=>sum+Number(row.amount),0);
  const thisExpense=expenseIn(now),previousExpense=expenseIn(prev),expenseDelta=previousExpense?((thisExpense-previousExpense)/previousExpense*100):0;
@@ -740,8 +755,7 @@ function renderInsights(){
   {asset:"stocks",tone:pl<0?"red":"green",eyebrow:"Portfolio P/L",title:`${pl<0?"Down":"Up"} ${fmt(Math.abs(pl))} · ${percent(pl,holdingsInvested,{absolute:true})}`,text:`Current holdings are ${fmt(holdingsPortfolio())} against ${fmt(holdingsInvested)} invested. Optional Netcash and Wallet are assets, not P/L.`}
  ];
  insightCards.innerHTML=insightData.map(x=>`<article class="story-card ${x.tone} insight-${x.asset}"><img src="/assets/insights/${x.asset}.png" alt="" loading="lazy"><div><small>${x.eyebrow}</small><h3>${x.title}</h3><p>${x.text}</p></div></article>`).join("");
- const operating=annualOperatingPerformance({clients:state.clients,budgets:state.budgets,yearly:state.yearly});
- const monthlyNet=operating.net/12,operatingMargin=operating.income?operating.net/operating.income*100:0;
+ const operatingMargin=operating.income?operating.net/operating.income*100:0;
  const usedBudget=state.budgets.reduce((sum,item)=>sum+recordedExpenseForBudget(item,state.transactions,now),0);
  const budgetUsedPct=monthlyBudget()?usedBudget/monthlyBudget()*100:0;
  const recurring=recurringClients(),largestClient=recurring.reduce((max,row)=>Number(row.monthly)>Number(max?.monthly||0)?row:max,null);

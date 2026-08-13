@@ -1,6 +1,6 @@
-# CVFinance v7.7.5
+# CVFinance v7.7.6
 
-v7.7.5 adds a full-bleed fuchsia app icon, nominal and percentage P/L for the portfolio and each holding, vertical target-price tables, non-duplicated Decision Metrics in Insights, and brighter OLED dark-mode summary grids. All new metrics are read-only and preserve the v7.7.4 financial model.
+v7.7.6 fills the remaining Insights space with a read-only Financial Action Plan, increases contrast on colored summary-card labels, and removes internal Target Price scrolling. Ticker and Current now use merged blocks beside the complete 2027–2036 target list. The v7.7.5 P/L percentages, fuchsia identity, Decision Metrics, History isolation, and Prospect formulas remain unchanged.
 
 v7.7.2 removes fragile Google HTML scraping and reads the `IDR=X` quote from Yahoo Finance JSON with two-host fallback, safe-rate validation, and last-valid/manual fallback. It also highlights Yearly costs due this month, enlarges the Expense Perusahaan dashboard, brightens Fixed Monthly, and turns Transaction Budget/Channel tags into rounded toggle filters.
 

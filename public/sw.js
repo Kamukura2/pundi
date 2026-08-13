@@ -1,4 +1,4 @@
-const SHELL_CACHE = "cvfinance-shell-v7.7.5-bright-metrics";
+const SHELL_CACHE = "cvfinance-shell-v7.7.6-action-plan-target-grid";
 const SHELL = ["/", "/index.html", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", event => {
