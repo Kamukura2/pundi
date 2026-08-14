@@ -914,8 +914,9 @@ select,input,.search{width:100%;min-width:0;height:46px;padding:0 12px;border-ra
 .trading-page-tools{display:flex;justify-content:flex-end;margin:0 0 12px}.trading-page-tools .danger-btn{font-weight:900}
 
 @media(max-width:1024px){
- html,body{overscroll-behavior-y:none}
- body{touch-action:pan-y}
+ html{height:auto!important;min-height:100%;overflow-x:hidden!important;overflow-y:auto!important;overscroll-behavior-y:auto!important;touch-action:auto!important}
+ body{height:auto!important;min-height:100dvh;overflow-x:hidden!important;overflow-y:visible!important;overscroll-behavior-y:auto!important;touch-action:auto!important;-webkit-overflow-scrolling:touch}
+ .app,main,.page.active{height:auto;overflow-y:visible;touch-action:pan-y}
  #trading,#trading>*{min-width:0;max-width:100%}
  .trading-page-tools{margin-bottom:10px}
  .trading-hero-grid{gap:14px}
@@ -926,6 +927,12 @@ select,input,.search{width:100%;min-width:0;height:46px;padding:0 12px;border-ra
  .trading-bottom-grid{gap:14px;margin-top:14px}
  dialog[open]{overscroll-behavior:contain}
  .modal{touch-action:pan-y;-webkit-overflow-scrolling:touch}
+}
+
+/* v7.9.1 mobile scroll recovery: never let refresh preservation or gesture containment lock the document scroller */
+@media(max-width:1024px){
+ #trading{overflow:visible!important;overscroll-behavior-y:auto!important;touch-action:pan-y!important}
+ #trading .panel,#trading .hero-card,#trading .trading-hero-grid,#trading .trading-bottom-grid{touch-action:pan-y}
 }
 
 @media(max-width:680px){

@@ -907,7 +907,7 @@ function renderAll(){
 function renderAllPreservingScroll(){
  const left=window.scrollX,top=window.scrollY;
  renderAll();
- requestAnimationFrame(()=>window.scrollTo({left,top,behavior:"auto"}));
+ if(!window.matchMedia("(max-width:1024px)").matches)requestAnimationFrame(()=>window.scrollTo({left,top,behavior:"auto"}));
 }
 
 function openSimple(title,fields,callback){

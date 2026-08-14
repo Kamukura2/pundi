@@ -1,4 +1,6 @@
-# CVFinance v7.9.0
+# CVFinance v7.9.1
+
+v7.9.1 restores native vertical document scrolling on phones and tablets. Mobile background/realtime renders no longer call `scrollTo`, the root document owns the vertical scroll again, and Trading cards explicitly allow vertical pan gestures. All v7.9.0 Trading behavior remains unchanged.
 
 v7.9.0 compacts the complete Trading workspace for phones and tablets, keeps financial values in stable grids, reduces the quote-source badge, and stops realtime/background refreshes from forcing the mobile page back to the top. Sell keeps the API quote as its default but accepts any user-entered execution price, then updates the position, Trading wallet, ledger, and P/L immediately. Total Gain/Loss is now the accumulated realized P/L from Trading sells only, with a sold-cost-basis percentage and a separate Last Sell P/L tile; Investment never enters either number. A confirmed Reset All Trading action removes only Trading positions, wallet entries, ledger, targets, and snapshots for safe testing.
 
