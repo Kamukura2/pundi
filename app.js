@@ -242,15 +242,15 @@ function attachTips(){
 }
 function toastMsg(x){toast.textContent=x;toast.classList.add("show");setTimeout(()=>toast.classList.remove("show"),1400)}
 function setTheme(t){state.theme=t;document.documentElement.dataset.theme=t;localStorage.setItem("cvfinance-theme-cache",t);saveSettings();themeBtn.textContent=t==="dark"?"☀":"☾"}
-function switchPage(p){
+function switchPage(p,{preserveScroll=false}={}){
  state.page=p;
  qa(".page").forEach(x=>x.classList.toggle("active",x.id===p));
  qa("[data-page]").forEach(x=>x.classList.toggle("active",x.dataset.page===p));
  const map={accumulation:["FINANCIAL COMMAND CENTER","Accumulation"],cashflow:["HISTORICAL RECORD","History"],expenses:["EDITABLE BUDGET & COSTS","Expenses"],clients:["RETAINERS & RECEIVABLES","Clients"],stocks:["LONG-TERM PORTFOLIO & TARGETS","Investment"],trading:["ACTIVE PORTFOLIO & PERFORMANCE","Trading"],electricity:["UTILITY COST MONITOR","Electricity"],prospect:["READ-ONLY FUTURE PROJECTION","Prospect"],insights:["INFOGRAPHIC SUMMARY","Insights"]};
  kicker.textContent=map[p][0]; title.textContent=map[p][1];
  applyLanguage();
- if(p==="trading"&&stockRefreshStarted)queueMicrotask(()=>refreshTradingPrices({silent:true}));
- if(window.matchMedia("(max-width:1024px)").matches)window.scrollTo({top:0,left:0,behavior:"auto"});
+ if(p==="trading"&&stockRefreshStarted&&!preserveScroll)queueMicrotask(()=>refreshTradingPrices({silent:true}));
+ if(window.matchMedia("(max-width:1024px)").matches&&!preserveScroll)window.scrollTo({top:0,left:0,behavior:"auto"});
 }
 
 function renderAccumulation(){
@@ -636,17 +636,22 @@ function recordTradingOpeningSnapshot(position,date){
 
 function renderTrading(){
  const metrics=tradingStats();
- const totalPct=metrics.externalFlows?metrics.totalPl/Math.abs(metrics.externalFlows)*100:0;
- tradingEquity.textContent=fmt(metrics.equity);
- tradingContributions.textContent=fmt(metrics.externalFlows);
- tradingTotalPl.textContent=`${metrics.totalPl>=0?"+":""}${fmt(metrics.totalPl)} · ${totalPct>=0?"+":""}${totalPct.toFixed(2)}%`;
- tradingRealizedPl.textContent=`${metrics.realized>=0?"+":""}${fmt(metrics.realized)}`;
- tradingUnrealizedPl.textContent=`${metrics.unrealized>=0?"+":""}${fmt(metrics.unrealized)}`;
- [tradingTotalPl,tradingRealizedPl,tradingUnrealizedPl].forEach((el,index)=>{const value=[metrics.totalPl,metrics.realized,metrics.unrealized][index];el.className=`private ${value<0?"negative":value>0?"positive":""}`;});
- tradingCashIdr.textContent=fmt(metrics.wallet.idr);
+ const compactMobile=window.matchMedia("(max-width:680px)").matches;
+ const money=value=>fmt(value,compactMobile);
+ const latestSell=[...state.tradingLedger].filter(row=>row.type==="sell").sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.__createdAt||"").localeCompare(String(a.__createdAt||"")))[0];
+ const lastSellPl=Number(latestSell?.realizedPlIdr||0);
+ tradingEquity.textContent=money(metrics.equity);
+ tradingContributions.textContent=money(metrics.externalFlows);
+ tradingTotalPl.textContent=`${metrics.realized>=0?"+":""}${money(metrics.realized)} · ${metrics.realizedReturn>=0?"+":""}${metrics.realizedReturn.toFixed(2)}%`;
+ tradingRealizedPl.textContent=latestSell?`${lastSellPl>=0?"+":""}${money(lastSellPl)}`:"—";
+ tradingUnrealizedPl.textContent=`${metrics.unrealized>=0?"+":""}${money(metrics.unrealized)}`;
+ [tradingTotalPl,tradingRealizedPl,tradingUnrealizedPl].forEach((el,index)=>{const value=[metrics.realized,lastSellPl,metrics.unrealized][index];el.className=`private ${value<0?"negative":value>0?"positive":""}`;});
+ tradingCashIdr.textContent=money(metrics.wallet.idr);
  tradingCashUsd.textContent=new Intl.NumberFormat("en-US",{style:"currency",currency:"USD",maximumFractionDigits:2}).format(metrics.wallet.usd);
- tradingCashUsdIdr.textContent=fmt(metrics.wallet.usd*Number(state.usdIdr||0));
- tradingQuoteSource.textContent=state.tradingQuoteMeta?.coverage||"TWELVE DATA PRIMARY · FINNHUB BACKUP";
+ tradingCashUsdIdr.textContent=money(metrics.wallet.usd*Number(state.usdIdr||0));
+ const fullCoverage=state.tradingQuoteMeta?.coverage||"TWELVE DATA PRIMARY · FINNHUB BACKUP";
+ tradingQuoteSource.textContent=compactMobile?fullCoverage.replace(/\s+PRIMARY/gi,"").replace(/\s+BACKUP/gi,""):fullCoverage;
+ tradingQuoteSource.title=fullCoverage;
 
  const snapshots=performancePreview(state.tradingSnapshots,metrics,state.spyQuote?.price,new Date());
  const series=performanceSeries(snapshots,state.tradingRange||"YTD",new Date());
@@ -667,7 +672,7 @@ function renderTrading(){
   const quoteTime=position.priceAsOf?new Date(position.priceAsOf).toLocaleString("en-GB",{dateStyle:"medium",timeStyle:"short"}):"Waiting for API quote";
   const status=position.priceStatus||"saved";
   const currentUsd=new Intl.NumberFormat("en-US",{style:"currency",currency:position.currency||"USD",minimumFractionDigits:2,maximumFractionDigits:4}).format(Number(position.current||0));
-  return `<article class="trading-position-card" data-trading-position="${position.id}"><div class="trading-position-head"><div><h4>${escapeHtml(position.ticker)}</h4><small>${position.market} · ${position.currency} · ${Number(position.quantity).toLocaleString("en-US",{maximumFractionDigits:6})} shares</small></div><span class="trading-position-state ${isPriceStale(position)?"stale":""}">${escapeHtml(status)}</span></div><div class="trading-current-price"><small>CURRENT PRICE</small><strong class="private">${currentUsd}</strong></div><div class="trading-position-value"><span><small>POSITION VALUE</small><b class="private">${fmt(value)}</b></span><span class="${pl<0?"negative":pl>0?"positive":""}"><b class="private">${pl>=0?"+":""}${fmt(pl)}</b><small>${pct>=0?"+":""}${pct.toFixed(2)}%</small></span></div><div class="trading-position-meta"><span><small>AVG / SHARE</small><b>${plainNumber(position.avg)}</b></span><span><small>TARGET PRICE</small><b>${position.targetPrice?plainNumber(position.targetPrice):"—"}</b></span><span><small>INVESTED</small><b class="private">${fmt(cost)}</b></span></div><div class="trading-position-actions"><button class="buy" type="button" data-trading-buy="${position.id}">BUY MORE</button><button class="sell" type="button" data-trading-sell="${position.id}" ${Number(position.quantity)<=0?"disabled":""}>SELL</button><button class="delete" type="button" data-trading-delete="${position.id}">DELETE</button></div><small class="price-time">${escapeHtml(quoteTime)}</small></article>`;
+  return `<article class="trading-position-card" data-trading-position="${position.id}"><div class="trading-position-head"><div><h4>${escapeHtml(position.ticker)}</h4><small>${position.market} · ${position.currency} · ${Number(position.quantity).toLocaleString("en-US",{maximumFractionDigits:6})} shares</small></div><span class="trading-position-state ${isPriceStale(position)?"stale":""}">${escapeHtml(status)}</span></div><div class="trading-current-price"><small>CURRENT PRICE</small><strong class="private">${currentUsd}</strong></div><div class="trading-position-value"><span><small>POSITION VALUE</small><b class="private">${money(value)}</b></span><span class="${pl<0?"negative":pl>0?"positive":""}"><b class="private">${pl>=0?"+":""}${money(pl)}</b><small>${pct>=0?"+":""}${pct.toFixed(2)}%</small></span></div><div class="trading-position-meta"><span><small>AVG / SHARE</small><b>${plainNumber(position.avg)}</b></span><span><small>TARGET PRICE</small><b>${position.targetPrice?plainNumber(position.targetPrice):"—"}</b></span><span><small>INVESTED</small><b class="private">${money(cost)}</b></span></div><div class="trading-position-actions"><button class="buy" type="button" data-trading-buy="${position.id}">BUY MORE</button><button class="sell" type="button" data-trading-sell="${position.id}" ${Number(position.quantity)<=0?"disabled":""}>SELL</button><button class="delete" type="button" data-trading-delete="${position.id}">DELETE</button></div><small class="price-time">${escapeHtml(quoteTime)}</small></article>`;
  }).join(""):`<div class="trading-empty"><b>No active Trading position</b><span>Add one only when you want to track a separate trading portfolio.</span></div>`;
 
  const ledger=[...state.tradingLedger].sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.__createdAt||"").localeCompare(String(a.__createdAt||"")));
@@ -676,10 +681,10 @@ function renderTrading(){
   const native=Math.abs(Number(row.quantity||0)*Number(row.price||0));
   const amountIdr=row.type==="deposit"||row.type==="withdraw"?Math.abs(Number(row.externalFlowIdr||0)):native*(row.currency==="USD"?Number(row.fxRate||state.usdIdr):1);
   const label={opening:"OPEN",deposit:"FUNDS",withdraw:"WITHDRAW",buy:"BUY",sell:"SELL"}[row.type]||row.type.toUpperCase();
-  return `<div class="trading-ledger-row ${row.type}"><i>${row.type==="sell"?"↗":row.type==="buy"||row.type==="opening"?"↘":row.type==="deposit"?"+":"−"}</i><div><b>${label}${row.ticker?` · ${escapeHtml(row.ticker)}`:""}</b><small>${row.date}${row.quantity?` · ${Number(row.quantity).toLocaleString("en-US",{maximumFractionDigits:6})} @ ${plainNumber(row.price)} ${row.currency}`:""}</small></div><strong class="private">${row.type==="buy"?"−":row.type==="sell"?"+":""}${fmt(amountIdr)}${row.realizedPlIdr?`<small class="${row.realizedPlIdr<0?"negative":"positive"}">P/L ${row.realizedPlIdr>=0?"+":""}${fmt(row.realizedPlIdr)}</small>`:""}</strong></div>`;
+  return `<div class="trading-ledger-row ${row.type}"><i>${row.type==="sell"?"↗":row.type==="buy"||row.type==="opening"?"↘":row.type==="deposit"?"+":"−"}</i><div><b>${label}${row.ticker?` · ${escapeHtml(row.ticker)}`:""}</b><small>${row.date}${row.quantity?` · ${Number(row.quantity).toLocaleString("en-US",{maximumFractionDigits:6})} @ ${plainNumber(row.price)} ${row.currency}`:""}</small></div><strong class="private">${row.type==="buy"?"−":row.type==="sell"?"+":""}${money(amountIdr)}${row.realizedPlIdr?`<small class="${row.realizedPlIdr<0?"negative":"positive"}">P/L ${row.realizedPlIdr>=0?"+":""}${money(row.realizedPlIdr)}</small>`:""}</strong></div>`;
  }).join(""):`<div class="trading-empty"><b>No Trading records yet</b><span>Deposits, withdrawals, buys and sells remain permanently recorded here.</span></div>`;
 
- tradingPlanList.innerHTML=state.tradingPositions.length?state.tradingPositions.map(position=>{const sim=tradingTargetSimulation(position,position.targetPrice,state.usdIdr),active=sim.target>0;return `<div class="trading-target-row"><div class="trading-target-title"><strong>${escapeHtml(position.ticker)}</strong><small>${Number(position.quantity).toLocaleString("en-US",{maximumFractionDigits:6})} shares · avg ${plainNumber(position.avg)}</small></div><label>TARGET PRICE (${position.currency})<input type="number" step=".01" min="0" data-trading-target data-position-id="${position.id}" value="${Number(position.targetPrice||0)||""}" placeholder="Enter target price"></label><span><small>PROJECTED P/L</small><b class="private ${active?(sim.projectedPlIdr<0?"negative":"positive"):""}">${active?`${sim.projectedPlIdr>=0?"+":""}${fmt(sim.projectedPlIdr)} · ${sim.projectedReturn>=0?"+":""}${sim.projectedReturn.toFixed(2)}%`:"—"}</b></span><span><small>PROJECTED VALUE</small><b class="private">${active?fmt(sim.projectedValueIdr):"—"}</b></span></div>`;}).join(""):`<div class="trading-empty"><b>No target price yet</b><span>Add a position, then enter one target price to simulate its result.</span></div>`;
+ tradingPlanList.innerHTML=state.tradingPositions.length?state.tradingPositions.map(position=>{const sim=tradingTargetSimulation(position,position.targetPrice,state.usdIdr),active=sim.target>0;return `<div class="trading-target-row"><div class="trading-target-title"><strong>${escapeHtml(position.ticker)}</strong><small>${Number(position.quantity).toLocaleString("en-US",{maximumFractionDigits:6})} shares · avg ${plainNumber(position.avg)}</small></div><label>TARGET PRICE (${position.currency})<input type="number" step="any" min="0" inputmode="decimal" data-trading-target data-position-id="${position.id}" value="${Number(position.targetPrice||0)||""}" placeholder="Enter target price"></label><span><small>PROJECTED P/L</small><b class="private ${active?(sim.projectedPlIdr<0?"negative":"positive"):""}">${active?`${sim.projectedPlIdr>=0?"+":""}${fmt(sim.projectedPlIdr)} · ${sim.projectedReturn>=0?"+":""}${sim.projectedReturn.toFixed(2)}%`:"—"}</b></span><span><small>PROJECTED VALUE</small><b class="private">${active?fmt(sim.projectedValueIdr):"—"}</b></span></div>`;}).join(""):`<div class="trading-empty"><b>No target price yet</b><span>Add a position, then enter one target price to simulate its result.</span></div>`;
  qa("[data-trading-target]").forEach(input=>{
   const updateLocal=()=>{const position=state.tradingPositions.find(row=>row.id===input.dataset.positionId);if(position)position.targetPrice=Math.max(0,Number(input.value||0));};
   input.oninput=updateLocal;
@@ -704,14 +709,14 @@ function openTradingCash(type,currency="USD"){
 function openTradingExecution(positionId,type){
  const position=state.tradingPositions.find(row=>row.id===positionId);if(!position)return;
  openSimple(type==="sell"?`Sell ${position.ticker}`:`Buy More ${position.ticker}`,[
-  {key:"quantity",label:`Shares${type==="sell"?` · max ${plainNumber(position.quantity)}`:""}`,type:"number",step:".000001",value:type==="sell"?position.quantity:""},
-  {key:"price",label:`Execution Price / Share (${position.currency})`,type:"number",step:".01",value:position.current},
-  {key:"fxRate",label:"USD/IDR Rate Used",type:"number",step:".01",value:state.usdIdr},
+  {key:"quantity",label:`Shares${type==="sell"?` · max ${plainNumber(position.quantity)}`:""}`,type:"number",step:"any",inputmode:"decimal",value:type==="sell"?position.quantity:""},
+  {key:"price",label:`Execution Price / Share (${position.currency}) · editable`,type:"number",step:"any",inputmode:"decimal",value:position.current},
+  {key:"fxRate",label:"USD/IDR Rate Used",type:"number",step:"any",inputmode:"decimal",value:state.usdIdr},
   {key:"date",label:"Execution Date",type:"date",value:todayISO()}
  ],values=>{
   const wallet=tradingStats().wallet,nativeCost=Number(values.quantity)*Number(values.price);
   if(type==="buy"&&nativeCost>Number(position.currency==="USD"?wallet.usd:wallet.idr)+1e-8){alert(`Insufficient ${position.currency} Trading wallet. Add funds first.`);return false;}
-  try{const entry=applyTrade({position,type,quantity:values.quantity,price:values.price,date:values.date,fxRate:values.fxRate,id:createId()});entry.__createdAt=new Date().toISOString();state.tradingLedger.push(entry);position.current=Number(values.price);position.manualCurrent=Number(values.price);position.priceSource="execution";position.priceStatus=type==="sell"?"sold":"manual";position.priceAsOf=new Date().toISOString();recordTradingSnapshot();}catch(error){alert(error.message);return false;}
+  try{const entry=applyTrade({position,type,quantity:values.quantity,price:values.price,date:values.date,fxRate:values.fxRate,id:createId()});entry.__createdAt=new Date().toISOString();state.tradingLedger.push(entry);position.current=Number(values.price);position.manualCurrent=Number(values.price);position.priceSource="execution";position.priceStatus=type==="sell"?"sold":"manual";position.priceAsOf=new Date().toISOString();recordTradingSnapshot();return {message:type==="sell"?`SELL ${position.ticker} recorded · P/L ${entry.realizedPlIdr>=0?"+":""}${fmt(entry.realizedPlIdr)}`:`BUY ${position.ticker} recorded`};}catch(error){alert(error.message);return false;}
  });
 }
 
@@ -862,7 +867,7 @@ function renderInsights(){
   {asset:"electricity",tone:electricDelta>5?"red":electricDelta<-5?"green":"blue",eyebrow:"Electricity trend",title:!latestElectric?"More readings needed":electricDelta<-5?"Electricity is decreasing — good job!":electricDelta>5?"Electricity usage is rising":"Electricity is stable",text:latestElectric?`Latest pace is ${latestElectric.daily.toFixed(1)} kWh/day (${electricDelta>=0?"+":""}${electricDelta.toFixed(1)}% versus the prior interval).`:"Add at least two readings to unlock a usage trend."},
   {asset:"calendar",tone:expenseDelta>5?"red":expenseDelta<-5?"green":"orange",eyebrow:"History trend",title:previousExpense?`Recorded expense ${expenseDelta>=0?"rose":"fell"} ${Math.abs(expenseDelta).toFixed(0)}%`:"Expense baseline is building",text:`History recorded ${fmt(thisExpense)} this month. It updates pacing only and is not deducted twice.`},
   {asset:"stocks",tone:pl<0?"red":"green",eyebrow:"Investment P/L",title:`${pl<0?"Down":"Up"} ${fmt(Math.abs(pl))} · ${percent(pl,holdingsInvested,{absolute:true})}`,text:`Investment holdings are ${fmt(holdingsPortfolio())} against ${fmt(holdingsInvested)} invested. Optional Netcash and Wallet are assets, not P/L.`},
-  {asset:"stocks",tone:activeTrading.totalPl<0?"red":activeTrading.totalPl>0?"green":"blue",eyebrow:"Trading performance",title:state.tradingLedger.length?`${activeTrading.totalPl<0?"Down":"Up"} ${fmt(Math.abs(activeTrading.totalPl))} · alpha ${tradingAlpha>=0?"+":""}${tradingAlpha.toFixed(2)}%`:"Trading is optional",text:state.tradingLedger.length?`Realized ${fmt(activeTrading.realized)}, unrealized ${fmt(activeTrading.unrealized)}. Deposits and withdrawals are excluded from gain/loss.`:"Add a Trading position only when you want a separate active portfolio."}
+  {asset:"stocks",tone:activeTrading.realized<0?"red":activeTrading.realized>0?"green":"blue",eyebrow:"Trading performance",title:closedTrades.length?`${activeTrading.realized<0?"Realized loss":"Realized gain"} ${fmt(Math.abs(activeTrading.realized))} · alpha ${tradingAlpha>=0?"+":""}${tradingAlpha.toFixed(2)}%`:"Trading is optional",text:state.tradingLedger.length?`Accumulated realized P/L is ${fmt(activeTrading.realized)}; open-position unrealized P/L is ${fmt(activeTrading.unrealized)}. Investment data is excluded.`:"Add a Trading position only when you want a separate active portfolio."}
  ];
  insightCards.innerHTML=insightData.map(x=>`<article class="story-card ${x.tone} insight-${x.asset}"><img src="/assets/insights/${x.asset}.png" alt="" loading="lazy"><div><small>${x.eyebrow}</small><h3>${x.title}</h3><p>${x.text}</p></div></article>`).join("");
  const operatingMargin=operating.income?operating.net/operating.income*100:0;
@@ -899,12 +904,18 @@ function renderAll(){
  applyLanguage();
 }
 
+function renderAllPreservingScroll(){
+ const left=window.scrollX,top=window.scrollY;
+ renderAll();
+ requestAnimationFrame(()=>window.scrollTo({left,top,behavior:"auto"}));
+}
+
 function openSimple(title,fields,callback){
  simpleTitle.textContent=title;
  simpleFields.innerHTML=fields.map(f=>{
   const input=f.options
    ? `<select id="sf_${f.key}">${f.options.map(o=>`<option ${String(o)===String(f.value)?'selected':''}>${o}</option>`).join("")}</select>`
-   : `<input id="sf_${f.key}" type="${f.type||'text'}" ${f.step?`step="${f.step}"`:''} ${f.value!==undefined?`value="${f.value}"`:''} ${f.required===false?'':'required'}>`;
+   : `<input id="sf_${f.key}" type="${f.type||'text'}" ${f.step?`step="${f.step}"`:''} ${f.inputmode?`inputmode="${f.inputmode}"`:''} ${f.value!==undefined?`value="${f.value}"`:''} ${f.required===false?'':'required'}>`;
   return `<label>${f.label}${input}</label>`;
  }).join("");
  simpleForm.onsubmit=(e)=>{
@@ -914,9 +925,10 @@ function openSimple(title,fields,callback){
    const el=q("#sf_"+f.key);
    obj[f.key]=f.type==="number"?Number(el.value):el.value;
   });
-  if(callback(obj)===false)return;
+  const result=callback(obj);
+  if(result===false)return;
   simpleModal.close();
-  save(); renderAll(); toastMsg("Saved");
+  save(); renderAll(); toastMsg(typeof result==="string"?result:result?.message||"Saved");
  };
  simpleModal.showModal();
 }
@@ -1102,7 +1114,7 @@ async function refreshTradingPrices({silent=false,force=false}={}){
   }catch{}
   if(lastCoverage)state.tradingQuoteMeta={coverage:lastCoverage,asOf:new Date().toISOString()};
   recordTradingSnapshot();
-  await save({background:silent});if(!hasActiveEditor())renderAll();
+  await save({background:silent});if(!hasActiveEditor())renderAllPreservingScroll();
   if(!silent)toastMsg(`${updated} Trading price${updated===1?"":"s"} updated${failed?`, ${failed} saved fallback`:""} · SPY compared`);
  })().finally(()=>{if(typeof refreshTradingBtn!=="undefined")refreshTradingBtn.disabled=false;tradingRefreshPromise=null;});
  return tradingRefreshPromise;
@@ -1302,7 +1314,7 @@ function applyCloudState(next,{preserveUi=false}={}){
  localStorage.setItem("cvfinance-language-cache",state.language||"en");
  themeBtn.textContent=state.theme==="dark"?"☀":"☾";
  baseGrowth.value=state.baseGrowth;optimisticGrowth.value=state.optimisticGrowth;
- updateModeToggleLabels();renderAll();switchPage(state.page);
+ updateModeToggleLabels();renderAllPreservingScroll();switchPage(state.page,{preserveScroll:true});
 }
 
 function updateSyncStatus(info){
@@ -1379,6 +1391,13 @@ seedDataBtn.onclick=async()=>{
 logoutBtn.onclick=()=>{if(fxRefreshTimer)clearInterval(fxRefreshTimer);if(tradingRefreshTimer)clearInterval(tradingRefreshTimer);syncManager.signOut();};
 refreshStocksBtn.onclick=()=>refreshMarkets();
 refreshTradingBtn.onclick=()=>refreshTradingPrices({force:true});
+q("#resetTradingBtn").onclick=()=>{
+ const count=state.tradingPositions.length+state.tradingLedger.length+state.tradingSnapshots.length;
+ if(!count)return toastMsg("Trading is already empty");
+ if(!confirm("Reset ALL Trading data?\n\nThis deletes Trading positions, wallet entries, buy/sell records, targets, and performance snapshots. Investment and every other tab stay untouched."))return;
+ state.tradingPositions=[];state.tradingLedger=[];state.tradingSnapshots=[];state.spyQuote=null;state.tradingQuoteMeta=null;
+ save();renderAll();toastMsg("All Trading test data reset");
+};
 refreshFxBtn.onclick=()=>refreshExchangeRate({force:true});
 editFxBtn.onclick=()=>openSimple("Set USD/IDR manually",[
  {key:"rate",label:"1 USD in IDR",type:"number",step:".01",value:Number(state.usdIdr||DEFAULT_USD_IDR)}

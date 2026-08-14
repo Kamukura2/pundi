@@ -137,6 +137,8 @@ assert.equal(tradeMetrics.totalPl,1600000,"Trading withdrawals must not become l
 tradingLedger.push(applyTrade({position:tradePosition,type:"sell",quantity:1,price:700,date:"2026-02-02",fxRate:16000,id:"sell1"}));
 tradeMetrics=tradingMetrics({positions:[tradePosition],ledger:tradingLedger,fxRate:16000});
 assert.equal(tradeMetrics.realized,3200000,"Sell execution must realize P/L using the stored cost basis and FX rate");
+assert.equal(tradeMetrics.realizedCost,8000000,"Realized return must use only the sold Trading cost basis");
+assert.equal(tradeMetrics.realizedReturn,40,"Accumulated Trading gain/loss percentage must be realized-only");
 const snapshots=[];upsertDailySnapshot(snapshots,{equity:16000000,externalFlows:16000000,holdingsValue:16000000,cashValue:0},500,"2026-01-02");
 upsertDailySnapshot(snapshots,{equity:17600000,externalFlows:16000000,holdingsValue:17600000,cashValue:0},550,"2026-02-02");
 const comparison=performanceSeries(snapshots,"ALL",new Date("2026-02-02"));
@@ -271,6 +273,10 @@ assert.match(app, /Portfolio vs S&amp;P 500 \/ SPY|tradingPerformanceChart/);
 assert.match(app, /Investment Stocks[\s\S]*Trading Stocks/);
 assert.match(app, /externalFlows/);
 assert.match(app, /openTradingExecution/);
+assert.match(app, /Execution Price \/ Share[\s\S]*step:"any"/, "Sell execution price must accept a freely typed manual value");
+assert.match(app, /#resetTradingBtn[\s\S]*state\.tradingPositions=\[\];state\.tradingLedger=\[\];state\.tradingSnapshots=\[\]/, "Reset All must clear only the isolated Trading workspace");
+assert.match(app, /tradingTotalPl\.textContent=`\$\{metrics\.realized/, "Trading Total Gain\/Loss must use accumulated realized P\/L only");
+assert.match(app, /switchPage\(state\.page,\{preserveScroll:true\}\)/, "Realtime sync must not force mobile Trading back to the top");
 assert.match(app, /performancePreview\(state\.tradingSnapshots,metrics,state\.spyQuote\?\.price/, "Trading benchmark must render a current preview without waiting for a sell");
 assert.match(app, /spyCurrentPrice\.textContent/, "Current SPY API price must be visible");
 assert.match(app, /data-trading-target/, "Trading target price must be directly editable");
@@ -298,4 +304,4 @@ assert.match(syncSource, /this\.pendingPersists/, "Realtime reloads must wait fo
 assert.match(syncSource, /await this\.repository\.loadCloud\(\);\s*result = await this\.repository\.save\(snapshot\)/, "Transient optimistic-lock conflicts must retry the unchanged local snapshot");
 assert.doesNotMatch(syncSource, /if \(\/conflict\/i\.test\(error\.message \|\| \"\"\)\) \{\s*const cloud[\s\S]*this\.onState\(cloud\)/, "A sync conflict must never overwrite unsaved local target input");
 
-console.log("CVFinance checks passed: schema, RLS markers, PWA, 9 tabs, v7.8.3 stable Trading target sync, conflict retry without local rollback, quiet background quote refresh, readable target simulation, withdrawal-neutral P/L, realized sell gains, same-day SPY comparison, visible SPY API quote, safe ticker deletion, Twelve Data primary quotes, Finnhub fallback, separate Investment and Trading assets in Prospect, Trading Insights, PAID-or-nominal client cards, persistent transaction templates, monthly History archives, Financial Action Plan isolation, Yahoo FX validation, offline queue coalescing, and JavaScript syntax.");
+console.log("CVFinance checks passed: schema, RLS markers, PWA, 9 tabs, v7.9.0 compact mobile Trading, stable vertical scroll, unrestricted manual Sell price, isolated Reset All, immediate sell feedback, realized-only accumulated Trading gain/loss, stable target sync, same-day SPY comparison, visible SPY API quote, safe ticker deletion, Twelve Data primary quotes, Finnhub fallback, separate Investment and Trading assets in Prospect, Trading Insights, PAID-or-nominal client cards, persistent transaction templates, monthly History archives, Financial Action Plan isolation, Yahoo FX validation, offline queue coalescing, and JavaScript syntax.");

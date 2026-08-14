@@ -909,3 +909,124 @@ select,input,.search{width:100%;min-width:0;height:46px;padding:0 12px;border-ra
 .trading-bottom-grid>.panel:has(#tradingPlanList) .panel-head p{font-size:11px;letter-spacing:.11em}.trading-bottom-grid>.panel:has(#tradingPlanList) .panel-head h3{font-size:clamp(25px,2.25vw,34px)}.trading-bottom-grid>.panel:has(#tradingPlanList) .pill{font-size:12px;padding:9px 13px}
 .trading-target-row{min-height:104px;padding:17px;gap:14px}.trading-target-title strong{font-size:27px}.trading-target-title small{margin-top:7px;font-size:14px;line-height:1.35}.trading-target-row label{font-size:11px;line-height:1.3}.trading-target-row input{min-height:50px;margin-top:8px;padding:12px 14px;font-size:18px}.trading-target-row input::placeholder{font-size:14px}.trading-target-row>span{min-height:72px;padding:13px 14px}.trading-target-row>span small{font-size:10px;line-height:1.3}.trading-target-row>span b{margin-top:8px;font-size:17px;line-height:1.3}
 @media(max-width:720px){.trading-target-title strong{font-size:24px}.trading-target-title small{font-size:13px}.trading-target-row input{font-size:17px}.trading-target-row>span b{font-size:16px}}
+
+/* v7.9.0 compact mobile Trading, stable vertical scroll and testing reset */
+.trading-page-tools{display:flex;justify-content:flex-end;margin:0 0 12px}.trading-page-tools .danger-btn{font-weight:900}
+
+@media(max-width:1024px){
+ html,body{overscroll-behavior-y:none}
+ body{touch-action:pan-y}
+ #trading,#trading>*{min-width:0;max-width:100%}
+ .trading-page-tools{margin-bottom:10px}
+ .trading-hero-grid{gap:14px}
+ .trading-equity-hero,.trading-benchmark-panel{min-height:0}
+ .trading-equity-hero{padding:20px}
+ .trading-equity-hero .hero-value{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .trading-wallet-panel,.trading-positions-panel{margin-top:14px}
+ .trading-bottom-grid{gap:14px;margin-top:14px}
+ dialog[open]{overscroll-behavior:contain}
+ .modal{touch-action:pan-y;-webkit-overflow-scrolling:touch}
+}
+
+@media(max-width:680px){
+ main{padding-bottom:calc(124px + env(safe-area-inset-bottom))}
+ #trading{font-size:12px}
+ .trading-page-tools{margin:-2px 0 9px}
+ .trading-page-tools .danger-btn{height:34px;min-height:34px;padding:0 11px;border-radius:11px;font-size:10px}
+ .trading-hero-grid{gap:10px}
+ .trading-equity-hero{min-height:0!important;padding:15px!important;border-radius:19px}
+ .trading-equity-hero>small{font-size:10px;line-height:1.2}
+ .trading-equity-hero .hero-chip{top:13px;right:13px;padding:5px 7px;font-size:7px}
+ .trading-equity-hero .hero-value{margin:22px 0 12px;font-size:clamp(29px,9.2vw,38px);line-height:.98;letter-spacing:-.065em;white-space:nowrap;overflow:visible;text-overflow:clip}
+ .trading-equity-metrics{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:7px;margin-top:10px}
+ .trading-equity-metrics>span{min-width:0;padding:9px 8px;border-radius:12px}
+ .trading-equity-metrics small{font-size:6.5px;line-height:1.25;letter-spacing:.075em}
+ .trading-equity-metrics b{margin-top:4px;font-size:clamp(11px,3.45vw,14px);line-height:1.18;overflow-wrap:anywhere}
+
+ .trading-benchmark-panel{padding:14px!important;border-radius:19px}
+ .trading-benchmark-panel .panel-head{align-items:center;margin-bottom:9px}
+ .trading-benchmark-panel .panel-head p{font-size:6.5px}
+ .trading-benchmark-panel .panel-head h3{font-size:18px;line-height:1.12}
+ .trading-benchmark-panel .ghost-btn{width:34px;min-width:34px;height:34px;padding:0;border-radius:11px}
+ .benchmark-kpis{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:5px}
+ .benchmark-kpis span{min-width:0;padding:8px 7px;border-radius:11px}
+ .benchmark-kpis small{font-size:6px;letter-spacing:.055em}
+ .benchmark-kpis b{margin-top:3px;font-size:clamp(12px,3.7vw,15px);line-height:1.1;overflow-wrap:anywhere}
+ .benchmark-kpis .spy em{margin-top:4px;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .benchmark-kpis .spy i{font-size:5.8px;line-height:1.2;overflow-wrap:anywhere}
+ .trading-performance-chart{height:155px;min-height:155px;margin-top:7px}
+ .trading-performance-chart .trading-empty{padding:24px 10px}
+ .trading-performance-chart .trading-empty b{font-size:13px}
+ .trading-performance-chart .trading-empty span{font-size:10px}
+ .trading-range-tabs{gap:0;margin-top:2px}
+ .trading-range-tabs button{min-width:0;flex:1;padding:7px 3px;border-radius:9px;font-size:10px}
+
+ .trading-wallet-panel,.trading-positions-panel{margin-top:10px;padding:14px!important;border-radius:19px}
+ .trading-wallet-panel .panel-head{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;margin-bottom:10px}
+ .trading-wallet-panel .panel-head h3,.trading-positions-panel .panel-head h3{font-size:19px}
+ .trading-wallet-panel .head-actions{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:7px;width:100%}
+ #tradingQuoteSource{min-width:0;max-width:100%;padding:6px 8px;border-radius:10px;font-size:7px;line-height:1.2;letter-spacing:.025em;text-align:center;white-space:normal;overflow-wrap:anywhere}
+ #tradingDepositBtn,#addTradingPositionBtn{height:34px;min-height:34px;padding:0 10px;border-radius:11px;font-size:10px;white-space:nowrap}
+ .trading-wallet-grid{grid-template-columns:1fr!important;gap:8px}
+ .trading-wallet-card{grid-template-columns:38px minmax(0,1fr) auto!important;gap:9px;padding:11px;border-radius:15px}
+ .trading-wallet-card .stock-cash-icon{width:38px;height:38px;border-radius:12px;font-size:14px}
+ .trading-wallet-card small{font-size:6.5px;letter-spacing:.07em}
+ .trading-wallet-card strong{margin-top:2px;font-size:18px;line-height:1.05;white-space:nowrap}
+ .trading-wallet-card em{margin-top:2px;font-size:9px}
+ .trading-wallet-card button{grid-column:auto!important;min-height:34px;padding:7px 9px;border-radius:10px;font-size:9px;white-space:nowrap}
+
+ .trading-positions-panel .panel-head{align-items:center;margin-bottom:10px}
+ .trading-position-grid{gap:9px}
+ .trading-position-card{padding:13px;border-radius:17px}
+ .trading-position-head{gap:7px}
+ .trading-position-head h4{font-size:21px;line-height:1}
+ .trading-position-head small{font-size:8px;line-height:1.25}
+ .trading-position-state{max-width:112px;padding:5px 7px;font-size:6.5px;white-space:normal;text-align:center;overflow-wrap:anywhere}
+ .trading-current-price{margin:13px 0 3px}
+ .trading-current-price small{font-size:6.5px}
+ .trading-current-price strong{margin-top:2px;font-size:31px;line-height:1;white-space:nowrap}
+ .trading-position-value{align-items:end;gap:8px;margin:9px 0 11px}
+ .trading-position-value>span{min-width:0}
+ .trading-position-value>span:first-child small{font-size:6px}
+ .trading-position-value>span:first-child b,.trading-position-value b{font-size:12px;overflow-wrap:anywhere}
+ .trading-position-value small{font-size:8px}
+ .trading-position-meta{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:5px}
+ .trading-position-meta span{min-width:0;padding:7px 6px;border-radius:10px}
+ .trading-position-meta small{font-size:5.8px;letter-spacing:.035em}
+ .trading-position-meta b{margin-top:3px;font-size:10px;line-height:1.15;overflow-wrap:anywhere}
+ .trading-position-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin-top:9px}
+ .trading-position-actions button{min-width:0!important;padding:8px 3px;border-radius:10px;font-size:9px}
+ .trading-position-card>.price-time{margin-top:5px;font-size:7.5px;white-space:normal}
+
+ .trading-bottom-grid{gap:10px;margin-top:10px}
+ .trading-bottom-grid>.panel{padding:14px!important;border-radius:19px}
+ .trading-bottom-grid .panel-head{align-items:center;margin-bottom:9px}
+ .trading-bottom-grid .panel-head h3,.trading-bottom-grid>.panel:has(#tradingPlanList) .panel-head h3{font-size:19px}
+ .trading-bottom-grid>.panel:has(#tradingPlanList) .panel-head p{font-size:6.5px}
+ .trading-bottom-grid>.panel:has(#tradingPlanList) .pill,.trading-bottom-grid .pill{padding:6px 8px;font-size:7px}
+ .trading-ledger-list{gap:6px}
+ .trading-ledger-row{grid-template-columns:30px minmax(0,1fr) auto;gap:7px;padding:8px;border-radius:11px}
+ .trading-ledger-row>i{width:30px;height:30px;border-radius:9px;font-size:10px}
+ .trading-ledger-row b{font-size:10px}
+ .trading-ledger-row small{font-size:7.5px;line-height:1.3}
+ .trading-ledger-row strong{max-width:100px;font-size:9px;overflow-wrap:anywhere}
+ .trading-target-row{grid-template-columns:1fr!important;min-height:0;padding:11px;gap:8px;border-radius:13px}
+ .trading-target-title{grid-column:auto!important}
+ .trading-target-title strong{font-size:20px}
+ .trading-target-title small{margin-top:3px;font-size:9px}
+ .trading-target-row label{font-size:7px}
+ .trading-target-row input{min-height:42px;height:42px;margin-top:5px;padding:8px 10px;font-size:15px}
+ .trading-target-row>span{min-height:52px;padding:9px 10px;border-radius:11px}
+ .trading-target-row>span small{font-size:7px}
+ .trading-target-row>span b{margin-top:5px;font-size:12px;overflow-wrap:anywhere}
+ .mobile-nav{height:58px;bottom:calc(7px + env(safe-area-inset-bottom));padding:5px}
+ .mobile-nav button{min-height:46px}
+}
+
+@media(max-width:370px){
+ .trading-equity-hero .hero-value{font-size:28px}
+ .trading-wallet-card{grid-template-columns:34px minmax(0,1fr) auto!important;gap:7px;padding:9px}
+ .trading-wallet-card .stock-cash-icon{width:34px;height:34px}
+ .trading-wallet-card strong{font-size:16px}
+ .trading-wallet-card button{padding:6px 7px;font-size:8px}
+}

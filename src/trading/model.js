@@ -27,11 +27,17 @@ export function tradingMetrics({ positions = [], ledger = [], fxRate = 0 } = {})
   const openCost = positions.reduce((sum, row) => sum + tradingPositionCost(row, fxRate), 0);
   const cashValue = wallet.idr + wallet.usd * n(fxRate);
   const realized = ledger.reduce((sum, row) => sum + n(row.realizedPlIdr), 0);
+  const realizedCost = ledger.reduce((sum, row) => {
+    if (row.type !== "sell") return sum;
+    const saleValueIdr = amountToIdr(n(row.quantity) * n(row.price), row.currency, row.fxRate || fxRate);
+    return sum + Math.max(0, saleValueIdr - n(row.realizedPlIdr));
+  }, 0);
+  const realizedReturn = realizedCost ? realized / realizedCost * 100 : 0;
   const externalFlows = ledger.reduce((sum, row) => sum + n(row.externalFlowIdr), 0);
   const unrealized = holdingsValue - openCost;
   const equity = cashValue + holdingsValue;
   const totalPl = equity - externalFlows;
-  return { wallet, holdingsValue, openCost, cashValue, equity, realized, unrealized, totalPl, externalFlows };
+  return { wallet, holdingsValue, openCost, cashValue, equity, realized, realizedCost, realizedReturn, unrealized, totalPl, externalFlows };
 }
 
 export function applyOpeningPosition({ position, date, fxRate, id }) {

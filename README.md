@@ -1,4 +1,6 @@
-# CVFinance v7.8.3
+# CVFinance v7.9.0
+
+v7.9.0 compacts the complete Trading workspace for phones and tablets, keeps financial values in stable grids, reduces the quote-source badge, and stops realtime/background refreshes from forcing the mobile page back to the top. Sell keeps the API quote as its default but accepts any user-entered execution price, then updates the position, Trading wallet, ledger, and P/L immediately. Total Gain/Loss is now the accumulated realized P/L from Trading sells only, with a sold-cost-basis percentage and a separate Last Sell P/L tile; Investment never enters either number. A confirmed Reset All Trading action removes only Trading positions, wallet entries, ledger, targets, and snapshots for safe testing.
 
 v7.8.3 prevents Trading Target Price edits from being rolled back by a simultaneous background quote refresh or transient Supabase optimistic-lock conflict. Local input remains authoritative, conflicts retry once against freshly loaded cloud metadata, realtime reloads wait for queued local saves, and automatic Trading price refreshes no longer flash the global Saving state or replace an active editor. Target Price Simulation typography, inputs, projected P/L, and projected value are enlarged for clearer desktop and mobile reading.
 
