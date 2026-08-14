@@ -222,3 +222,29 @@ export function removeTradingPositionData({ positions = [], ledger = [], snapsho
     removedLedgerCount:affected.length
   };
 }
+
+export function removeTradingLedgerEntry({ positions = [], ledger = [], snapshots = [] } = {}, ledgerId) {
+  const removed = ledger.find(row => row.id === ledgerId);
+  if (!removed) return { positions:[...positions], ledger:[...ledger], snapshots:[...snapshots], removed:null };
+  const nextLedger = ledger.filter(row => row.id !== ledgerId);
+  let nextPositions = positions.map(row => ({ ...row }));
+  if (removed.positionId) {
+    const linked = nextLedger.filter(row => row.positionId === removed.positionId);
+    if (!linked.some(row => row.type === "opening")) {
+      nextPositions = nextPositions.filter(row => row.id !== removed.positionId);
+    } else {
+      reconcileTradingPositions(nextPositions, nextLedger);
+      nextPositions = nextPositions.filter(position => {
+        if (position.id !== removed.positionId) return true;
+        return n(position.quantity) > 1e-9 || !linked.some(row => row.type === "sell");
+      });
+    }
+  }
+  const removedDate = String(removed.date || "");
+  return {
+    positions:nextPositions,
+    ledger:nextLedger,
+    snapshots:removedDate ? snapshots.filter(row => String(row.date || "") < removedDate) : [...snapshots],
+    removed
+  };
+}

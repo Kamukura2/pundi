@@ -29,6 +29,14 @@ assert.doesNotMatch(index, /id="cashIncome"|id="cashExpense"|id="cashNet"/, "The
 assert.match(index, /id="cashChannelDonut"/);
 assert.match(index, /id="cashChannelLegend"/);
 assert.ok(index.indexOf('id="txDescription"') < index.indexOf('id="txAmount"'), "Transaction Description must appear above Amount");
+assert.match(index,/data-page="clients"[^>]*>[\s\S]*?<span>Income<\/span>/,"Desktop navigation must expose Income as the parent category");
+assert.match(index,/class="segmented workspace-tabs income-workspace-tabs"/,"Income must have a Stocks-style Clients subcategory switcher");
+assert.match(index,/class="segmented workspace-tabs history-workspace-tabs"/,"History filters must share the Stocks workspace tab design");
+assert.match(index,/id="sideAvailableBalance"/,"Desktop sidebar must show Accumulation Available Balance above projections");
+const mobileNav=index.slice(index.indexOf('<nav class="mobile-nav"'),index.indexOf('</nav>',index.indexOf('<nav class="mobile-nav"')));
+assert.equal((mobileNav.match(/<button/g)||[]).length,9,"Mobile navigation must expose all eight destinations plus the center transaction action");
+for(const marker of ["accumulation","cashflow","clients","expenses","stocks","electricity","insights","prospect"])assert.match(mobileNav,new RegExp(`data-page="${marker}"`));
+assert.match(css,/v8\.1\.0 mobile workspace redesign and navigation unification/);
 
 const sql = read("supabase/migrations/001_initial_schema.sql");
 for (const table of ["profiles","accounts","transactions","monthly_budgets","yearly_expenses","planned_events","credit_facilities","credit_items","clients","stock_holdings","stock_price_targets","electricity_readings","app_settings"]) {
@@ -158,7 +166,7 @@ assert.equal(duplicateDividendState.dividends.length,1);assert.ok(Math.abs(dupli
 assert.equal(reverseDividendCredit(duplicateDividendState,duplicateDividendState.dividends[0],new Date("2026-08-14T00:00:00Z")),true);
 assert.ok(Math.abs(duplicateDividendState.stockExtras.netcashIdr)<.02,"Cancelling a dividend credit must reverse its exact wallet amount");
 
-const { applyOpeningPosition, applyTrade, archiveClosedTradingPositions, cashEvent, performancePreview, performanceSeries, reconcileTradingPositions, removeTradingPositionData, setTradingWalletBalance, tradingMetrics, tradingTargetSimulation, tradingWallet, upsertDailySnapshot } = await import("../src/trading/model.js");
+const { applyOpeningPosition, applyTrade, archiveClosedTradingPositions, cashEvent, performancePreview, performanceSeries, reconcileTradingPositions, removeTradingLedgerEntry, removeTradingPositionData, setTradingWalletBalance, tradingMetrics, tradingTargetSimulation, tradingWallet, upsertDailySnapshot } = await import("../src/trading/model.js");
 const tradePosition={id:"p1",ticker:"MU",market:"NASDAQ",currency:"USD",quantity:0,avg:0,current:0};
 const tradingLedger=[cashEvent({type:"deposit",currency:"USD",amount:1000,date:"2026-01-02",fxRate:16000,id:"cash1"})];
 const editableWallet=[];
@@ -191,6 +199,9 @@ const target=tradingTargetSimulation({quantity:2,avg:100,currency:"USD"},125,160
 assert.equal(target.projectedValueIdr,4000000);assert.equal(target.projectedPlIdr,800000);assert.equal(target.projectedReturn,25);
 const removed=removeTradingPositionData({positions:[{id:"p1"},{id:"p2"}],ledger:[{id:"l1",positionId:"p1",date:"2026-02-01"},{id:"l2",positionId:"p2",date:"2026-01-01"}],snapshots:[{date:"2026-01-01"},{date:"2026-02-01"}]},"p1");
 assert.deepEqual(removed.positions,[{id:"p2"}]);assert.deepEqual(removed.ledger,[{id:"l2",positionId:"p2",date:"2026-01-01"}]);assert.deepEqual(removed.snapshots,[{date:"2026-01-01"}]);
+const ledgerDeletion=removeTradingLedgerEntry({positions:[],ledger:[{id:"deposit-a",type:"deposit",date:"2026-01-02",cashDeltaUsd:100,externalFlowIdr:1600000},{id:"deposit-b",type:"deposit",date:"2026-02-02",cashDeltaUsd:50,externalFlowIdr:800000}],snapshots:[{date:"2026-01-02"},{date:"2026-02-02"}]},"deposit-b");
+assert.deepEqual(ledgerDeletion.ledger.map(row=>row.id),["deposit-a"],"Deleting a Trading ledger record must remove only that execution");
+assert.deepEqual(ledgerDeletion.snapshots,[{date:"2026-01-02"}],"Trading performance must be rebuilt from the deleted record date");
 assert.ok(applyOpeningPosition({position:{id:"p2",ticker:"MU",currency:"USD",quantity:1,avg:978},date:"2026-01-01",fxRate:16000,id:"open"}).externalFlowIdr>0);
 const staleSoldPosition={id:"stale",ticker:"MU",currency:"USD",quantity:1,avg:100,current:80};
 const staleSoldLedger=[

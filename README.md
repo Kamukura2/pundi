@@ -1,4 +1,6 @@
-# CVFinance v8.0.0
+# CVFinance v8.1.0
+
+v8.1.0 rebuilds the phone and tablet workspace around compact, readable cards and a nine-action floating navigation bar that mirrors the desktop section icons. The Clients destination is now the Income workspace with a Clients subcategory, History filters share the Stocks tab design, Available Balance appears above desktop sidebar projections, dividend review uses `✓ Confirm`, and individual Trading Ledger records can be removed with their wallet, position, P/L, and performance effects recalculated. Desktop financial functions and the isolated Investment/Trading workspaces remain unchanged.
 
 v8.0.0 consolidates Investment and Trading into one **Stocks** navigation destination with an in-page Investment/Trading switch. Both workspaces retain their existing isolated calculations and persistence, while their Netcash & USD Wallet cards now share one visual and interaction pattern. Stocks → Investment adds a dynamic confirmed-dividend ledger per active ticker, official/provider discovery, entitlement dates, receivables, one-time wallet crediting, and confirmed future dividend income in Prospect. The new Supabase migration `013_investment_dividends.sql` is required before deploying the application files.
 
