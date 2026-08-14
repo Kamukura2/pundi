@@ -124,7 +124,7 @@ const migration012 = read("supabase/migrations/012_trading_portfolio.sql");
 for (const marker of ["trading_positions","trading_ledger","trading_snapshots","external_flow_idr","realized_pl_idr","enable row level security"]) assert.match(migration012,new RegExp(marker));
 assert.doesNotMatch(migration012,/drop\s+table|truncate\s+|delete\s+from/i);
 
-const { applyOpeningPosition, applyTrade, cashEvent, performanceSeries, tradingMetrics, upsertDailySnapshot } = await import("../src/trading/model.js");
+const { applyOpeningPosition, applyTrade, cashEvent, performancePreview, performanceSeries, removeTradingPositionData, tradingMetrics, tradingTargetSimulation, upsertDailySnapshot } = await import("../src/trading/model.js");
 const tradePosition={id:"p1",ticker:"MU",market:"NASDAQ",currency:"USD",quantity:0,avg:0,current:0};
 const tradingLedger=[cashEvent({type:"deposit",currency:"USD",amount:1000,date:"2026-01-02",fxRate:16000,id:"cash1"})];
 tradingLedger.push(applyTrade({position:tradePosition,type:"buy",quantity:1,price:500,date:"2026-01-02",fxRate:16000,id:"buy1"}));
@@ -141,6 +141,14 @@ const snapshots=[];upsertDailySnapshot(snapshots,{equity:16000000,externalFlows:
 upsertDailySnapshot(snapshots,{equity:17600000,externalFlows:16000000,holdingsValue:17600000,cashValue:0},550,"2026-02-02");
 const comparison=performanceSeries(snapshots,"ALL",new Date("2026-02-02"));
 assert.ok(Math.abs(comparison.portfolioReturn-10)<1e-9);assert.ok(Math.abs(comparison.spyReturn-10)<1e-9);
+const sameDayPreview=performancePreview([{id:"base",date:"2026-02-02",equityIdr:15520000,netContributionsIdr:16000000,holdingsValueIdr:15520000,cashValueIdr:0,spyPrice:500}],{equity:15520000,externalFlows:16000000,holdingsValue:15520000,cashValue:0},510,new Date("2026-02-02"));
+const sameDayComparison=performanceSeries(sameDayPreview,"ALL",new Date("2026-02-02"));
+assert.ok(Math.abs(sameDayComparison.portfolioReturn+3)<1e-9,"Same-day Trading performance must work before any sell");
+assert.ok(Math.abs(sameDayComparison.spyReturn-2)<1e-9,"SPY must compare its current API quote with the opening-day baseline");
+const target=tradingTargetSimulation({quantity:2,avg:100,currency:"USD"},125,16000);
+assert.equal(target.projectedValueIdr,4000000);assert.equal(target.projectedPlIdr,800000);assert.equal(target.projectedReturn,25);
+const removed=removeTradingPositionData({positions:[{id:"p1"},{id:"p2"}],ledger:[{id:"l1",positionId:"p1",date:"2026-02-01"},{id:"l2",positionId:"p2",date:"2026-01-01"}],snapshots:[{date:"2026-01-01"},{date:"2026-02-01"}]},"p1");
+assert.deepEqual(removed.positions,[{id:"p2"}]);assert.deepEqual(removed.ledger,[{id:"l2",positionId:"p2",date:"2026-01-01"}]);assert.deepEqual(removed.snapshots,[{date:"2026-01-01"}]);
 assert.ok(applyOpeningPosition({position:{id:"p2",ticker:"MU",currency:"USD",quantity:1,avg:978},date:"2026-01-01",fxRate:16000,id:"open"}).externalFlowIdr>0);
 
 const { normalizeStockMapping, quantityForDisplay, quantityForStorage } = await import("../src/stocks/holding.js");
@@ -245,6 +253,12 @@ assert.match(app, /Portfolio vs S&amp;P 500 \/ SPY|tradingPerformanceChart/);
 assert.match(app, /Investment Stocks[\s\S]*Trading Stocks/);
 assert.match(app, /externalFlows/);
 assert.match(app, /openTradingExecution/);
+assert.match(app, /performancePreview\(state\.tradingSnapshots,metrics,state\.spyQuote\?\.price/, "Trading benchmark must render a current preview without waiting for a sell");
+assert.match(app, /spyCurrentPrice\.textContent/, "Current SPY API price must be visible");
+assert.match(app, /data-trading-target/, "Trading target price must be directly editable");
+assert.match(app, /tradingTargetSimulation/, "Trading targets must simulate projected value and P\/L");
+assert.match(app, /data-trading-delete/, "Every Trading ticker must expose a safe delete action");
+assert.doesNotMatch(app, /data-trading-manual|Current \/ Manual Fallback \(USD\)|TAKE PROFIT<input|STOP LOSS<input/, "Trading UI must not expose manual price, take-profit, or stop-loss fields");
 assert.match(app, /const decisionMetrics=/);
 assert.match(app, /statusText=paid\?"PAID":fmt\(outstanding\)/, "Paid clients must show PAID while unpaid clients show only the nominal value");
 assert.doesNotMatch(app, /0 outstanding|outstanding left/, "Client headline copy must not include outstanding wording");
@@ -259,4 +273,4 @@ assert.match(app, /Financial Action Plan/);
 assert.match(app, /2\*60\*1000/, "Trading auto-refresh must use a quota-aware two-minute interval");
 assert.match(app, /state\.page==="trading"&&!document\.hidden/, "Trading auto-refresh must pause outside the visible Trading page");
 
-console.log("CVFinance checks passed: schema, RLS markers, PWA, 9 tabs, v7.8.1 isolated Trading ledger, withdrawal-neutral P/L, realized sell gains, SPY comparison, Twelve Data primary quotes, Finnhub fallback, quota-aware visible-page refresh, separate Investment and Trading assets in Prospect, Trading Insights, PAID-or-nominal client cards, persistent transaction templates, monthly History archives, target-price cards, Financial Action Plan isolation, Yahoo FX validation, offline queue coalescing, and JavaScript syntax.");
+console.log("CVFinance checks passed: schema, RLS markers, PWA, 9 tabs, v7.8.2 isolated Trading ledger, withdrawal-neutral P/L, realized sell gains, same-day SPY comparison, visible SPY API quote, Trading target simulation, safe ticker deletion, Twelve Data primary quotes, Finnhub fallback, quota-aware visible-page refresh, separate Investment and Trading assets in Prospect, Trading Insights, PAID-or-nominal client cards, persistent transaction templates, monthly History archives, target-price cards, Financial Action Plan isolation, Yahoo FX validation, offline queue coalescing, and JavaScript syntax.");

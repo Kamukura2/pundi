@@ -1,4 +1,4 @@
-const SHELL_CACHE = "cvfinance-shell-v7.8.1-twelve-data-trading";
+const SHELL_CACHE = "cvfinance-shell-v7.8.2-trading-targets-spy";
 const SHELL = ["/", "/index.html", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", event => {

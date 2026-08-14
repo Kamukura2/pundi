@@ -123,3 +123,41 @@ export function performanceSeries(snapshots = [], range = "YTD", now = new Date(
   if (rows.length === 1 && n(base.netContributionsIdr) > 0) portfolio[0] = (n(base.equityIdr) / n(base.netContributionsIdr) - 1) * 100;
   return { labels, portfolio, spy, portfolioReturn:portfolio.at(-1) || 0, spyReturn:spy.at(-1) || 0 };
 }
+
+export function performancePreview(snapshots = [], metrics = {}, spyPrice = 0, now = new Date()) {
+  const rows = [...snapshots].map(row => ({ ...row })).sort((a,b) => String(a.date).localeCompare(String(b.date)));
+  if (!rows.length) return rows;
+  if (rows.length === 1 && n(rows[0].netContributionsIdr) > 0) {
+    rows[0].equityIdr = n(rows[0].netContributionsIdr);
+    rows[0].holdingsValueIdr = n(rows[0].netContributionsIdr);
+    rows[0].cashValueIdr = 0;
+  }
+  const day = isoDay(now);
+  rows.push({
+    id:"current-preview", date:`${day}T23:59:59`, equityIdr:n(metrics.equity),
+    netContributionsIdr:n(metrics.externalFlows), holdingsValueIdr:n(metrics.holdingsValue),
+    cashValueIdr:n(metrics.cashValue), spyPrice:n(spyPrice) || n(rows.at(-1)?.spyPrice)
+  });
+  return rows;
+}
+
+export function tradingTargetSimulation(position, targetPrice, fxRate) {
+  const target = Math.max(0, n(targetPrice));
+  const quantity = n(position?.quantity), average = n(position?.avg);
+  const multiplier = position?.currency === "USD" ? n(fxRate) : 1;
+  const projectedValueIdr = quantity * target * multiplier;
+  const projectedPlIdr = quantity * (target - average) * multiplier;
+  const projectedReturn = average > 0 ? (target / average - 1) * 100 : 0;
+  return { target, projectedValueIdr, projectedPlIdr, projectedReturn };
+}
+
+export function removeTradingPositionData({ positions = [], ledger = [], snapshots = [] } = {}, positionId) {
+  const affected = ledger.filter(row => row.positionId === positionId);
+  const firstDate = affected.map(row => String(row.date || "")).filter(Boolean).sort()[0] || null;
+  return {
+    positions:positions.filter(row => row.id !== positionId),
+    ledger:ledger.filter(row => row.positionId !== positionId),
+    snapshots:firstDate ? snapshots.filter(row => String(row.date) < firstDate) : [...snapshots],
+    removedLedgerCount:affected.length
+  };
+}

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-  <title>CVFinance v7.8.1</title>
+  <title>CVFinance v7.8.2</title>
   <meta name="theme-color" content="#d6249f">
   <meta name="description" content="Private synchronized personal finance dashboard">
   <meta name="mobile-web-app-capable" content="yes">
@@ -424,7 +424,7 @@
           </div>
           <div class="benchmark-kpis">
             <span class="portfolio"><small>PORTFOLIO</small><b id="tradingPeriodReturn">0.00%</b></span>
-            <span class="spy"><small>SPY</small><b id="spyPeriodReturn">0.00%</b></span>
+            <span class="spy"><small>SPY RETURN</small><b id="spyPeriodReturn">0.00%</b><em id="spyCurrentPrice">Waiting for API</em><i id="spyCurrentMeta">Current SPY quote</i></span>
             <span><small>ALPHA</small><b id="tradingAlpha">0.00%</b></span>
           </div>
           <div id="tradingPerformanceChart" class="chart trading-performance-chart"></div>
@@ -461,7 +461,7 @@
           <div id="tradingLedgerList" class="trading-ledger-list"></div>
         </article>
         <article class="panel">
-          <div class="panel-head"><div><p>Risk &amp; targets</p><h3>Trade Plan</h3></div><span class="pill">Per ticker</span></div>
+          <div class="panel-head"><div><p>Price scenario</p><h3>Target Price Simulation</h3></div><span class="pill">One target per ticker</span></div>
           <div id="tradingPlanList" class="trading-plan-list"></div>
         </article>
       </div>

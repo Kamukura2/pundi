@@ -4,7 +4,7 @@ import { SyncManager } from "./src/sync/sync-manager.js";
 import { fetchHoldingQuote, fetchTradingBenchmark, fetchTradingQuote, fetchUsdIdrRate, isPriceStale, validateHoldingSymbol } from "./src/stocks/client.js";
 import { normalizeStockMapping, quantityForDisplay, quantityForStorage, quantityUnit } from "./src/stocks/holding.js";
 import { getSupabase } from "./src/lib/supabase.js";
-import { applyOpeningPosition, applyTrade, cashEvent, performanceSeries, tradingMetrics, tradingPositionCost, tradingPositionValue, upsertDailySnapshot } from "./src/trading/model.js";
+import { applyOpeningPosition, applyTrade, cashEvent, performancePreview, performanceSeries, removeTradingPositionData, tradingMetrics, tradingPositionCost, tradingPositionValue, tradingTargetSimulation, upsertDailySnapshot } from "./src/trading/model.js";
 
 const COLORS=["#7F66FF","#39C3FF","#FF8F63","#36D695","#F4C24F","#FF6EA8","#62C8FF","#8D7AFF"];
 const COMPANY_EXPENSE_TAG="Expense Perusahaan";
@@ -621,13 +621,13 @@ function renderTargetTable(mode,headEl,bodyEl){
 
 function recordTradingSnapshot(spyPrice=Number(state.spyQuote?.price||state.tradingSnapshots.at(-1)?.spyPrice||0)){
  if(!state.tradingLedger.length&&!state.tradingPositions.length)return null;
- const row=upsertDailySnapshot(state.tradingSnapshots,tradingStats(),spyPrice,new Date());
+ const existing=state.tradingSnapshots.find(item=>item.date===todayISO());
+ const row=upsertDailySnapshot(state.tradingSnapshots,tradingStats(),Number(existing?.spyPrice||spyPrice),new Date());
  row.id ||= createId();
  return row;
 }
 function recordTradingOpeningSnapshot(position,date){
  const snapshotDate=String(date||todayISO()).slice(0,10),cost=tradingPositionCost(position,state.usdIdr);
- if(snapshotDate===todayISO())return recordTradingSnapshot();
  let row=state.tradingSnapshots.find(item=>item.date===snapshotDate);
  if(!row){row={id:createId(),date:snapshotDate,equityIdr:0,netContributionsIdr:0,holdingsValueIdr:0,cashValueIdr:0,spyPrice:0};state.tradingSnapshots.push(row);}
  row.equityIdr=Number(row.equityIdr||0)+cost;row.netContributionsIdr=Number(row.netContributionsIdr||0)+cost;row.holdingsValueIdr=Number(row.holdingsValueIdr||0)+cost;
@@ -648,24 +648,26 @@ function renderTrading(){
  tradingCashUsdIdr.textContent=fmt(metrics.wallet.usd*Number(state.usdIdr||0));
  tradingQuoteSource.textContent=state.tradingQuoteMeta?.coverage||"TWELVE DATA PRIMARY · FINNHUB BACKUP";
 
- const snapshots=state.tradingSnapshots.map(row=>({...row}));
- if(state.tradingLedger.length||state.tradingPositions.length){const current=upsertDailySnapshot(snapshots,metrics,state.spyQuote?.price||snapshots.at(-1)?.spyPrice||0,new Date());current.id ||= "preview";}
+ const snapshots=performancePreview(state.tradingSnapshots,metrics,state.spyQuote?.price,new Date());
  const series=performanceSeries(snapshots,state.tradingRange||"YTD",new Date());
  const alpha=series.portfolioReturn-series.spyReturn;
  tradingPeriodReturn.textContent=`${series.portfolioReturn>=0?"+":""}${series.portfolioReturn.toFixed(2)}%`;
  spyPeriodReturn.textContent=`${series.spyReturn>=0?"+":""}${series.spyReturn.toFixed(2)}%`;
  tradingAlpha.textContent=`${alpha>=0?"+":""}${alpha.toFixed(2)}%`;
+ spyCurrentPrice.textContent=Number(state.spyQuote?.price)>0?new Intl.NumberFormat("en-US",{style:"currency",currency:"USD",minimumFractionDigits:2,maximumFractionDigits:4}).format(state.spyQuote.price):"Waiting for API";
+ spyCurrentMeta.textContent=state.spyQuote?.asOf?`${String(state.spyQuote.provider||"API").toUpperCase()} · ${new Date(state.spyQuote.asOf).toLocaleString("en-GB",{dateStyle:"medium",timeStyle:"short"})}`:"Current SPY quote";
  tradingPeriodReturn.className=series.portfolioReturn<0?"negative":"positive";spyPeriodReturn.className=series.spyReturn<0?"negative":"positive";tradingAlpha.className=alpha<0?"negative":"positive";
  tradingPerformanceChart.innerHTML=series.labels.length?lineMulti([
   {name:"Portfolio",vals:series.portfolio,color:"#2bd49a"},{name:"SPY",vals:series.spy,color:"#a460e8"}
- ],series.labels.map(label=>label.slice(5))):`<div class="trading-empty"><b>Performance starts with your first position or deposit</b><span>Trading is optional and may remain at zero.</span></div>`;
+ ],series.labels.map(label=>label.includes("T")?"NOW":label.slice(5))):`<div class="trading-empty"><b>Performance starts with your first position or deposit</b><span>Trading is optional and may remain at zero.</span></div>`;
  qa("[data-trading-range]").forEach(button=>button.classList.toggle("active",button.dataset.tradingRange===(state.tradingRange||"YTD")));
 
  tradingPositions.innerHTML=state.tradingPositions.length?state.tradingPositions.map(position=>{
   const value=tradingPositionValue(position,state.usdIdr),cost=tradingPositionCost(position,state.usdIdr),pl=value-cost,pct=cost?pl/cost*100:0;
-  const quoteTime=position.priceAsOf?new Date(position.priceAsOf).toLocaleString("en-GB",{dateStyle:"medium",timeStyle:"short"}):"Manual fallback";
-  const status=position.priceStatus||"manual";
-  return `<article class="trading-position-card" data-trading-position="${position.id}"><div class="trading-position-head"><div><h4>${escapeHtml(position.ticker)}</h4><small>${position.market} · ${position.currency} · ${Number(position.quantity).toLocaleString("en-US",{maximumFractionDigits:6})} shares</small></div><span class="trading-position-state ${isPriceStale(position)?"stale":""}">${escapeHtml(status)}</span></div><div class="trading-position-value"><strong class="private">${fmt(value)}</strong><span class="${pl<0?"negative":pl>0?"positive":""}"><b class="private">${pl>=0?"+":""}${fmt(pl)}</b><small>${pct>=0?"+":""}${pct.toFixed(2)}%</small></span></div><div class="trading-position-meta"><span><small>AVG / SHARE</small><b>${plainNumber(position.avg)}</b></span><span><small>CURRENT</small><b>${plainNumber(position.current)}</b></span><span><small>TARGET</small><b>${position.targetPrice?plainNumber(position.targetPrice):"—"}</b></span><span><small>STOP LOSS</small><b>${position.stopLoss?plainNumber(position.stopLoss):"—"}</b></span></div><div class="trading-position-actions"><button class="buy" type="button" data-trading-buy="${position.id}">BUY MORE</button><button class="sell" type="button" data-trading-sell="${position.id}" ${Number(position.quantity)<=0?"disabled":""}>SELL</button><button type="button" data-trading-manual="${position.id}">PRICE</button>${Number(position.quantity)<=0?`<button type="button" data-trading-remove="${position.id}">REMOVE</button>`:""}</div><small class="price-time">${escapeHtml(quoteTime)}</small></article>`;
+  const quoteTime=position.priceAsOf?new Date(position.priceAsOf).toLocaleString("en-GB",{dateStyle:"medium",timeStyle:"short"}):"Waiting for API quote";
+  const status=position.priceStatus||"saved";
+  const currentUsd=new Intl.NumberFormat("en-US",{style:"currency",currency:position.currency||"USD",minimumFractionDigits:2,maximumFractionDigits:4}).format(Number(position.current||0));
+  return `<article class="trading-position-card" data-trading-position="${position.id}"><div class="trading-position-head"><div><h4>${escapeHtml(position.ticker)}</h4><small>${position.market} · ${position.currency} · ${Number(position.quantity).toLocaleString("en-US",{maximumFractionDigits:6})} shares</small></div><span class="trading-position-state ${isPriceStale(position)?"stale":""}">${escapeHtml(status)}</span></div><div class="trading-current-price"><small>CURRENT PRICE</small><strong class="private">${currentUsd}</strong></div><div class="trading-position-value"><span><small>POSITION VALUE</small><b class="private">${fmt(value)}</b></span><span class="${pl<0?"negative":pl>0?"positive":""}"><b class="private">${pl>=0?"+":""}${fmt(pl)}</b><small>${pct>=0?"+":""}${pct.toFixed(2)}%</small></span></div><div class="trading-position-meta"><span><small>AVG / SHARE</small><b>${plainNumber(position.avg)}</b></span><span><small>TARGET PRICE</small><b>${position.targetPrice?plainNumber(position.targetPrice):"—"}</b></span><span><small>INVESTED</small><b class="private">${fmt(cost)}</b></span></div><div class="trading-position-actions"><button class="buy" type="button" data-trading-buy="${position.id}">BUY MORE</button><button class="sell" type="button" data-trading-sell="${position.id}" ${Number(position.quantity)<=0?"disabled":""}>SELL</button><button class="delete" type="button" data-trading-delete="${position.id}">DELETE</button></div><small class="price-time">${escapeHtml(quoteTime)}</small></article>`;
  }).join(""):`<div class="trading-empty"><b>No active Trading position</b><span>Add one only when you want to track a separate trading portfolio.</span></div>`;
 
  const ledger=[...state.tradingLedger].sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.__createdAt||"").localeCompare(String(a.__createdAt||"")));
@@ -677,12 +679,11 @@ function renderTrading(){
   return `<div class="trading-ledger-row ${row.type}"><i>${row.type==="sell"?"↗":row.type==="buy"||row.type==="opening"?"↘":row.type==="deposit"?"+":"−"}</i><div><b>${label}${row.ticker?` · ${escapeHtml(row.ticker)}`:""}</b><small>${row.date}${row.quantity?` · ${Number(row.quantity).toLocaleString("en-US",{maximumFractionDigits:6})} @ ${plainNumber(row.price)} ${row.currency}`:""}</small></div><strong class="private">${row.type==="buy"?"−":row.type==="sell"?"+":""}${fmt(amountIdr)}${row.realizedPlIdr?`<small class="${row.realizedPlIdr<0?"negative":"positive"}">P/L ${row.realizedPlIdr>=0?"+":""}${fmt(row.realizedPlIdr)}</small>`:""}</strong></div>`;
  }).join(""):`<div class="trading-empty"><b>No Trading records yet</b><span>Deposits, withdrawals, buys and sells remain permanently recorded here.</span></div>`;
 
- tradingPlanList.innerHTML=state.tradingPositions.length?state.tradingPositions.map(position=>`<div class="trading-plan-row"><strong>${escapeHtml(position.ticker)}</strong><label>TAKE PROFIT<input type="number" step=".01" min="0" data-trading-plan="targetPrice" data-position-id="${position.id}" value="${Number(position.targetPrice||0)||""}" placeholder="Optional"></label><label>STOP LOSS<input type="number" step=".01" min="0" data-trading-plan="stopLoss" data-position-id="${position.id}" value="${Number(position.stopLoss||0)||""}" placeholder="Optional"></label></div>`).join(""):`<div class="trading-empty"><b>No trade plan required</b><span>Targets appear after a position is added.</span></div>`;
- qa("[data-trading-plan]").forEach(input=>input.onchange=()=>{const position=state.tradingPositions.find(row=>row.id===input.dataset.positionId);if(!position)return;position[input.dataset.tradingPlan]=Math.max(0,Number(input.value||0));save();});
+ tradingPlanList.innerHTML=state.tradingPositions.length?state.tradingPositions.map(position=>{const sim=tradingTargetSimulation(position,position.targetPrice,state.usdIdr),active=sim.target>0;return `<div class="trading-target-row"><div class="trading-target-title"><strong>${escapeHtml(position.ticker)}</strong><small>${Number(position.quantity).toLocaleString("en-US",{maximumFractionDigits:6})} shares · avg ${plainNumber(position.avg)}</small></div><label>TARGET PRICE (${position.currency})<input type="number" step=".01" min="0" data-trading-target data-position-id="${position.id}" value="${Number(position.targetPrice||0)||""}" placeholder="Enter target price"></label><span><small>PROJECTED P/L</small><b class="private ${active?(sim.projectedPlIdr<0?"negative":"positive"):""}">${active?`${sim.projectedPlIdr>=0?"+":""}${fmt(sim.projectedPlIdr)} · ${sim.projectedReturn>=0?"+":""}${sim.projectedReturn.toFixed(2)}%`:"—"}</b></span><span><small>PROJECTED VALUE</small><b class="private">${active?fmt(sim.projectedValueIdr):"—"}</b></span></div>`;}).join(""):`<div class="trading-empty"><b>No target price yet</b><span>Add a position, then enter one target price to simulate its result.</span></div>`;
+ qa("[data-trading-target]").forEach(input=>input.onchange=()=>{const position=state.tradingPositions.find(row=>row.id===input.dataset.positionId);if(!position)return;position.targetPrice=Math.max(0,Number(input.value||0));save();renderTrading();});
  qa("[data-trading-buy]").forEach(button=>button.onclick=()=>openTradingExecution(button.dataset.tradingBuy,"buy"));
  qa("[data-trading-sell]").forEach(button=>button.onclick=()=>openTradingExecution(button.dataset.tradingSell,"sell"));
- qa("[data-trading-manual]").forEach(button=>button.onclick=()=>openTradingManualPrice(button.dataset.tradingManual));
- qa("[data-trading-remove]").forEach(button=>button.onclick=()=>{const position=state.tradingPositions.find(row=>row.id===button.dataset.tradingRemove);if(!position||Number(position.quantity)>0)return;state.tradingPositions=state.tradingPositions.filter(row=>row.id!==position.id);save();renderAll();toastMsg("Closed position removed · ledger retained");});
+ qa("[data-trading-delete]").forEach(button=>button.onclick=()=>{const position=state.tradingPositions.find(row=>row.id===button.dataset.tradingDelete);if(!position)return;if(!confirm(`Delete ${position.ticker} and its Trading ledger records?\n\nUse SELL instead when this is a real closed trade. Delete is only for an incorrect input.`))return;const cleaned=removeTradingPositionData({positions:state.tradingPositions,ledger:state.tradingLedger,snapshots:state.tradingSnapshots},position.id);state.tradingPositions=cleaned.positions;state.tradingLedger=cleaned.ledger;state.tradingSnapshots=cleaned.snapshots;recordTradingSnapshot();save();renderAll();toastMsg(`${position.ticker} deleted · ${cleaned.removedLedgerCount} linked record${cleaned.removedLedgerCount===1?"":"s"} removed`);});
 }
 
 function openTradingCash(type,currency="USD"){
@@ -709,10 +710,6 @@ function openTradingExecution(positionId,type){
  });
 }
 
-function openTradingManualPrice(positionId){
- const position=state.tradingPositions.find(row=>row.id===positionId);if(!position)return;
- openSimple(`Update ${position.ticker} Price`,[{key:"price",label:`Current Price (${position.currency})`,type:"number",step:".01",value:position.current}],values=>{position.current=Math.max(0,Number(values.price));position.manualCurrent=position.current;position.priceSource="manual";position.priceStatus="manual";position.priceAsOf=new Date().toISOString();recordTradingSnapshot();});
-}
 function updateModeToggleLabels(){
  if(typeof baseModeToggle!=="undefined") baseModeToggle.textContent = state.baseMode === "auto" ? "Auto" : "Manual";
  if(typeof optimisticModeToggle!=="undefined") optimisticModeToggle.textContent = state.optimisticMode === "auto" ? "Auto" : "Manual";
@@ -1258,14 +1255,13 @@ addTickerBtn.onclick=()=>openSimple("Add Ticker",[
 addTradingPositionBtn.onclick=()=>openSimple("Add Trading Position",[
  {key:"ticker",label:"US Ticker"},{key:"market",label:"Market",options:["NASDAQ","NYSE","AMEX"],value:"NASDAQ"},
  {key:"quantity",label:"Shares",type:"number",step:".000001"},{key:"avg",label:"Entry Price / Share (USD)",type:"number",step:".01"},
- {key:"current",label:"Current / Manual Fallback (USD)",type:"number",step:".01"},{key:"targetPrice",label:"Take Profit (optional)",type:"number",step:".01",required:false,value:0},
- {key:"stopLoss",label:"Stop Loss (optional)",type:"number",step:".01",required:false,value:0},{key:"date",label:"Opening Date",type:"date",value:todayISO()}
+ {key:"date",label:"Opening Date",type:"date",value:todayISO()}
 ],values=>{
  const ticker=String(values.ticker||"").trim().toUpperCase();
  if(state.tradingPositions.some(row=>row.ticker===ticker&&row.market===values.market)){alert(`${ticker} already exists in Trading.`);return false;}
  if(!(Number(values.quantity)>0)||!(Number(values.avg)>=0)){alert("Enter a valid share quantity and entry price.");return false;}
- const position={id:createId(),ticker,displaySymbol:ticker,providerSymbol:ticker,market:values.market,currency:"USD",quantity:Number(values.quantity),avg:Number(values.avg),current:Number(values.current||values.avg),manualCurrent:Number(values.current||values.avg),targetPrice:Number(values.targetPrice||0),stopLoss:Number(values.stopLoss||0),priceSource:"manual",priceStatus:"manual",priceAsOf:new Date().toISOString(),lastPriceFetchAt:null,__createdAt:new Date().toISOString()};
- state.tradingPositions.push(position);state.tradingLedger.push({...applyOpeningPosition({position,date:values.date,fxRate:state.usdIdr,id:createId()}),__createdAt:new Date().toISOString()});recordTradingOpeningSnapshot(position,values.date);recordTradingSnapshot();
+ const position={id:createId(),ticker,displaySymbol:ticker,providerSymbol:ticker,market:values.market,currency:"USD",quantity:Number(values.quantity),avg:Number(values.avg),current:Number(values.avg),manualCurrent:Number(values.avg),targetPrice:0,stopLoss:0,priceSource:"saved entry",priceStatus:"waiting for API",priceAsOf:null,lastPriceFetchAt:null,__createdAt:new Date().toISOString()};
+ state.tradingPositions.push(position);state.tradingLedger.push({...applyOpeningPosition({position,date:values.date,fxRate:state.usdIdr,id:createId()}),__createdAt:new Date().toISOString()});recordTradingOpeningSnapshot(position,values.date);queueMicrotask(()=>refreshTradingPrices({silent:true,force:true}));
 });
 tradingDepositBtn.onclick=()=>openTradingCash("deposit","USD");
 qa("[data-trading-withdraw]").forEach(button=>button.onclick=()=>openTradingCash("withdraw",button.dataset.tradingWithdraw));
