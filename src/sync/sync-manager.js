@@ -10,6 +10,7 @@ export class SyncManager {
     this.saveChain = Promise.resolve();
     this.unsubscribe = null;
     this.busy = false;
+    this.pendingPersists = 0;
   }
 
   status(kind, message, extras = {}) {
@@ -46,7 +47,7 @@ export class SyncManager {
   }
 
   async handleRemoteChange() {
-    if (!this.repository || this.busy || await this.repository.pendingCount()) return;
+    if (!this.repository || this.busy || this.pendingPersists || await this.repository.pendingCount()) return;
     try {
       const state = await this.repository.loadCloud();
       this.onState(state);
@@ -56,27 +57,34 @@ export class SyncManager {
     }
   }
 
-  persist(state) {
+  persist(state, { background = false } = {}) {
+    if (!this.repository) return this.saveChain;
     const snapshot = structuredClone(state);
+    this.pendingPersists += 1;
     this.saveChain = this.saveChain.then(async () => {
-      if (!this.repository) return;
       this.busy = true;
-      this.status(navigator.onLine ? "saving" : "offline", navigator.onLine ? "Saving…" : "Queued offline");
+      if (!background) this.status(navigator.onLine ? "saving" : "offline", navigator.onLine ? "Saving…" : "Queued offline");
       try {
-        const result = await this.repository.save(snapshot);
-        this.onState(result.state, { preserveUi:true });
-        this.status(result.offline ? "offline" : "saved", result.offline ? `${result.pending} unsynced` : "Saved", {
-          lastSynced:result.offline ? null : new Date().toISOString(), pending:result.pending
-        });
-      } catch (error) {
-        if (/conflict/i.test(error.message || "")) {
-          const cloud = await this.repository.loadCloud();
-          this.onState(cloud);
+        let result;
+        try {
+          result = await this.repository.save(snapshot);
+        } catch (error) {
+          if (!/conflict/i.test(error.message || "")) throw error;
+          await this.repository.loadCloud();
+          result = await this.repository.save(snapshot);
         }
+        this.onState(result.state, { preserveUi:true });
+        if (!background || result.offline) {
+          this.status(result.offline ? "offline" : "saved", result.offline ? `${result.pending} unsynced` : "Saved", {
+            lastSynced:result.offline ? null : new Date().toISOString(), pending:result.pending
+          });
+        }
+      } catch (error) {
         this.status("error", "Sync error", { detail:error.message });
         throw error;
       } finally {
         this.busy = false;
+        this.pendingPersists = Math.max(0, this.pendingPersists - 1);
       }
     }).catch(() => {});
     return this.saveChain;

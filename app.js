@@ -52,7 +52,7 @@ const percent=(value,base,{absolute=false}={})=>{
  const shown=absolute?Math.abs(normalized):normalized;
  return `${shown>0&&!absolute?"+":""}${shown.toFixed(2)}%`;
 };
-const save=()=>syncManager?.persist(state);
+const save=(options)=>syncManager?.persist(state,options);
 const saveSettings=()=>save();
 const q=(s)=>document.querySelector(s);
 const qa=(s)=>[...document.querySelectorAll(s)];
@@ -680,7 +680,12 @@ function renderTrading(){
  }).join(""):`<div class="trading-empty"><b>No Trading records yet</b><span>Deposits, withdrawals, buys and sells remain permanently recorded here.</span></div>`;
 
  tradingPlanList.innerHTML=state.tradingPositions.length?state.tradingPositions.map(position=>{const sim=tradingTargetSimulation(position,position.targetPrice,state.usdIdr),active=sim.target>0;return `<div class="trading-target-row"><div class="trading-target-title"><strong>${escapeHtml(position.ticker)}</strong><small>${Number(position.quantity).toLocaleString("en-US",{maximumFractionDigits:6})} shares · avg ${plainNumber(position.avg)}</small></div><label>TARGET PRICE (${position.currency})<input type="number" step=".01" min="0" data-trading-target data-position-id="${position.id}" value="${Number(position.targetPrice||0)||""}" placeholder="Enter target price"></label><span><small>PROJECTED P/L</small><b class="private ${active?(sim.projectedPlIdr<0?"negative":"positive"):""}">${active?`${sim.projectedPlIdr>=0?"+":""}${fmt(sim.projectedPlIdr)} · ${sim.projectedReturn>=0?"+":""}${sim.projectedReturn.toFixed(2)}%`:"—"}</b></span><span><small>PROJECTED VALUE</small><b class="private">${active?fmt(sim.projectedValueIdr):"—"}</b></span></div>`;}).join(""):`<div class="trading-empty"><b>No target price yet</b><span>Add a position, then enter one target price to simulate its result.</span></div>`;
- qa("[data-trading-target]").forEach(input=>input.onchange=()=>{const position=state.tradingPositions.find(row=>row.id===input.dataset.positionId);if(!position)return;position.targetPrice=Math.max(0,Number(input.value||0));save();renderTrading();});
+ qa("[data-trading-target]").forEach(input=>{
+  const updateLocal=()=>{const position=state.tradingPositions.find(row=>row.id===input.dataset.positionId);if(position)position.targetPrice=Math.max(0,Number(input.value||0));};
+  input.oninput=updateLocal;
+  input.onchange=()=>{updateLocal();save();renderTrading();};
+  input.onkeydown=event=>{if(event.key==="Enter"){event.preventDefault();input.blur();}};
+ });
  qa("[data-trading-buy]").forEach(button=>button.onclick=()=>openTradingExecution(button.dataset.tradingBuy,"buy"));
  qa("[data-trading-sell]").forEach(button=>button.onclick=()=>openTradingExecution(button.dataset.tradingSell,"sell"));
  qa("[data-trading-delete]").forEach(button=>button.onclick=()=>{const position=state.tradingPositions.find(row=>row.id===button.dataset.tradingDelete);if(!position)return;if(!confirm(`Delete ${position.ticker} and its Trading ledger records?\n\nUse SELL instead when this is a real closed trade. Delete is only for an incorrect input.`))return;const cleaned=removeTradingPositionData({positions:state.tradingPositions,ledger:state.tradingLedger,snapshots:state.tradingSnapshots},position.id);state.tradingPositions=cleaned.positions;state.tradingLedger=cleaned.ledger;state.tradingSnapshots=cleaned.snapshots;recordTradingSnapshot();save();renderAll();toastMsg(`${position.ticker} deleted · ${cleaned.removedLedgerCount} linked record${cleaned.removedLedgerCount===1?"":"s"} removed`);});
@@ -1097,7 +1102,7 @@ async function refreshTradingPrices({silent=false,force=false}={}){
   }catch{}
   if(lastCoverage)state.tradingQuoteMeta={coverage:lastCoverage,asOf:new Date().toISOString()};
   recordTradingSnapshot();
-  await save();renderAll();
+  await save({background:silent});if(!hasActiveEditor())renderAll();
   if(!silent)toastMsg(`${updated} Trading price${updated===1?"":"s"} updated${failed?`, ${failed} saved fallback`:""} · SPY compared`);
  })().finally(()=>{if(typeof refreshTradingBtn!=="undefined")refreshTradingBtn.disabled=false;tradingRefreshPromise=null;});
  return tradingRefreshPromise;

@@ -226,6 +226,24 @@ await repository.queueOperation({table:"accounts",action:"delete",id,previousUpd
 queued = await mutationList();
 assert.equal(queued.length, 0);
 
+const { SyncManager } = await import("../src/sync/sync-manager.js");
+let syncSaveCalls=0, retriedTarget=0;
+const targetSync = new SyncManager({onState:()=>{},onStatus:()=>{}});
+targetSync.repository = {
+  pendingCount:async()=>0,
+  loadCloud:async()=>({tradingPositions:[{targetPrice:0}]}),
+  save:async snapshot=>{
+    syncSaveCalls+=1;
+    if(syncSaveCalls===1)throw new Error("Synchronization conflict in trading_positions. Cloud data was reloaded.");
+    retriedTarget=snapshot.tradingPositions[0].targetPrice;
+    return {state:snapshot,pending:0,offline:false};
+  }
+};
+await targetSync.persist({tradingPositions:[{targetPrice:1200}]});
+assert.equal(syncSaveCalls,2,"Target sync must retry once after a transient optimistic-lock conflict");
+assert.equal(retriedTarget,1200,"Conflict retry must preserve the user's local target price");
+assert.equal(targetSync.pendingPersists,0,"The queued-save guard must clear after target persistence");
+
 const appSource = read("app.js");
 assert.doesNotMatch(appSource, /<input[^>]*type=\"number\"[^>]*data-target=/, "Target-price editors must not use native number steppers");
 assert.match(appSource, /class=\"target-price-input\" type=\"text\" inputmode=\"decimal\"/, "Target-price inputs must preserve editable text drafts");
@@ -256,6 +274,8 @@ assert.match(app, /openTradingExecution/);
 assert.match(app, /performancePreview\(state\.tradingSnapshots,metrics,state\.spyQuote\?\.price/, "Trading benchmark must render a current preview without waiting for a sell");
 assert.match(app, /spyCurrentPrice\.textContent/, "Current SPY API price must be visible");
 assert.match(app, /data-trading-target/, "Trading target price must be directly editable");
+assert.match(app, /input\.oninput=updateLocal/, "Trading target edits must stay in local state while the editor is active");
+assert.match(app, /save\(\{background:silent\}\);if\(!hasActiveEditor\(\)\)renderAll/, "Background quote refresh must not replace an active target editor");
 assert.match(app, /tradingTargetSimulation/, "Trading targets must simulate projected value and P\/L");
 assert.match(app, /data-trading-delete/, "Every Trading ticker must expose a safe delete action");
 assert.doesNotMatch(app, /data-trading-manual|Current \/ Manual Fallback \(USD\)|TAKE PROFIT<input|STOP LOSS<input/, "Trading UI must not expose manual price, take-profit, or stop-loss fields");
@@ -273,4 +293,9 @@ assert.match(app, /Financial Action Plan/);
 assert.match(app, /2\*60\*1000/, "Trading auto-refresh must use a quota-aware two-minute interval");
 assert.match(app, /state\.page==="trading"&&!document\.hidden/, "Trading auto-refresh must pause outside the visible Trading page");
 
-console.log("CVFinance checks passed: schema, RLS markers, PWA, 9 tabs, v7.8.2 isolated Trading ledger, withdrawal-neutral P/L, realized sell gains, same-day SPY comparison, visible SPY API quote, Trading target simulation, safe ticker deletion, Twelve Data primary quotes, Finnhub fallback, quota-aware visible-page refresh, separate Investment and Trading assets in Prospect, Trading Insights, PAID-or-nominal client cards, persistent transaction templates, monthly History archives, target-price cards, Financial Action Plan isolation, Yahoo FX validation, offline queue coalescing, and JavaScript syntax.");
+const syncSource = read("src/sync/sync-manager.js");
+assert.match(syncSource, /this\.pendingPersists/, "Realtime reloads must wait for queued local saves");
+assert.match(syncSource, /await this\.repository\.loadCloud\(\);\s*result = await this\.repository\.save\(snapshot\)/, "Transient optimistic-lock conflicts must retry the unchanged local snapshot");
+assert.doesNotMatch(syncSource, /if \(\/conflict\/i\.test\(error\.message \|\| \"\"\)\) \{\s*const cloud[\s\S]*this\.onState\(cloud\)/, "A sync conflict must never overwrite unsaved local target input");
+
+console.log("CVFinance checks passed: schema, RLS markers, PWA, 9 tabs, v7.8.3 stable Trading target sync, conflict retry without local rollback, quiet background quote refresh, readable target simulation, withdrawal-neutral P/L, realized sell gains, same-day SPY comparison, visible SPY API quote, safe ticker deletion, Twelve Data primary quotes, Finnhub fallback, separate Investment and Trading assets in Prospect, Trading Insights, PAID-or-nominal client cards, persistent transaction templates, monthly History archives, Financial Action Plan isolation, Yahoo FX validation, offline queue coalescing, and JavaScript syntax.");

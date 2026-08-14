@@ -1,6 +1,6 @@
-# CVFinance v7.8.2
+# CVFinance v7.8.3
 
-v7.8.2 fixes the first-day Portfolio vs SPY comparison by preserving the daily benchmark baseline and rendering the current API quote as a separate preview point. The benchmark now shows SPY's current price and quote timestamp, so performance does not require a Sell transaction. Trading position entry is reduced to ticker, market, shares, entry price, and opening date; current price remains API-driven. Position cards emphasize current price, remove stop-loss/manual-price controls, add a safe Delete flow for incorrect records, and replace Trade Plan with one Target Price simulation per ticker showing projected P/L, return, and total value.
+v7.8.3 prevents Trading Target Price edits from being rolled back by a simultaneous background quote refresh or transient Supabase optimistic-lock conflict. Local input remains authoritative, conflicts retry once against freshly loaded cloud metadata, realtime reloads wait for queued local saves, and automatic Trading price refreshes no longer flash the global Saving state or replace an active editor. Target Price Simulation typography, inputs, projected P/L, and projected value are enlarged for clearer desktop and mobile reading.
 
 v7.8.0 renames the existing Stocks navigation to Investment without changing its holdings, targets, wallet, pricing, or projection behavior. It adds a separate optional Trading workspace with persistent positions, USD/IDR trading cash, opening cost basis, buy-more and sell execution dialogs, realized and unrealized P/L, withdrawal-neutral performance, take-profit/stop-loss plans, permanent execution ledger, and a 1W/1M/3M/YTD/ALL equity comparison against SPY. Trading assets are persisted in three new RLS-protected Supabase tables and appear separately from Investment Stocks in Prospect. Insights now report Trading alpha, realized/unrealized performance, and win rate.
 
@@ -82,6 +82,7 @@ For local full-stack testing, use `vercel dev`; plain `npm run dev` does not emu
 - [Investment, isolated Trading ledger and SPY benchmark v7.8.0 patch](docs/PATCH_v7_8_0_INVESTMENT_TRADING_SPY.md)
 - [Twelve Data primary Trading quotes v7.8.1 patch](docs/PATCH_v7_8_1_TWELVE_DATA_TRADING.md)
 - [Trading SPY baseline and Target Price v7.8.2 patch](docs/PATCH_v7_8_2_TRADING_SPY_TARGETS.md)
+- [Trading Target Sync Stability and Readability v7.8.3 patch](docs/PATCH_v7_8_3_TARGET_SYNC_READABILITY.md)
 - [Second account setup](docs/SECOND_ACCOUNT_SETUP.md)
 - [Manual actions](docs/MANUAL_ACTIONS.md)
 - [Test checklist](docs/TEST_CHECKLIST.md)
