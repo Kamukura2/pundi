@@ -11,6 +11,7 @@ assert.equal(manifest.display, "standalone");
 for (const icon of manifest.icons) assert.ok(existsSync(resolve(root, "public", icon.src.replace(/^\//, ""))), `Missing ${icon.src}`);
 
 const index = read("index.html");
+const css = read("styles.css");
 for (const tab of ["accumulation","cashflow","expenses","clients","stocks","trading","electricity","prospect","insights"]) assert.match(index, new RegExp(`id="${tab}"`));
 assert.match(index, /manifest\.webmanifest/);
 assert.match(index, /authForm/);
@@ -291,6 +292,10 @@ assert.doesNotMatch(read("index.html"), /NET CONTRIBUTIONS/, "The old Net Contri
 assert.match(app, /switchPage\(state\.page,\{preserveScroll:true\}\)/, "Realtime sync must not force mobile Trading back to the top");
 assert.match(app, /if\(!window\.matchMedia\("\(max-width:1024px\)"\)\.matches\)requestAnimationFrame/, "Mobile background sync must never fight touch scrolling with scrollTo");
 assert.match(app, /performancePreview\(state\.tradingSnapshots,metrics,state\.spyQuote\?\.price/, "Trading benchmark must render a current preview without waiting for a sell");
+assert.match(app, /tradingPositions\.addEventListener\("click",handleTradingPositionAction\)/, "Trading actions must use a persistent delegated desktop click handler");
+assert.doesNotMatch(app, /\[data-trading-sell\]"\)\.forEach/, "SELL must not rely on a per-render button handler");
+assert.match(css, /\.trading-position-card::after\{[^}]*pointer-events:none/, "Trading card decoration must never intercept desktop clicks");
+assert.match(css, /\.trading-position-actions\{[^}]*z-index:5/, "Trading action row must stay above card decoration");
 assert.match(app, /spyCurrentPrice\.textContent/, "Current SPY API price must be visible");
 assert.match(app, /data-trading-target/, "Trading target price must be directly editable");
 assert.match(app, /input\.oninput=updateLocal/, "Trading target edits must stay in local state while the editor is active");
@@ -317,4 +322,4 @@ assert.match(syncSource, /this\.pendingPersists/, "Realtime reloads must wait fo
 assert.match(syncSource, /await this\.repository\.loadCloud\(\);\s*result = await this\.repository\.save\(snapshot\)/, "Transient optimistic-lock conflicts must retry the unchanged local snapshot");
 assert.doesNotMatch(syncSource, /if \(\/conflict\/i\.test\(error\.message \|\| \"\"\)\) \{\s*const cloud[\s\S]*this\.onState\(cloud\)/, "A sync conflict must never overwrite unsaved local target input");
 
-console.log("CVFinance checks passed: schema, RLS markers, PWA, 9 tabs, v7.9.3 Trading equity ledger reconciliation, Starting Funds label, mobile document scroll recovery, no background scrollTo on touch devices, compact mobile Trading, unrestricted manual Sell price, isolated Reset All, immediate sell feedback, realized-only accumulated Trading gain/loss, stable target sync, same-day SPY comparison, visible SPY API quote, safe ticker deletion, Twelve Data primary quotes, Finnhub fallback, separate Investment and Trading assets in Prospect, Trading Insights, PAID-or-nominal client cards, persistent transaction templates, monthly History archives, Financial Action Plan isolation, Yahoo FX validation, offline queue coalescing, and JavaScript syntax.");
+console.log("CVFinance checks passed: schema, RLS markers, PWA, 9 tabs, v7.9.4 persistent desktop Trading SELL handler, Trading equity ledger reconciliation, Starting Funds label, mobile document scroll recovery, no background scrollTo on touch devices, compact mobile Trading, unrestricted manual Sell price, isolated Reset All, immediate sell feedback, realized-only accumulated Trading gain/loss, stable target sync, same-day SPY comparison, visible SPY API quote, safe ticker deletion, Twelve Data primary quotes, Finnhub fallback, separate Investment and Trading assets in Prospect, Trading Insights, PAID-or-nominal client cards, persistent transaction templates, monthly History archives, Financial Action Plan isolation, Yahoo FX validation, offline queue coalescing, and JavaScript syntax.");

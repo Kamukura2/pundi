@@ -693,10 +693,22 @@ function renderTrading(){
   input.onchange=()=>{updateLocal();save();renderTrading();};
   input.onkeydown=event=>{if(event.key==="Enter"){event.preventDefault();input.blur();}};
  });
- qa("[data-trading-buy]").forEach(button=>button.onclick=()=>openTradingExecution(button.dataset.tradingBuy,"buy"));
- qa("[data-trading-sell]").forEach(button=>button.onclick=()=>openTradingExecution(button.dataset.tradingSell,"sell"));
- qa("[data-trading-delete]").forEach(button=>button.onclick=()=>{const position=state.tradingPositions.find(row=>row.id===button.dataset.tradingDelete);if(!position)return;if(!confirm(`Delete ${position.ticker} and its Trading ledger records?\n\nUse SELL instead when this is a real closed trade. Delete is only for an incorrect input.`))return;const cleaned=removeTradingPositionData({positions:state.tradingPositions,ledger:state.tradingLedger,snapshots:state.tradingSnapshots},position.id);state.tradingPositions=cleaned.positions;state.tradingLedger=cleaned.ledger;state.tradingSnapshots=cleaned.snapshots;recordTradingSnapshot();save();renderAll();toastMsg(`${position.ticker} deleted · ${cleaned.removedLedgerCount} linked record${cleaned.removedLedgerCount===1?"":"s"} removed`);});
 }
+
+function handleTradingPositionAction(event){
+ const button=event.target.closest("button[data-trading-buy],button[data-trading-sell],button[data-trading-delete]");
+ if(!button||!tradingPositions.contains(button))return;
+ event.preventDefault();event.stopPropagation();
+ if(button.disabled)return toastMsg("No open shares available to sell");
+ if(button.dataset.tradingBuy)return openTradingExecution(button.dataset.tradingBuy,"buy");
+ if(button.dataset.tradingSell)return openTradingExecution(button.dataset.tradingSell,"sell");
+ const position=state.tradingPositions.find(row=>row.id===button.dataset.tradingDelete);if(!position)return;
+ if(!confirm(`Delete ${position.ticker} and its Trading ledger records?\n\nUse SELL instead when this is a real closed trade. Delete is only for an incorrect input.`))return;
+ const cleaned=removeTradingPositionData({positions:state.tradingPositions,ledger:state.tradingLedger,snapshots:state.tradingSnapshots},position.id);
+ state.tradingPositions=cleaned.positions;state.tradingLedger=cleaned.ledger;state.tradingSnapshots=cleaned.snapshots;
+ recordTradingSnapshot();save();renderAll();toastMsg(`${position.ticker} deleted · ${cleaned.removedLedgerCount} linked record${cleaned.removedLedgerCount===1?"":"s"} removed`);
+}
+tradingPositions.addEventListener("click",handleTradingPositionAction);
 
 function openTradingCash(type,currency="USD"){
  const wallet=tradingStats().wallet;
@@ -710,6 +722,7 @@ function openTradingCash(type,currency="USD"){
 
 function openTradingExecution(positionId,type){
  const position=state.tradingPositions.find(row=>row.id===positionId);if(!position)return;
+ if(type==="sell"&&!(Number(position.quantity)>0)){toastMsg("No open shares available to sell");return;}
  openSimple(type==="sell"?`Sell ${position.ticker}`:`Buy More ${position.ticker}`,[
   {key:"quantity",label:`Shares${type==="sell"?` · max ${plainNumber(position.quantity)}`:""}`,type:"number",step:"any",inputmode:"decimal",value:type==="sell"?position.quantity:""},
   {key:"price",label:`Execution Price / Share (${position.currency}) · editable`,type:"number",step:"any",inputmode:"decimal",value:position.current},

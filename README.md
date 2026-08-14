@@ -1,4 +1,6 @@
-# CVFinance v7.9.3
+# CVFinance v7.9.4
+
+v7.9.4 makes the desktop Trading BUY, SELL, and DELETE controls resilient to quote refreshes and cloud re-renders. A permanent delegated click handler now lives on the Trading portfolio container, while the action row is layered above non-interactive card decoration. SELL still opens with the API price as an editable default and remains disabled only when the ledger-confirmed open quantity is zero.
 
 v7.9.3 fixes Trading equity after a sell by reconciling every active position's quantity and average cost against its isolated Trading ledger. If a Supabase reload returns a stale pre-sell position beside the saved SELL record, CVFinance now repairs the open quantity, refreshes the current snapshot, and persists the corrected position. Sell proceeds therefore appear once, fully sold positions carry no unrealized P/L, and the portfolio/SPY comparison uses the repaired equity. Investment remains excluded.
 

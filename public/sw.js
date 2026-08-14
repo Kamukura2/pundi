@@ -1,4 +1,4 @@
-const SHELL_CACHE = "cvfinance-shell-v7.9.3-trading-equity-accounting";
+const SHELL_CACHE = "cvfinance-shell-v7.9.4-desktop-trading-sell";
 const SHELL = ["/", "/index.html", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", event => {
