@@ -524,7 +524,7 @@ function renderClients(){
  clientIncomeOutstanding.textContent=fmt(income.outstanding);
  clientIncomeRecurring.textContent=fmt(income.recurring);
  clientIncomeRemainingMonths.textContent=`${Math.max(0,11-new Date().getMonth())} remaining months`;
- const card=(c)=>{const i=state.clients.indexOf(c),ending=c.clientType==="ending",outstanding=clientOutstanding(c),paid=ending?c.endingPaid:outstanding===0,visual=ending?(paid?"ending-paid":"ending-unpaid"):paid?"paid":"outstanding",statusIcon=ending?"⚑":paid?"✓":"⏳",statusText=paid?"0 outstanding":`${fmt(outstanding)} outstanding left`,meta=ending?(paid?"Final payment completed":"Final payment pending"):`Paid this month: ${fmt(getClientPaidThisMonth(c))} · Previous: ${fmt(c.carry)}`;return `<div class="client-card ${visual} ${ending?"ending":"recurring"}" data-client-id="${c.id}" title="Drag card to reorder or move between sections"><div class="status-icon ${paid?"paid":"pending"}" title="${ending?`ending client · ${paid?"paid":"unpaid"}`:paid?"paid":"outstanding"}">${statusIcon}</div><h4>${escapeHtml(c.name)}</h4><small>${ending?"Final payment":"Recurring monthly"} · ${fmt(c.monthly)}</small><strong class="private client-outstanding-copy">${statusText}</strong><small class="client-payment-meta private">${meta}</small><div class="client-actions"><button class="icon-mini" data-edit-client="${i}" title="Edit">✎</button><button class="icon-mini" data-status-client="${i}" title="Status">◉</button><button class="icon-mini" data-remove-client="${i}" title="Remove">🗑</button></div></div>`;};
+ const card=(c)=>{const i=state.clients.indexOf(c),ending=c.clientType==="ending",outstanding=clientOutstanding(c),paid=ending?c.endingPaid:outstanding===0,visual=ending?(paid?"ending-paid":"ending-unpaid"):paid?"paid":"outstanding",statusIcon=ending?"⚑":paid?"✓":"⏳",statusText=paid?"PAID":fmt(outstanding),meta=ending?(paid?"Final payment completed":"Final payment pending"):`Paid this month: ${fmt(getClientPaidThisMonth(c))} · Previous: ${fmt(c.carry)}`;return `<div class="client-card ${visual} ${ending?"ending":"recurring"}" data-client-id="${c.id}" title="Drag card to reorder or move between sections"><div class="status-icon ${paid?"paid":"pending"}" title="${ending?`ending client · ${paid?"paid":"unpaid"}`:paid?"paid":"outstanding"}">${statusIcon}</div><h4>${escapeHtml(c.name)}</h4><small>${ending?"Final payment":"Recurring monthly"} · ${fmt(c.monthly)}</small><strong class="private client-outstanding-copy ${paid?"is-paid":"is-due"}">${statusText}</strong><small class="client-payment-meta private">${meta}</small><div class="client-actions"><button class="icon-mini" data-edit-client="${i}" title="Edit">✎</button><button class="icon-mini" data-status-client="${i}" title="Status">◉</button><button class="icon-mini" data-remove-client="${i}" title="Remove">🗑</button></div></div>`;};
  const recurring=[...recurringClients()].sort((a,b)=>Number(a.sortOrder||0)-Number(b.sortOrder||0)),ending=[...endingClients()].sort((a,b)=>Number(a.sortOrder||0)-Number(b.sortOrder||0));
  recurringClientCount.textContent=recurring.length;endingClientCount.textContent=ending.length;
  recurringClientGrid.innerHTML=recurring.map(card).join("")||emptyLane("No recurring clients");
@@ -843,11 +843,19 @@ function openTxEditor(id){
  txAmount.value=tx.amount; txDescription.value=tx.description; txChannel.value=tx.channel; txDate.value=tx.date;renderTxCategoryTags(tx.category);renderTxChannelTags(tx.channel);
  txModal.showModal();
 }
+function latestTransactionTemplate(){
+ if(!state.transactions.length)return null;
+ return state.transactions.reduce((latest,row)=>{
+  const latestTime=Date.parse(latest?.__createdAt||"")||0,rowTime=Date.parse(row?.__createdAt||"")||0;
+  return rowTime>latestTime?row:latest;
+ },state.transactions[0]);
+}
 function resetTxModal(){
  state.txEdit=null;
  txModalTitle.textContent="Add Transaction";
- qa("#txType button").forEach((b,i)=>b.classList.toggle("active",i===0));
- txAmount.value=""; txDescription.value=""; txChannel.value="Offline"; txDate.value=todayISO();renderTxCategoryTags();renderTxChannelTags("Offline");
+ const template=latestTransactionTemplate(),type=template?.type||"expense",channel=template?.channel||"Offline";
+ qa("#txType button").forEach(b=>b.classList.toggle("active",b.dataset.type===type));
+ txDescription.value=template?.description||"";txAmount.value=template?.amount??"";txChannel.value=channel;txDate.value=template?.date||todayISO();renderTxCategoryTags(template?.category);renderTxChannelTags(channel);
 }
 function editMonthly(i){
  const x=state.budgets[i];
@@ -1028,7 +1036,8 @@ qa("[data-open-tx]").forEach(b=>b.onclick=()=>{resetTxModal(); txModal.showModal
 qa("#txType button").forEach(b=>b.onclick=()=>{qa("#txType button").forEach(x=>x.classList.remove("active")); b.classList.add("active");renderTxCategoryTags();});
 txForm.onsubmit=(e)=>{
  e.preventDefault();
- const tx={id:state.txEdit||createId(),type:q("#txType .active").dataset.type,amount:Number(txAmount.value),description:txDescription.value,category:txCategory.value,channel:txChannel.value,date:txDate.value};
+ const previous=state.txEdit?state.transactions.find(item=>item.id===state.txEdit):null;
+ const tx={id:state.txEdit||createId(),type:q("#txType .active").dataset.type,amount:Number(txAmount.value),description:txDescription.value,category:txCategory.value,channel:txChannel.value,date:txDate.value,__createdAt:previous?.__createdAt||new Date().toISOString(),__updatedAt:previous?.__updatedAt};
  if(state.txEdit){
   const idx=state.transactions.findIndex(t=>t.id===state.txEdit);
   if(idx>-1) state.transactions[idx]=tx;

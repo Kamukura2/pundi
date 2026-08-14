@@ -879,3 +879,9 @@ select,input,.search{width:100%;min-width:0;height:46px;padding:0 12px;border-ra
 [data-theme=dark] .tx-current-month{background:linear-gradient(145deg,#13283b,#171d39);border-color:rgba(84,179,232,.22)}
 @media (max-width:1350px){.history-overview-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.history-budget-panel{grid-column:1/-1}#budgetPace{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}#budgetPace .progress-row{margin-bottom:0}}
 @media (max-width:720px){.history-expense-hero{grid-template-columns:1fr;padding:19px}.history-expense-hero>strong,.history-expense-hero>span{grid-column:1;grid-row:auto;text-align:left}.history-expense-hero>strong{margin-top:7px;font-size:36px}.history-overview-grid{grid-template-columns:1fr}.history-budget-panel{grid-column:auto}#budgetPace{grid-template-columns:1fr}.tx-period-head,.tx-archive-heading{align-items:flex-start;flex-direction:column}.tx-period-head .archive-totals{text-align:left}.tx-archive-heading p{text-align:left}}
+
+/* v7.7.9 concise client states, remembered transaction templates and larger donuts */
+.client-outstanding-copy.is-paid{font-size:clamp(24px,2.3vw,34px)!important;letter-spacing:.035em}.client-outstanding-copy.is-due{font-size:clamp(27px,2.55vw,38px)!important}
+.history-overview-grid .donut-svg{width:min(340px,100%);height:auto}.history-overview-grid .donut-layout.vertical{gap:24px}.history-overview-grid>.panel:not(.history-budget-panel){min-height:590px}.history-overview-grid>.panel:not(.history-budget-panel) .panel-head{margin-bottom:8px}
+@media (max-width:1350px){.history-overview-grid .donut-svg{width:min(320px,100%)}.history-overview-grid>.panel:not(.history-budget-panel){min-height:560px}}
+@media (max-width:720px){.history-overview-grid .donut-svg{width:min(285px,100%)}.history-overview-grid>.panel:not(.history-budget-panel){min-height:0}.client-outstanding-copy.is-paid,.client-outstanding-copy.is-due{font-size:24px!important}}

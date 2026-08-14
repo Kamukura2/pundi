@@ -22,6 +22,7 @@ assert.match(index, /id="cashMonthExpense"/, "History must show one current-mont
 assert.doesNotMatch(index, /id="cashIncome"|id="cashExpense"|id="cashNet"/, "The old three History summary cards must be removed");
 assert.match(index, /id="cashChannelDonut"/);
 assert.match(index, /id="cashChannelLegend"/);
+assert.ok(index.indexOf('id="txDescription"') < index.indexOf('id="txAmount"'), "Transaction Description must appear above Amount");
 
 const sql = read("supabase/migrations/001_initial_schema.sql");
 for (const table of ["profiles","accounts","transactions","monthly_budgets","yearly_expenses","planned_events","credit_facilities","credit_items","clients","stock_holdings","stock_price_targets","electricity_readings","app_settings"]) {
@@ -206,10 +207,14 @@ assert.match(appSource, /tx-history-archive/, "Previous History months must rema
 const app = read("app.js");
 assert.match(app, /portfolioPL\.textContent=`\$\{fmt\(pl\)\} · \$\{percent\(pl,inv\)\}`/);
 assert.match(app, /const decisionMetrics=/);
-assert.match(app, /paid\?"0 outstanding":`\$\{fmt\(outstanding\)\} outstanding left`/, "Client cards must use concise outstanding copy");
+assert.match(app, /statusText=paid\?"PAID":fmt\(outstanding\)/, "Paid clients must show PAID while unpaid clients show only the nominal value");
+assert.doesNotMatch(app, /0 outstanding|outstanding left/, "Client headline copy must not include outstanding wording");
+assert.match(app, /function latestTransactionTemplate\(\)/, "Add Transaction must recover the latest saved entry as its next template");
+assert.match(app, /txDescription\.value=template\?\.description[\s\S]*txAmount\.value=template\?\.amount/, "Description and Amount must both remain populated from the latest entry");
+assert.match(app, /__createdAt:previous\?\.__createdAt\|\|new Date\(\)\.toISOString\(\)/, "New entries must retain insertion order for persistent templates");
 assert.match(app, /class="target-years-grid"/, "Target Price groups must use a compact two-up year grid");
 assert.match(app, /class="target-year-card"/, "Each future year and target must remain one stable edit card");
 assert.match(app, /<details class="year-card prospect-year-card">/, "Future Cash + Assets details must be collapsed until clicked");
 assert.match(app, /Financial Action Plan/);
 
-console.log("CVFinance checks passed: schema, RLS markers, PWA, 8 tabs, v7.7.8 monthly History reset without deletion, one Total Expense headline, category and channel expense charts, permanent monthly archives, concise client outstanding labels, two-up Target Price cards, collapsed Prospect year details, Financial Action Plan isolation, P/L percentages, annual and monthly operating dashboard isolation, Yahoo FX validation, ledger-only History, dynamic Budget meters, toggleable Transaction tags, safe dialog dismissal, auditable projections, one-time dated credit, optional stock cash assets, sorting invariants, stock provider abstraction, offline queue coalescing, and JavaScript syntax.");
+console.log("CVFinance checks passed: schema, RLS markers, PWA, 8 tabs, v7.7.9 PAID-or-nominal client cards, Description-before-Amount transaction form, persistent latest-entry templates, larger category/channel donuts, monthly History reset without deletion, permanent monthly archives, two-up Target Price cards, collapsed Prospect year details, Financial Action Plan isolation, P/L percentages, annual and monthly operating dashboard isolation, Yahoo FX validation, ledger-only History, dynamic Budget meters, toggleable Transaction tags, safe dialog dismissal, auditable projections, one-time dated credit, optional stock cash assets, sorting invariants, stock provider abstraction, offline queue coalescing, and JavaScript syntax.");

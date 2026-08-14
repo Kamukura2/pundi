@@ -1,4 +1,6 @@
-# CVFinance v7.7.8
+# CVFinance v7.7.9
+
+v7.7.9 simplifies client cards to `PAID` or the remaining nominal value only, swaps the Add Transaction form so Description sits above Amount, and pre-fills every new entry from the latest saved transaction for faster batch input. The remembered template includes type, description, amount, category, channel, and date and is recovered from the synchronized transaction record itself. History category/channel donuts are enlarged. No financial formula or projection rule changes.
 
 v7.7.8 turns History into a true monthly ledger workspace: the former Income/Expense/Net cards become one Total Expense This Month headline; totals, category mix, channel mix, Budget Pace, and the active transaction list automatically start fresh when the calendar month changes. Nothing is deleted—older transactions move into permanent monthly Archive cards. Category and channel donuts both show nominal values and percentages. History remains ledger-only and cannot change Balance, Net Worth, Cash, or Prospect.
 
@@ -72,6 +74,7 @@ For local full-stack testing, use `vercel dev`; plain `npm run dev` does not emu
 - [Annual operating performance v7.7.3 patch](docs/PATCH_v7_7_3_ANNUAL_OPERATING_PERFORMANCE.md)
 - [Compact targets and Prospect dropdowns v7.7.7 patch](docs/PATCH_v7_7_7_COMPACT_TARGETS_PROSPECT_DROPDOWNS.md)
 - [Monthly History and expense mix v7.7.8 patch](docs/PATCH_v7_7_8_MONTHLY_HISTORY_EXPENSE_MIX.md)
+- [Sticky transaction entry and larger donuts v7.7.9 patch](docs/PATCH_v7_7_9_STICKY_TRANSACTION_LARGE_DONUTS.md)
 - [Second account setup](docs/SECOND_ACCOUNT_SETUP.md)
 - [Manual actions](docs/MANUAL_ACTIONS.md)
 - [Test checklist](docs/TEST_CHECKLIST.md)
