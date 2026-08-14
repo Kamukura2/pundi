@@ -21,6 +21,37 @@ export function tradingPositionCost(position, fxRate) {
   return amountToIdr(n(position.quantity) * n(position.avg), position.currency, fxRate);
 }
 
+export function reconcileTradingPositions(positions = [], ledger = []) {
+  let changed = false;
+  positions.forEach(position => {
+    const rows = ledger
+      .filter(row => row.positionId === position.id && ["opening", "buy", "sell"].includes(row.type))
+      .sort((a,b) => String(a.date || "").localeCompare(String(b.date || "")) || String(a.__createdAt || "").localeCompare(String(b.__createdAt || "")));
+    if (!rows.some(row => row.type === "opening")) return;
+    let quantity = 0, average = 0;
+    rows.forEach(row => {
+      const rowQuantity = Math.max(0, n(row.quantity));
+      if (row.type === "opening" || row.type === "buy") {
+        const nextQuantity = quantity + rowQuantity;
+        average = nextQuantity ? (quantity * average + rowQuantity * n(row.price)) / nextQuantity : 0;
+        quantity = nextQuantity;
+      } else {
+        quantity = Math.max(0, quantity - rowQuantity);
+        if (!quantity) average = 0;
+      }
+    });
+    if (Math.abs(n(position.quantity) - quantity) > 1e-9) {
+      position.quantity = quantity;
+      changed = true;
+    }
+    if (quantity > 0 && Math.abs(n(position.avg) - average) > 1e-9) {
+      position.avg = average;
+      changed = true;
+    }
+  });
+  return changed;
+}
+
 export function tradingMetrics({ positions = [], ledger = [], fxRate = 0 } = {}) {
   const wallet = tradingWallet(ledger);
   const holdingsValue = positions.reduce((sum, row) => sum + tradingPositionValue(row, fxRate), 0);

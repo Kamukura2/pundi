@@ -1,4 +1,8 @@
-# CVFinance v7.9.1
+# CVFinance v7.9.3
+
+v7.9.3 fixes Trading equity after a sell by reconciling every active position's quantity and average cost against its isolated Trading ledger. If a Supabase reload returns a stale pre-sell position beside the saved SELL record, CVFinance now repairs the open quantity, refreshes the current snapshot, and persists the corrected position. Sell proceeds therefore appear once, fully sold positions carry no unrealized P/L, and the portfolio/SPY comparison uses the repaired equity. Investment remains excluded.
+
+v7.9.2 renames the Trading dashboard capital label from Net Contributions to Starting Funds. The underlying isolated Trading capital calculation remains unchanged.
 
 v7.9.1 restores native vertical document scrolling on phones and tablets. Mobile background/realtime renders no longer call `scrollTo`, the root document owns the vertical scroll again, and Trading cards explicitly allow vertical pan gestures. All v7.9.0 Trading behavior remains unchanged.
 

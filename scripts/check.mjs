@@ -124,7 +124,7 @@ const migration012 = read("supabase/migrations/012_trading_portfolio.sql");
 for (const marker of ["trading_positions","trading_ledger","trading_snapshots","external_flow_idr","realized_pl_idr","enable row level security"]) assert.match(migration012,new RegExp(marker));
 assert.doesNotMatch(migration012,/drop\s+table|truncate\s+|delete\s+from/i);
 
-const { applyOpeningPosition, applyTrade, cashEvent, performancePreview, performanceSeries, removeTradingPositionData, tradingMetrics, tradingTargetSimulation, upsertDailySnapshot } = await import("../src/trading/model.js");
+const { applyOpeningPosition, applyTrade, cashEvent, performancePreview, performanceSeries, reconcileTradingPositions, removeTradingPositionData, tradingMetrics, tradingTargetSimulation, upsertDailySnapshot } = await import("../src/trading/model.js");
 const tradePosition={id:"p1",ticker:"MU",market:"NASDAQ",currency:"USD",quantity:0,avg:0,current:0};
 const tradingLedger=[cashEvent({type:"deposit",currency:"USD",amount:1000,date:"2026-01-02",fxRate:16000,id:"cash1"})];
 tradingLedger.push(applyTrade({position:tradePosition,type:"buy",quantity:1,price:500,date:"2026-01-02",fxRate:16000,id:"buy1"}));
@@ -152,6 +152,16 @@ assert.equal(target.projectedValueIdr,4000000);assert.equal(target.projectedPlId
 const removed=removeTradingPositionData({positions:[{id:"p1"},{id:"p2"}],ledger:[{id:"l1",positionId:"p1",date:"2026-02-01"},{id:"l2",positionId:"p2",date:"2026-01-01"}],snapshots:[{date:"2026-01-01"},{date:"2026-02-01"}]},"p1");
 assert.deepEqual(removed.positions,[{id:"p2"}]);assert.deepEqual(removed.ledger,[{id:"l2",positionId:"p2",date:"2026-01-01"}]);assert.deepEqual(removed.snapshots,[{date:"2026-01-01"}]);
 assert.ok(applyOpeningPosition({position:{id:"p2",ticker:"MU",currency:"USD",quantity:1,avg:978},date:"2026-01-01",fxRate:16000,id:"open"}).externalFlowIdr>0);
+const staleSoldPosition={id:"stale",ticker:"MU",currency:"USD",quantity:1,avg:100,current:80};
+const staleSoldLedger=[
+  applyOpeningPosition({position:{...staleSoldPosition},date:"2026-01-01",fxRate:16000,id:"stale-open"}),
+  {id:"stale-sell",type:"sell",positionId:"stale",ticker:"MU",quantity:1,price:80,currency:"USD",fxRate:16000,cashDeltaIdr:0,cashDeltaUsd:80,externalFlowIdr:0,realizedPlIdr:-320000,date:"2026-02-01"}
+];
+assert.equal(reconcileTradingPositions([staleSoldPosition],staleSoldLedger),true,"A cloud-reloaded sold position must be repaired from its Trading ledger");
+assert.equal(staleSoldPosition.quantity,0,"A fully sold Trading position must not remain in open holdings");
+const repairedSoldMetrics=tradingMetrics({positions:[staleSoldPosition],ledger:staleSoldLedger,fxRate:16000});
+assert.equal(repairedSoldMetrics.equity,1280000,"Sell proceeds must appear once in Trading equity, not again as a stale holding");
+assert.equal(repairedSoldMetrics.unrealized,0,"A fully sold position cannot retain unrealized P/L");
 
 const { normalizeStockMapping, quantityForDisplay, quantityForStorage } = await import("../src/stocks/holding.js");
 const idxHolding = {ticker:"BMRI",market:"IDX",provider:"finnhub",providerSymbol:"BMRI",currency:"IDR",quantity:10000};
@@ -276,6 +286,8 @@ assert.match(app, /openTradingExecution/);
 assert.match(app, /Execution Price \/ Share[\s\S]*step:"any"/, "Sell execution price must accept a freely typed manual value");
 assert.match(app, /#resetTradingBtn[\s\S]*state\.tradingPositions=\[\];state\.tradingLedger=\[\];state\.tradingSnapshots=\[\]/, "Reset All must clear only the isolated Trading workspace");
 assert.match(app, /tradingTotalPl\.textContent=`\$\{metrics\.realized/, "Trading Total Gain\/Loss must use accumulated realized P\/L only");
+assert.match(read("index.html"), /STARTING FUNDS/, "Trading capital label must use Starting Funds");
+assert.doesNotMatch(read("index.html"), /NET CONTRIBUTIONS/, "The old Net Contributions label must be removed from Trading");
 assert.match(app, /switchPage\(state\.page,\{preserveScroll:true\}\)/, "Realtime sync must not force mobile Trading back to the top");
 assert.match(app, /if\(!window\.matchMedia\("\(max-width:1024px\)"\)\.matches\)requestAnimationFrame/, "Mobile background sync must never fight touch scrolling with scrollTo");
 assert.match(app, /performancePreview\(state\.tradingSnapshots,metrics,state\.spyQuote\?\.price/, "Trading benchmark must render a current preview without waiting for a sell");
@@ -305,4 +317,4 @@ assert.match(syncSource, /this\.pendingPersists/, "Realtime reloads must wait fo
 assert.match(syncSource, /await this\.repository\.loadCloud\(\);\s*result = await this\.repository\.save\(snapshot\)/, "Transient optimistic-lock conflicts must retry the unchanged local snapshot");
 assert.doesNotMatch(syncSource, /if \(\/conflict\/i\.test\(error\.message \|\| \"\"\)\) \{\s*const cloud[\s\S]*this\.onState\(cloud\)/, "A sync conflict must never overwrite unsaved local target input");
 
-console.log("CVFinance checks passed: schema, RLS markers, PWA, 9 tabs, v7.9.1 mobile document scroll recovery, no background scrollTo on touch devices, compact mobile Trading, unrestricted manual Sell price, isolated Reset All, immediate sell feedback, realized-only accumulated Trading gain/loss, stable target sync, same-day SPY comparison, visible SPY API quote, safe ticker deletion, Twelve Data primary quotes, Finnhub fallback, separate Investment and Trading assets in Prospect, Trading Insights, PAID-or-nominal client cards, persistent transaction templates, monthly History archives, Financial Action Plan isolation, Yahoo FX validation, offline queue coalescing, and JavaScript syntax.");
+console.log("CVFinance checks passed: schema, RLS markers, PWA, 9 tabs, v7.9.3 Trading equity ledger reconciliation, Starting Funds label, mobile document scroll recovery, no background scrollTo on touch devices, compact mobile Trading, unrestricted manual Sell price, isolated Reset All, immediate sell feedback, realized-only accumulated Trading gain/loss, stable target sync, same-day SPY comparison, visible SPY API quote, safe ticker deletion, Twelve Data primary quotes, Finnhub fallback, separate Investment and Trading assets in Prospect, Trading Insights, PAID-or-nominal client cards, persistent transaction templates, monthly History archives, Financial Action Plan isolation, Yahoo FX validation, offline queue coalescing, and JavaScript syntax.");
