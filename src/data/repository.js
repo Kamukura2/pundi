@@ -4,12 +4,12 @@ import { createEmptyState, createId, YEARS } from "./default-data.js";
 export const DATA_TABLES = [
   "profiles", "accounts", "transactions", "monthly_budgets", "yearly_expenses",
   "planned_events", "credit_facilities", "credit_items", "clients", "stock_holdings",
-  "stock_price_targets", "trading_positions", "trading_ledger", "trading_snapshots",
+  "stock_price_targets", "investment_dividends", "trading_positions", "trading_ledger", "trading_snapshots",
   "electricity_readings", "entrusted_funds", "app_settings"
 ];
 
 const SAVE_TABLES = DATA_TABLES.filter(table => table !== "profiles");
-const parentFirst = ["accounts","transactions","monthly_budgets","yearly_expenses","planned_events","credit_facilities","credit_items","clients","stock_holdings","stock_price_targets","trading_positions","trading_ledger","trading_snapshots","electricity_readings","entrusted_funds","app_settings"];
+const parentFirst = ["accounts","transactions","monthly_budgets","yearly_expenses","planned_events","credit_facilities","credit_items","clients","stock_holdings","stock_price_targets","investment_dividends","trading_positions","trading_ledger","trading_snapshots","electricity_readings","entrusted_funds","app_settings"];
 const deleteFirst = [...parentFirst].reverse();
 const meta = row => ({ __createdAt: row.created_at, __updatedAt: row.updated_at });
 const clean = value => JSON.parse(JSON.stringify(value));
@@ -50,6 +50,13 @@ function rowsToState(rows) {
       base:target.base,optimistic:target.optimistic,targetIds:target.ids,...meta(row)
     };
   });
+  state.dividends = (rows.investment_dividends || []).map(row => ({
+    id:row.id,holdingId:row.holding_id,eventKey:row.event_key,ticker:row.ticker,type:row.dividend_type,
+    currency:row.currency,amountPerShare:Number(row.amount_per_share),eligibleShares:Number(row.eligible_shares),
+    announcementDate:row.announcement_date||"",exDate:row.ex_date||"",recordDate:row.record_date||"",paymentDate:row.payment_date||"",
+    status:row.dividend_status,eligibilityStatus:row.eligibility_status,sourceProvider:row.source_provider,
+    sourceUrl:row.source_url||"",manual:Boolean(row.is_manual),fxRate:Number(row.fx_rate||0),creditedAt:row.credited_at,...meta(row)
+  }));
   state.tradingPositions = (rows.trading_positions || []).map(row => ({
     id:row.id,ticker:row.display_symbol,displaySymbol:row.display_symbol,market:row.market,
     providerSymbol:row.provider_symbol,currency:row.currency,quantity:Number(row.quantity),
@@ -123,6 +130,13 @@ function stateToRows(state, userId) {
       price_as_of:row.priceAsOf || null,last_price_fetch_at:row.lastPriceFetchAt || null,...stamp(row)
     })),
     stock_price_targets: targets,
+    investment_dividends: (state.dividends || []).map(row => owned({
+      id:row.id,holding_id:row.holdingId,event_key:row.eventKey,ticker:row.ticker,dividend_type:row.type||"regular",
+      currency:row.currency,amount_per_share:Number(row.amountPerShare||0),eligible_shares:Number(row.eligibleShares||0),
+      announcement_date:row.announcementDate||null,ex_date:row.exDate||null,record_date:row.recordDate||null,payment_date:row.paymentDate||null,
+      dividend_status:row.status||"confirmed",eligibility_status:row.eligibilityStatus||"pending",source_provider:row.sourceProvider||"manual",
+      source_url:row.sourceUrl||"",is_manual:Boolean(row.manual),fx_rate:Number(row.fxRate||0),credited_at:row.creditedAt||null,...stamp(row)
+    })),
     trading_positions: (state.tradingPositions || []).map(row => owned({
       id:row.id,display_symbol:row.displaySymbol || row.ticker,market:row.market,provider_symbol:row.providerSymbol || row.ticker,
       currency:row.currency,quantity:Number(row.quantity),avg_purchase_price:Number(row.avg),current_price:Number(row.current),
@@ -308,7 +322,7 @@ export class FinanceRepository {
 
 export function exportBackup(state, userId) {
   const data = clean(state);
-  ["page","privacy","filter","sort","expenseView","txEdit","prospectMode"].forEach(key => delete data[key]);
+  ["page","privacy","filter","sort","expenseView","txEdit","prospectMode","stockView"].forEach(key => delete data[key]);
   return { format:"cvfinance-backup", version:1, exportedAt:new Date().toISOString(), userId, data };
 }
 
@@ -320,5 +334,6 @@ export function validateBackup(value) {
   if (!Array.isArray(value.data.tradingPositions)) value.data.tradingPositions = [];
   if (!Array.isArray(value.data.tradingLedger)) value.data.tradingLedger = [];
   if (!Array.isArray(value.data.tradingSnapshots)) value.data.tradingSnapshots = [];
+  if (!Array.isArray(value.data.dividends)) value.data.dividends = [];
   return { ...createEmptyState(), ...value.data, settingsId:createId() };
 }

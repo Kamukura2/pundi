@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-  <title>CVFinance v7.9.6</title>
+  <title>CVFinance v8.0.0</title>
   <meta name="theme-color" content="#d6249f">
   <meta name="description" content="Private synchronized personal finance dashboard">
   <meta name="mobile-web-app-capable" content="yes">
@@ -29,8 +29,7 @@
       <button class="nav" data-page="cashflow"><span class="nav-ic i-chart">📊</span><span>History</span></button>
       <button class="nav" data-page="expenses"><span class="nav-ic i-bill">🧾</span><span>Expenses</span></button>
       <button class="nav" data-page="clients"><span class="nav-ic i-client">🤝</span><span>Clients</span></button>
-      <button class="nav" data-page="stocks"><span class="nav-ic i-stock">📈</span><span>Investment</span></button>
-      <button class="nav" data-page="trading"><span class="nav-ic i-trading">⚡</span><span>Trading</span></button>
+      <button class="nav" data-page="stocks"><span class="nav-ic i-stock">📈</span><span>Stocks</span></button>
       <button class="nav" data-page="electricity"><span class="nav-ic i-electric">⚡</span><span>Electricity</span></button>
       <button class="nav" data-page="prospect"><span class="nav-ic i-rocket">🚀</span><span>Prospect</span></button>
       <button class="nav" data-page="insights"><span class="nav-ic i-insight">✨</span><span>Insights</span></button>
@@ -314,6 +313,12 @@
     </section>
 
     <section id="stocks" class="page">
+      <div id="stockWorkspaceTabs" class="segmented stock-workspace-tabs" role="tablist" aria-label="Stock workspace">
+        <button type="button" class="active" data-stock-workspace="investment" role="tab" aria-selected="true">Investment</button>
+        <button type="button" data-stock-workspace="trading" role="tab" aria-selected="false">Trading</button>
+      </div>
+
+      <div id="investment" class="stock-workspace-view active" data-stock-view="investment">
       <div class="hero-grid">
         <article class="hero-card hero-dark">
           <div class="hero-chip alt">API READY</div>
@@ -335,30 +340,30 @@
         </article>
       </div>
 
-      <article class="panel stock-cash-panel">
+      <article class="panel stock-cash-panel investment-wallet-panel">
         <div class="panel-head">
-          <div><p>Optional liquid assets</p><h3>Netcash & USD Wallet</h3></div>
+          <div><p>Investment liquidity</p><h3>Netcash &amp; USD Wallet</h3></div>
           <div class="head-actions stock-rate-pills">
-            <span class="pill">Included in total assets</span>
             <span id="usdIdrRate" class="pill fx-rate" title="Last saved exchange rate">USD/IDR loading…</span>
             <button id="editFxBtn" class="ghost-btn fx-refresh-btn" type="button" title="Set USD/IDR manually" aria-label="Set USD to IDR manually">✎</button>
             <button id="refreshFxBtn" class="ghost-btn fx-refresh-btn" type="button" title="Refresh USD/IDR now" aria-label="Refresh USD to IDR exchange rate">↻</button>
+            <button id="investmentDepositBtn" class="primary-btn" type="button">＋ Add Funds</button>
           </div>
         </div>
-        <div class="stock-cash-grid">
-          <label class="stock-cash-card netcash-card">
+        <div class="trading-wallet-grid investment-wallet-grid">
+          <article class="trading-wallet-card investment-wallet-card idr">
             <span class="stock-cash-icon">Rp</span>
-            <span><small>NETCASH INDONESIA</small><b>IDR</b></span>
-            <input id="stockNetcashIdr" type="number" min="0" step="1000" placeholder="Optional · 0">
-            <em id="stockNetcashValue" class="private">Rp0</em>
-          </label>
-          <label class="stock-cash-card wallet-card">
+            <div><small>NETCASH INDONESIA</small><strong id="stockNetcashValue" class="private">Rp0</strong></div>
+            <button type="button" data-investment-withdraw="IDR">Tarik dana</button>
+          </article>
+          <article class="trading-wallet-card investment-wallet-card usd">
             <span class="stock-cash-icon">$</span>
-            <span><small>USD WALLET</small><b>USD</b></span>
-            <input id="stockWalletUsd" type="number" min="0" step=".01" placeholder="Optional · 0">
-            <em id="stockWalletValue" class="private">Rp0</em>
-          </label>
+            <div><small>USD WALLET</small><strong id="stockWalletUsdValue" class="private">$0.00</strong><em id="stockWalletValue" class="private">Rp0</em></div>
+            <button type="button" data-investment-withdraw="USD">Tarik dana</button>
+          </article>
         </div>
+        <input id="stockNetcashIdr" type="hidden" value="0">
+        <input id="stockWalletUsd" type="hidden" value="0">
       </article>
 
       <article class="panel">
@@ -401,9 +406,22 @@
           <div class="target-price-board"><div id="optimisticHead" class="target-board-caption"></div><div id="optimisticBody" class="target-stock-groups"></div></div>
         </article>
       </div>
-    </section>
 
-    <section id="trading" class="page">
+      <article class="panel dividend-panel">
+        <div class="panel-head">
+          <div><p>Confirmed corporate actions</p><h3>Dividend Income</h3></div>
+          <div class="head-actions">
+            <span id="dividendSyncMeta" class="pill">Official &amp; provider data</span>
+            <button id="refreshDividendsBtn" class="ghost-btn" type="button" title="Check confirmed dividends">↻</button>
+            <button id="addDividendBtn" class="primary-btn" type="button">＋ Dividend</button>
+          </div>
+        </div>
+        <div id="dividendSummary" class="dividend-summary"></div>
+        <div id="dividendTickerList" class="dividend-ticker-list"></div>
+      </article>
+      </div>
+
+      <div id="trading" class="stock-workspace-view" data-stock-view="trading">
       <div class="trading-page-tools">
         <button id="resetTradingBtn" class="danger-btn" type="button">↺ Reset All Trading</button>
       </div>
@@ -467,6 +485,7 @@
           <div class="panel-head"><div><p>Price scenario</p><h3>Target Price Simulation</h3></div><span class="pill">One target per ticker</span></div>
           <div id="tradingPlanList" class="trading-plan-list"></div>
         </article>
+      </div>
       </div>
     </section>
 
@@ -594,11 +613,8 @@
     <button class="plus" data-open-tx type="button" aria-label="Add transaction" title="Add transaction">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
     </button>
-    <button data-page="stocks" type="button" aria-label="Investment" title="Investment">
+    <button data-page="stocks" type="button" aria-label="Stocks" title="Stocks">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 17 5-5 3 3 7-8M15 7h4v4"/></svg>
-    </button>
-    <button data-page="trading" type="button" aria-label="Trading" title="Trading">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16.5 8.5 12l3 3L20 6.5M16 6.5h4v4M5 20h14"/></svg>
     </button>
     <button data-page="electricity" type="button" aria-label="Electricity" title="Electricity">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m13.5 2-7 11h5l-1 9 7-12h-5l1-8Z"/></svg>
@@ -657,7 +673,7 @@
       <div class="mobile-more-grid">
         <button class="ghost-btn" type="button" data-page="expenses"><span>🧾</span>Expenses</button>
         <button class="ghost-btn" type="button" data-page="clients"><span>🤝</span>Clients</button>
-        <button class="ghost-btn" type="button" data-page="trading"><span>⚡</span>Trading</button>
+        <button class="ghost-btn" type="button" data-page="stocks"><span>📈</span>Stocks</button>
         <button class="ghost-btn" type="button" data-page="electricity"><span>⚡</span>Electricity</button>
         <button class="ghost-btn" type="button" data-page="insights"><span>✨</span>Insights</button>
       </div>

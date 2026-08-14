@@ -1,8 +1,9 @@
 import { createEmptyState, createId, createMvpSeed, readLegacyLocalStorage, YEARS } from "./src/data/default-data.js";
 import { annualExpenseBreakdown, annualOperatingPerformance, buildMonthlyTimeline, buildProjection, getBudgetProgress, getClientOutstanding, getClientPaidThisMonth, getCurrentNetWorth, getEndingClients, getEntrustedDeduction, getFixedIncome, getReceivableClients, getRecurringClients, getTotalOutstanding, getTotalPaid, getYearlyProjectionTotal, monthKey, monthlyBudgetRemaining, recordedExpenseForBudget, remainingYearExpenseBreakdown, remainingYearIncomeBreakdown } from "./src/data/finance-model.js";
 import { SyncManager } from "./src/sync/sync-manager.js";
-import { fetchHoldingQuote, fetchTradingBenchmark, fetchTradingQuote, fetchUsdIdrRate, isPriceStale, validateHoldingSymbol } from "./src/stocks/client.js";
+import { fetchHoldingDividends, fetchHoldingQuote, fetchTradingBenchmark, fetchTradingQuote, fetchUsdIdrRate, isPriceStale, validateHoldingSymbol } from "./src/stocks/client.js";
 import { normalizeStockMapping, quantityForDisplay, quantityForStorage, quantityUnit } from "./src/stocks/holding.js";
+import { advanceDividendLifecycle, creditDividendToWallet, dividendEventYear, dividendGross, dividendNativeGross, dividendReceivables, mergeDividendEvents, projectedDividendForMonth, summarizeDividends } from "./src/stocks/dividends.js";
 import { getSupabase } from "./src/lib/supabase.js";
 import { applyOpeningPosition, applyTrade, archiveClosedTradingPositions, cashEvent, performancePreview, performanceSeries, reconcileTradingPositions, removeTradingPositionData, tradingMetrics, tradingPositionCost, tradingPositionValue, tradingTargetSimulation, upsertDailySnapshot } from "./src/trading/model.js";
 
@@ -20,15 +21,18 @@ const todayISO=()=>{
 const state=createEmptyState();
 state.theme=localStorage.getItem("cvfinance-theme-cache")||"dark";
 state.language=localStorage.getItem("cvfinance-language-cache")||"en";
+state.stockView=localStorage.getItem("cvfinance-stock-view-cache")==="trading"?"trading":"investment";
 let syncManager;
 let stockRefreshStarted=false;
 let fxRefreshTimer=null;
 let tradingRefreshTimer=null;
 let fxRefreshPromise=null;
 let tradingRefreshPromise=null;
+let dividendRefreshPromise=null;
 let transactionTagFilter=null;
 const currentYear=()=>new Date().getFullYear();
 const escapeHtml=value=>String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));
+const safeExternalUrl=value=>{try{const url=new URL(String(value||""));return ["http:","https:"].includes(url.protocol)?url.href:"";}catch{return "";}};
 const validUsdIdr=value=>Number.isFinite(Number(value))&&Number(value)>=MIN_USD_IDR&&Number(value)<=MAX_USD_IDR;
 const monthIndexFromName=value=>{
  const parsed=new Date(`${String(value||"").trim()} 1, 2000`).getMonth();
@@ -103,9 +107,10 @@ const invested=(s)=>{
  return s.currency==="USD"?v*state.usdIdr:v;
 };
 const stockExtrasValue=()=>Math.max(0,Number(state.stockExtras?.netcashIdr||0))+Math.max(0,Number(state.stockExtras?.walletUsd||0))*Number(state.usdIdr||0);
+const investmentDividendReceivables=()=>dividendReceivables(state.dividends||[],state.usdIdr);
 const holdingsPortfolio=(y=currentYear(),mode="base")=>state.stocks.reduce((a,s)=>a+stockValue(s,y,mode),0);
 const portfolio=(y=currentYear(),mode="base")=>holdingsPortfolio(y,mode)+stockExtrasValue();
-const netPortfolio=(y=currentYear(),mode="base")=>portfolio(y,mode)-entrustedTotal("stocks");
+const netPortfolio=(y=currentYear(),mode="base")=>portfolio(y,mode)-entrustedTotal("stocks")+(y===currentYear()?investmentDividendReceivables():0);
 const tradingStats=()=>tradingMetrics({positions:state.tradingPositions,ledger:state.tradingLedger,fxRate:state.usdIdr});
 const tradingAssets=()=>tradingStats().equity;
 const combinedPortfolio=(y=currentYear(),mode="base")=>netPortfolio(y,mode)+tradingAssets();
@@ -114,7 +119,8 @@ const AGE_BASE=[33,30,0];
 const ageTriplet=(year)=>AGE_BASE.map(v=>v+(year-2026));
 const moneyClass=(n)=>Number(n)<0?"negative":"";
 const ID_TRANSLATIONS={
- "Accumulation":"Akumulasi","History":"Riwayat","Expenses":"Pengeluaran","Clients":"Klien","Investment":"Investasi","Trading":"Trading","Stocks":"Saham","Electricity":"Listrik","Prospect":"Proyeksi","Insights":"Insight",
+ "Accumulation":"Akumulasi","History":"Riwayat","Expenses":"Pengeluaran","Clients":"Klien","Investment":"Investasi","Trading":"Trading","Stocks":"Saham","Stocks · Investment":"Saham · Investasi","Stocks · Trading":"Saham · Trading","Electricity":"Listrik","Prospect":"Proyeksi","Insights":"Insight","Dividend Income":"Pendapatan Dividen",
+ "Investment liquidity":"Likuiditas investasi","Confirmed corporate actions":"Aksi korporasi terkonfirmasi","Remaining this year":"Sisa tahun ini","Receivable":"Piutang dividen","Next payment":"Pembayaran berikutnya","Eligible Shares":"Saham yang berhak","Gross Dividend":"Dividen bruto","Payment Date":"Tanggal pembayaran",
  "Available Balance":"Saldo Tersedia","Outstanding Client Income":"Piutang Klien","Balances":"Saldo","Cash, Bank & Wallets":"Tunai, Bank & Dompet","Payment Status":"Status Pembayaran",
  "Pending Expenses":"Kewajiban Mendatang","Where the Money Sits":"Distribusi Aset","Planned vs Actual":"Rencana vs Aktual","All":"Semua","Expense":"Pengeluaran","Income":"Pemasukan",
  "Newest":"Terbaru","Category":"Kategori","Amount":"Nominal","Recorded Income":"Pemasukan Tercatat","Recorded Expense":"Pengeluaran Tercatat","Recorded Net":"Net Tercatat",
@@ -177,11 +183,12 @@ function normalizeStockMappings() {
 function projection(mode="base"){
  return buildProjection({
   years:YEARS,referenceDate:new Date(),accountTotal:netAccountTotal(),clients:state.clients,budgets:state.budgets,yearly:state.yearly,
-  events:state.events,credit:state.credit,transactions:[],portfolioForYear:year=>combinedPortfolio(year,mode)
+  events:state.events,credit:state.credit,transactions:[],portfolioForYear:year=>combinedPortfolio(year,mode),
+  plannedIncomeForMonth:(year,month)=>projectedDividendForMonth(state.dividends||[],year,month,state.usdIdr)
  });
 }
 function monthlyTimeline(mode="base"){
- return buildMonthlyTimeline({referenceDate:new Date(),accountTotal:netAccountTotal(),clients:state.clients,budgets:state.budgets,yearly:state.yearly,events:state.events,credit:state.credit,transactions:[],portfolioForYear:year=>combinedPortfolio(year,mode)});
+ return buildMonthlyTimeline({referenceDate:new Date(),accountTotal:netAccountTotal(),clients:state.clients,budgets:state.budgets,yearly:state.yearly,events:state.events,credit:state.credit,transactions:[],portfolioForYear:year=>combinedPortfolio(year,mode),plannedIncomeForMonth:(year,month)=>projectedDividendForMonth(state.dividends||[],year,month,state.usdIdr)});
 }
 
 function donut(entries,label){
@@ -242,14 +249,27 @@ function attachTips(){
 }
 function toastMsg(x){toast.textContent=x;toast.classList.add("show");setTimeout(()=>toast.classList.remove("show"),1400)}
 function setTheme(t){state.theme=t;document.documentElement.dataset.theme=t;localStorage.setItem("cvfinance-theme-cache",t);saveSettings();themeBtn.textContent=t==="dark"?"☀":"☾"}
+function setStockWorkspace(view,{refresh=true}={}){
+ const next=view==="trading"?"trading":"investment";state.stockView=next;
+ localStorage.setItem("cvfinance-stock-view-cache",next);
+ qa("[data-stock-workspace]").forEach(button=>{const active=button.dataset.stockWorkspace===next;button.classList.toggle("active",active);button.setAttribute("aria-selected",String(active));});
+ qa("[data-stock-view]").forEach(panel=>panel.classList.toggle("active",panel.dataset.stockView===next));
+ kicker.textContent=next==="trading"?"ACTIVE PORTFOLIO & PERFORMANCE":"LONG-TERM PORTFOLIO & TARGETS";
+ title.textContent=next==="trading"?"Stocks · Trading":"Stocks · Investment";
+ applyLanguage();
+ if(refresh&&next==="trading"&&stockRefreshStarted)queueMicrotask(()=>refreshTradingPrices({silent:true}));
+ if(refresh&&next==="investment"&&stockRefreshStarted)queueMicrotask(()=>refreshInvestmentDividends({silent:true}));
+ if(window.matchMedia("(max-width:1024px)").matches)window.scrollTo({top:0,left:0,behavior:"auto"});
+}
 function switchPage(p,{preserveScroll=false}={}){
+ if(p==="trading"){state.stockView="trading";p="stocks";}
  state.page=p;
  qa(".page").forEach(x=>x.classList.toggle("active",x.id===p));
  qa("[data-page]").forEach(x=>x.classList.toggle("active",x.dataset.page===p));
- const map={accumulation:["FINANCIAL COMMAND CENTER","Accumulation"],cashflow:["HISTORICAL RECORD","History"],expenses:["EDITABLE BUDGET & COSTS","Expenses"],clients:["RETAINERS & RECEIVABLES","Clients"],stocks:["LONG-TERM PORTFOLIO & TARGETS","Investment"],trading:["ACTIVE PORTFOLIO & PERFORMANCE","Trading"],electricity:["UTILITY COST MONITOR","Electricity"],prospect:["READ-ONLY FUTURE PROJECTION","Prospect"],insights:["INFOGRAPHIC SUMMARY","Insights"]};
+ const map={accumulation:["FINANCIAL COMMAND CENTER","Accumulation"],cashflow:["HISTORICAL RECORD","History"],expenses:["EDITABLE BUDGET & COSTS","Expenses"],clients:["RETAINERS & RECEIVABLES","Clients"],stocks:["PORTFOLIO WORKSPACE","Stocks"],electricity:["UTILITY COST MONITOR","Electricity"],prospect:["READ-ONLY FUTURE PROJECTION","Prospect"],insights:["INFOGRAPHIC SUMMARY","Insights"]};
  kicker.textContent=map[p][0]; title.textContent=map[p][1];
+ if(p==="stocks")setStockWorkspace(state.stockView||"investment",{refresh:!preserveScroll});
  applyLanguage();
- if(p==="trading"&&stockRefreshStarted&&!preserveScroll)queueMicrotask(()=>refreshTradingPrices({silent:true}));
  if(window.matchMedia("(max-width:1024px)").matches&&!preserveScroll)window.scrollTo({top:0,left:0,behavior:"auto"});
 }
 
@@ -570,6 +590,7 @@ function renderStocks(){
  stockNetcashIdr.value=Number(state.stockExtras?.netcashIdr||0)||"";
  stockWalletUsd.value=Number(state.stockExtras?.walletUsd||0)||"";
  stockNetcashValue.textContent=fmt(state.stockExtras?.netcashIdr||0);
+ stockWalletUsdValue.textContent=new Intl.NumberFormat("en-US",{style:"currency",currency:"USD",maximumFractionDigits:2}).format(Number(state.stockExtras?.walletUsd||0));
  stockWalletValue.textContent=fmt(Number(state.stockExtras?.walletUsd||0)*Number(state.usdIdr||0));
  if(typeof usdIdrRate!=="undefined"){
   const meta=state.usdIdrMeta;
@@ -577,8 +598,6 @@ function renderStocks(){
   usdIdrRate.textContent=`1 USD = ${new Intl.NumberFormat("id-ID",{maximumFractionDigits:2}).format(Number(state.usdIdr||0))} IDR · ${providerLabel}`;
   usdIdrRate.title=meta?.asOf?`${providerLabel} · updated ${new Date(meta.asOf).toLocaleString("en-GB",{dateStyle:"medium",timeStyle:"short"})}`:"Last saved exchange rate";
  }
- stockNetcashIdr.onchange=()=>{state.stockExtras ||= {netcashIdr:0,walletUsd:0};state.stockExtras.netcashIdr=Math.max(0,Number(stockNetcashIdr.value||0));save();renderAll();};
- stockWalletUsd.onchange=()=>{state.stockExtras ||= {netcashIdr:0,walletUsd:0};state.stockExtras.walletUsd=Math.max(0,Number(stockWalletUsd.value||0));save();renderAll();};
  holdingsBody.innerHTML=state.stocks.map((s,i)=>{
   const stale=isPriceStale(s), status=s.priceStatus||"manual", stamp=s.priceAsOf?new Date(s.priceAsOf).toLocaleString("en-GB",{dateStyle:"medium",timeStyle:"short"}):"Never";
   const statusLabel=status==="manual"?"MANUAL FALLBACK":status;
@@ -596,9 +615,10 @@ function renderStocks(){
   if(f==="current"){s.manualCurrent=Number(el.value);s.priceSource="manual";s.priceStatus="manual";s.priceAsOf=new Date().toISOString();}
   save();renderAll();
  });
- qa("[data-del-stock]").forEach(el=>el.onclick=()=>{state.stocks.splice(Number(el.dataset.delStock),1);save();renderAll();});
+ qa("[data-del-stock]").forEach(el=>el.onclick=()=>{const removed=state.stocks.splice(Number(el.dataset.delStock),1)[0];if(removed)state.dividends=(state.dividends||[]).filter(event=>event.holdingId!==removed.id);save();renderAll();});
  renderTargetTable("base",baseHead,baseBody);
  renderTargetTable("optimistic",optimisticHead,optimisticBody);
+ renderDividends();
 }
 
 function renderTargetTable(mode,headEl,bodyEl){
@@ -616,6 +636,65 @@ function renderTargetTable(mode,headEl,bodyEl){
   };
   el.addEventListener("keydown",event=>{if(event.key==="Enter"){event.preventDefault();el.blur()}else if(event.key==="Escape"){el.value=plainNumber(state.stocks[Number(el.dataset.stock)][mode][Number(el.dataset.year)]);el.blur();}});
   el.addEventListener("blur",commit);
+ });
+}
+
+function formatDividendNative(value,currency){
+ if(state.privacy)return currency==="USD"?"$••••":"Rp••••";
+ return new Intl.NumberFormat(currency==="USD"?"en-US":"id-ID",{style:"currency",currency,maximumFractionDigits:currency==="USD"?4:2}).format(Number(value||0));
+}
+
+function renderDividends(){
+ const events=state.dividends||[],year=currentYear(),summary=summarizeDividends(events,year,state.usdIdr,new Date());
+ const paidRows=events.filter(event=>dividendEventYear(event)===year&&(event.status==="paid"||event.creditedAt));
+ if(!state.stocks.length){dividendSummary.innerHTML="";dividendTickerList.innerHTML=`<div class="dividend-empty"><b>No Investment holdings</b><span>Dividend rows appear dynamically after you add an Investment ticker.</span></div>`;addDividendBtn.disabled=true;dividendSyncMeta.textContent="No Investment tickers";return;}
+ const nextDate=summary.next?.paymentDate||summary.next?.recordDate||summary.next?.exDate||"—";
+ dividendSummary.innerHTML=[
+  ["Remaining this year",fmt(summary.remaining),summary.remaining?"Confirmed + receivable":"No remaining confirmed dividend"],
+  ["Receivable",fmt(summary.receivable),summary.receivable?"Entitlement already locked":"Nothing awaiting payment"],
+  [`Total dividend ${year}`,fmt(summary.total),`${summary.rows.length} confirmed event${summary.rows.length===1?"":"s"}`],
+  ["Next payment",nextDate,summary.next?`${summary.next.ticker} · ${formatDividendNative(summary.next.amountPerShare,summary.next.currency)} / share`:"No scheduled payment"]
+ ].map(([label,value,note])=>`<article class="dividend-summary-card"><small>${label}</small><strong class="private">${value}</strong><span>${note}</span></article>`).join("");
+ addDividendBtn.disabled=false;
+ dividendTickerList.innerHTML=state.stocks.map(holding=>{
+  const rows=events.filter(event=>event.holdingId===holding.id).sort((a,b)=>String(b.paymentDate||b.recordDate||b.exDate).localeCompare(String(a.paymentDate||a.recordDate||a.exDate)));
+  const currentRows=rows.filter(event=>dividendEventYear(event)===year&&event.status!=="cancelled"),perShare=currentRows.reduce((sum,event)=>sum+Number(event.amountPerShare||0),0),holdingTotal=currentRows.reduce((sum,event)=>sum+dividendGross(event,state.usdIdr),0);
+  const remaining=currentRows.filter(event=>!["paid","cancelled"].includes(event.status)&&!event.creditedAt).reduce((sum,event)=>sum+dividendGross(event,state.usdIdr),0);
+  const eventHtml=rows.length?rows.map(event=>{
+   const native=dividendNativeGross(event),date=event.paymentDate||event.recordDate||event.exDate||"Date unavailable",review=event.eligibilityStatus==="review"&&!event.creditedAt;
+   const sourceUrl=safeExternalUrl(event.sourceUrl);
+   return `<div class="dividend-event"><div class="dividend-event-main"><b>${escapeHtml(event.type.toUpperCase())} · ${formatDividendNative(event.amountPerShare,event.currency)} / share</b><small>${escapeHtml(event.sourceProvider||"Manual")} · ${escapeHtml(date)}</small>${sourceUrl?`<small><a href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener noreferrer">View source</a></small>`:""}</div><div class="dividend-event-cell"><small>ELIGIBLE SHARES</small><b>${Number(event.eligibleShares||0).toLocaleString("en-US",{maximumFractionDigits:6})}</b></div><div class="dividend-event-cell"><small>GROSS DIVIDEND</small><b class="private">${formatDividendNative(native,event.currency)}</b></div><div class="dividend-event-cell"><small>PAYMENT DATE</small><b>${escapeHtml(event.paymentDate||"—")}</b></div><div><span class="dividend-status ${event.status} ${review?"review":""}">${review?"Review eligibility":event.status}</span></div><div class="dividend-event-actions">${review?`<button type="button" class="credit" data-credit-dividend="${event.id}" title="Confirm eligible shares and credit wallet">✓ Credit</button>`:""}<button type="button" data-edit-dividend="${event.id}" title="Edit dividend">✎</button><button type="button" data-delete-dividend="${event.id}" title="Delete dividend">🗑</button></div></div>`;
+  }).join(""):`<div class="dividend-empty"><b>0 confirmed dividend</b><span>No confirmed dividend event is stored for ${escapeHtml(holding.ticker)}.</span></div>`;
+  return `<details class="dividend-ticker-card" ${rows.length?"open":""}><summary><div class="dividend-ticker-title"><strong>${escapeHtml(holding.ticker)}</strong><small>${holding.market} · ${holding.currency}</small></div><div class="dividend-ticker-stat"><small>${year} per share</small><b>${formatDividendNative(perShare,holding.currency)}</b></div><div class="dividend-ticker-stat"><small>${year} entitlement</small><b class="private">${fmt(holdingTotal)}</b></div><div class="dividend-ticker-stat"><small>Remaining</small><b class="private">${fmt(remaining)}</b></div><span class="dividend-toggle">⌄</span></summary><div class="dividend-events">${eventHtml}</div></details>`;
+ }).join("");
+ qa("[data-edit-dividend]").forEach(button=>button.onclick=()=>openDividendEditor(button.dataset.editDividend));
+ qa("[data-delete-dividend]").forEach(button=>button.onclick=()=>{const event=events.find(row=>row.id===button.dataset.deleteDividend);if(!event||!confirm(`Delete ${event.ticker} dividend record?`))return;state.dividends=events.filter(row=>row.id!==event.id);save();renderAll();toastMsg("Dividend record deleted");});
+ qa("[data-credit-dividend]").forEach(button=>button.onclick=()=>{const event=events.find(row=>row.id===button.dataset.creditDividend);if(!event)return;const shares=prompt(`Eligible ${event.ticker} shares on record date`,String(event.eligibleShares||0));if(shares===null)return;event.eligibleShares=Math.max(0,Number(shares||0));if(!creditDividendToWallet(state,event))return toastMsg("Dividend amount is zero");save();renderAll();toastMsg(`${event.ticker} dividend credited to Investment wallet`);});
+ dividendSyncMeta.textContent=paidRows.length?`${paidRows.length} paid · official & provider data`:"Official & provider data";
+}
+
+function openDividendEditor(eventId){
+ const existing=(state.dividends||[]).find(row=>row.id===eventId),holding=state.stocks.find(row=>row.id===(existing?.holdingId||state.stocks[0]?.id));if(!holding)return;
+ const holdingOptions=state.stocks.map(row=>`${row.ticker} · ${row.id}`);
+ openSimple(existing?`Edit ${existing.ticker} Dividend`:"Add Investment Dividend",[
+  {key:"holding",label:"Investment Ticker",options:holdingOptions,value:`${holding.ticker} · ${holding.id}`},
+  {key:"type",label:"Dividend Type",options:["regular","interim","final","special"],value:existing?.type||"regular"},
+  {key:"amount",label:`Dividend / Share (${existing?.currency||holding.currency})`,type:"number",step:"any",value:existing?.amountPerShare||""},
+  {key:"shares",label:"Eligible Shares",type:"number",step:"any",value:existing?.eligibleShares??holding.quantity},
+  {key:"announcementDate",label:"Announcement Date",type:"date",required:false,value:existing?.announcementDate||""},
+  {key:"exDate",label:"Ex-Dividend Date",type:"date",required:false,value:existing?.exDate||""},
+  {key:"recordDate",label:"Record Date",type:"date",required:false,value:existing?.recordDate||""},
+  {key:"paymentDate",label:"Payment Date",type:"date",required:false,value:existing?.paymentDate||""},
+  {key:"status",label:"Status",options:["confirmed","announced","receivable","paid","cancelled"],value:existing?.status||"confirmed"},
+  {key:"sourceUrl",label:"Official Source URL",required:false,value:existing?.sourceUrl||""}
+ ],values=>{
+  const holdingId=String(values.holding).split(" · ").at(-1),selected=state.stocks.find(row=>row.id===holdingId);if(!selected)return false;
+  const amount=Math.max(0,Number(values.amount||0)),payment=values.paymentDate||values.recordDate||values.exDate||values.announcementDate||todayISO();
+  const row=existing||{id:createId(),creditedAt:null};
+  Object.assign(row,{holdingId:selected.id,ticker:selected.ticker,eventKey:existing?.eventKey||`manual:${selected.ticker}:${payment}:${amount}:${values.type}:${createId()}`,type:values.type,currency:selected.currency,amountPerShare:amount,eligibleShares:Math.max(0,Number(values.shares||0)),announcementDate:values.announcementDate||"",exDate:values.exDate||"",recordDate:values.recordDate||"",paymentDate:values.paymentDate||"",status:values.status,eligibilityStatus:values.status==="receivable"||values.status==="paid"?"locked":new Date(`${values.recordDate||values.exDate||payment}T00:00:00`)<new Date()?"review":"pending",sourceProvider:"Manual official record",sourceUrl:values.sourceUrl||"",manual:true,fxRate:selected.currency==="USD"?state.usdIdr:0});
+  if(!existing)state.dividends.push(row);
+  if(values.status==="paid"&&!row.creditedAt)creditDividendToWallet(state,row);
+  save();renderAll();toastMsg("Dividend record saved");
  });
 }
 
@@ -720,6 +799,21 @@ function openTradingCash(type,currency="USD"){
  ],values=>{
   if(type==="withdraw"&&Number(values.amount)>Number(values.currency==="USD"?wallet.usd:wallet.idr)){alert(`Maximum available: ${values.currency==="USD"?wallet.usd:wallet.idr} ${values.currency}`);return false;}
   state.tradingLedger.push({...cashEvent({type,currency:values.currency,amount:values.amount,date:values.date,fxRate:state.usdIdr,id:createId(),note:values.note}),__createdAt:new Date().toISOString()});recordTradingSnapshot();
+ });
+}
+
+function openInvestmentCash(type,currency="IDR"){
+ const extras=state.stockExtras||(state.stockExtras={netcashIdr:0,walletUsd:0});
+ openSimple(type==="withdraw"?"Withdraw Investment Funds":"Add Investment Funds",[
+  {key:"currency",label:"Currency",options:["IDR","USD"],value:currency},
+  {key:"amount",label:"Amount",type:"number",step:"any",inputmode:"decimal"}
+ ],values=>{
+  const amount=Math.max(0,Number(values.amount||0));
+  if(!(amount>0)){alert("Enter an amount greater than zero.");return false;}
+  const key=values.currency==="USD"?"walletUsd":"netcashIdr",balance=Number(extras[key]||0);
+  if(type==="withdraw"&&amount>balance+1e-8){alert(`Maximum available: ${plainNumber(balance)} ${values.currency}`);return false;}
+  extras[key]=type==="withdraw"?balance-amount:balance+amount;
+  return {message:type==="withdraw"?"Investment funds withdrawn":"Investment funds added"};
  });
 }
 
@@ -840,7 +934,7 @@ function renderProspect(){
    </div>
    <p>Monthly Income − Monthly Expense · read-only</p>
   </div>`;
- yearGrid.innerHTML=pr.map(y=>{const ages=ageTriplet(y.year).join(", "),current=y.year===currentYear(),hasCredit=Number(y.expenses.credit)>0,investmentValue=netPortfolio(y.year,state.prospectMode),tradingValue=tradingAssets(); return `<details class="year-card prospect-year-card"><summary><div class="year-head"><small>${y.year}</small><span class="age-triplet">${ages}</span></div><div class="year-summary-value"><h4 class="private ${moneyClass(y.nw)}">${fmt(y.nw)}</h4><span class="year-toggle">⌄</span></div><small class="year-equation">Opening Cash + Investment + Trading + Income − Expenses</small></summary><div class="year-details"><small class="year-split private"><span>Opening Cash <b class="${moneyClass(y.opening)}">${fmt(y.opening)}</b></span><span>Investment Stocks <b class="${moneyClass(investmentValue)}">${fmt(investmentValue)}</b></span><span>Trading Stocks <b class="${moneyClass(tradingValue)}">${fmt(tradingValue)}</b></span><span>${current?"Remaining recurring income":"Recurring income"} <b class="positive">+${fmt(y.incomeBreakdown.recurring)}</b></span>${y.incomeBreakdown.outstanding?`<span>Current receivables <b class="positive">+${fmt(y.incomeBreakdown.outstanding)}</b></span>`:""}${current?`<span>This month remaining <b class="negative">−${fmt(y.expenses.currentMonth)}</b></span>`:""}<span>Recurring expense <b class="negative">−${fmt(y.expenses.recurring)}</b></span><span>Yearly expense <b class="negative">−${fmt(y.expenses.yearly)}</b></span><span>Events <b class="negative">−${fmt(y.expenses.events)}</b></span>${hasCredit?`<span>Credit & PayLater <b class="negative">−${fmt(y.expenses.credit)}</b></span>`:""}</small></div></details>`;}).join("");
+ yearGrid.innerHTML=pr.map(y=>{const ages=ageTriplet(y.year).join(", "),current=y.year===currentYear(),hasCredit=Number(y.expenses.credit)>0,investmentValue=netPortfolio(y.year,state.prospectMode),tradingValue=tradingAssets(),dividendIncome=Number(y.incomeBreakdown.dividends||0); return `<details class="year-card prospect-year-card"><summary><div class="year-head"><small>${y.year}</small><span class="age-triplet">${ages}</span></div><div class="year-summary-value"><h4 class="private ${moneyClass(y.nw)}">${fmt(y.nw)}</h4><span class="year-toggle">⌄</span></div><small class="year-equation">Opening Cash + Investment + Trading + Income + Dividends − Expenses</small></summary><div class="year-details"><small class="year-split private"><span>Opening Cash <b class="${moneyClass(y.opening)}">${fmt(y.opening)}</b></span><span>Investment Stocks <b class="${moneyClass(investmentValue)}">${fmt(investmentValue)}</b></span><span>Trading Stocks <b class="${moneyClass(tradingValue)}">${fmt(tradingValue)}</b></span><span>${current?"Remaining recurring income":"Recurring income"} <b class="positive">+${fmt(y.incomeBreakdown.recurring)}</b></span>${y.incomeBreakdown.outstanding?`<span>Current receivables <b class="positive">+${fmt(y.incomeBreakdown.outstanding)}</b></span>`:""}${dividendIncome?`<span>Dividend Income <b class="positive">+${fmt(dividendIncome)}</b></span>`:""}${current?`<span>This month remaining <b class="negative">−${fmt(y.expenses.currentMonth)}</b></span>`:""}<span>Recurring expense <b class="negative">−${fmt(y.expenses.recurring)}</b></span><span>Yearly expense <b class="negative">−${fmt(y.expenses.yearly)}</b></span><span>Events <b class="negative">−${fmt(y.expenses.events)}</b></span>${hasCredit?`<span>Credit & PayLater <b class="negative">−${fmt(y.expenses.credit)}</b></span>`:""}</small></div></details>`;}).join("");
 }
 
 function renderInsights(){
@@ -1115,6 +1209,35 @@ async function refreshStockPrices({silent=false}={}){
  if(!silent)toastMsg(`${updated} price${updated===1?"":"s"} updated${failed?`, ${failed} fallback`:""}`);
 }
 
+async function refreshInvestmentDividends({silent=false,force=false}={}){
+ if(!navigator.onLine||!state.stocks.length){if(!state.stocks.length)renderDividends();return false;}
+ if(dividendRefreshPromise)return dividendRefreshPromise;
+ const holdingSignature=state.stocks.map(stock=>stock.id).sort().join(",");
+ const refreshKey=`cvfinance-dividends-refresh:${todayISO()}:${holdingSignature}`;
+ if(!force&&localStorage.getItem(refreshKey)==="done")return false;
+ dividendRefreshPromise=(async()=>{
+  if(typeof refreshDividendsBtn!=="undefined")refreshDividendsBtn.disabled=true;
+  if(typeof dividendSyncMeta!=="undefined")dividendSyncMeta.textContent="Checking confirmed dividends…";
+  const incoming=[];let succeeded=0,failed=0;const coverage=new Set();
+  for(const stock of state.stocks){
+   try{
+    const result=await fetchHoldingDividends(stock.id);
+    (result.events||[]).forEach(event=>incoming.push({...event,holdingId:stock.id}));
+    if(result.coverage)coverage.add(result.coverage);succeeded++;
+   }catch{failed++;}
+  }
+  const merged=mergeDividendEvents(state.dividends||(state.dividends=[]),incoming,state.stocks,createId,new Date());
+  const advanced=advanceDividendLifecycle(state,new Date());
+  if(succeeded)localStorage.setItem(refreshKey,"done");
+  if(merged||advanced)await save({background:silent});
+  if(!hasActiveEditor()){renderStocks();renderAccumulation();renderProspect();renderInsights();attachTips();applyLanguage();}
+  if(typeof dividendSyncMeta!=="undefined")dividendSyncMeta.textContent=coverage.size?[...coverage].join(" + "):succeeded?"No confirmed dividend found":"Provider unavailable · saved data retained";
+  if(!silent)toastMsg(`${succeeded} ticker${succeeded===1?"":"s"} checked${failed?` · ${failed} saved data`:""}`);
+  return merged||advanced;
+ })().finally(()=>{if(typeof refreshDividendsBtn!=="undefined")refreshDividendsBtn.disabled=false;dividendRefreshPromise=null;});
+ return dividendRefreshPromise;
+}
+
 async function refreshTradingPrices({silent=false,force=false}={}){
  if(!navigator.onLine)return;
  if(!state.tradingPositions.length&&!state.tradingLedger.length)return;
@@ -1183,7 +1306,8 @@ async function refreshExchangeRate({silent=false,force=false}={}){
 async function refreshMarkets({silent=false}={}){
  await refreshExchangeRate({silent:true,force:true});
  await refreshStockPrices({silent:true});
- if(state.page==="trading")await refreshTradingPrices({silent:true});
+ await refreshInvestmentDividends({silent:true});
+ if(state.page==="stocks"&&state.stockView==="trading")await refreshTradingPrices({silent:true});
  if(!silent)toastMsg("Market prices and USD/IDR updated");
 }
 
@@ -1202,6 +1326,7 @@ async function validateStockSymbols(){
 qa("[data-page]").forEach(b=>b.onclick=()=>switchPage(b.dataset.page));
 qa(".mobile-more [data-page]").forEach(b=>b.addEventListener("click",()=>dataModal.close()));
 qa("[data-go]").forEach(b=>b.onclick=()=>switchPage(b.dataset.go));
+qa("[data-stock-workspace]").forEach(button=>button.onclick=()=>setStockWorkspace(button.dataset.stockWorkspace));
 themeBtn.onclick=()=>setTheme(state.theme==="dark"?"light":"dark");
 languageBtn.onclick=()=>{state.language=state.language==="en"?"id":"en";applyLanguage();saveSettings();renderAll();switchPage(state.page);};
 privacyBtn.onclick=()=>{state.privacy=!state.privacy; document.body.classList.toggle("private-hidden",state.privacy); privacyBtn.textContent=state.privacy?"🙈":"👁"; renderAll();};
@@ -1295,7 +1420,7 @@ addTickerBtn.onclick=()=>openSimple("Add Ticker",[
  {key:"quantity",label:"Quantity (IDX = lots · US = shares)",type:"number",step:".000001"},
  {key:"avg",label:"Average Price / Share",type:"number",step:".01"},
  {key:"current",label:"Manual Fallback Price / Share",type:"number",step:".01",value:0}
-],o=>{o.id=createId();o.ticker=o.ticker.toUpperCase();o.displaySymbol=o.ticker;o.quantity=quantityForStorage(o.market,o.quantity);normalizeStockMapping(o);o.manualCurrent=o.current;o.priceSource="manual";o.priceStatus="manual";o.priceAsOf=null;o.base={};o.optimistic={};YEARS.slice(1).forEach(y=>{o.base[y]=o.current;o.optimistic[y]=o.current});state.stocks.push(o);});
+],o=>{o.id=createId();o.ticker=o.ticker.toUpperCase();o.displaySymbol=o.ticker;o.quantity=quantityForStorage(o.market,o.quantity);normalizeStockMapping(o);o.manualCurrent=o.current;o.priceSource="manual";o.priceStatus="manual";o.priceAsOf=null;o.base={};o.optimistic={};YEARS.slice(1).forEach(y=>{o.base[y]=o.current;o.optimistic[y]=o.current});state.stocks.push(o);queueMicrotask(()=>refreshInvestmentDividends({silent:true,force:true}));});
 addTradingPositionBtn.onclick=()=>openSimple("Add Trading Position",[
  {key:"ticker",label:"US Ticker"},{key:"market",label:"Market",options:["NASDAQ","NYSE","AMEX"],value:"NASDAQ"},
  {key:"quantity",label:"Shares",type:"number",step:".000001"},{key:"avg",label:"Entry Price / Share (USD)",type:"number",step:".01"},
@@ -1312,6 +1437,10 @@ addTradingPositionBtn.onclick=()=>openSimple("Add Trading Position",[
 });
 tradingDepositBtn.onclick=()=>openTradingCash("deposit","USD");
 qa("[data-trading-withdraw]").forEach(button=>button.onclick=()=>openTradingCash("withdraw",button.dataset.tradingWithdraw));
+investmentDepositBtn.onclick=()=>openInvestmentCash("deposit","IDR");
+qa("[data-investment-withdraw]").forEach(button=>button.onclick=()=>openInvestmentCash("withdraw",button.dataset.investmentWithdraw));
+addDividendBtn.onclick=()=>openDividendEditor();
+refreshDividendsBtn.onclick=()=>refreshInvestmentDividends({force:true});
 addElectricityBtn.onclick=()=>openSimple("Add Meter Reading",[
  {key:"date",label:"Date",type:"date",value:todayISO()},
  {key:"time",label:"Time",type:"time",value:"19:00"},
@@ -1340,15 +1469,16 @@ function applyCloudState(next,{preserveUi=false}={}){
  const repairedPositionState=reconcileTradingPositions(next.tradingPositions||[],next.tradingLedger||[]);
  const closedPositionState=archiveClosedTradingPositions({positions:next.tradingPositions||[],ledger:next.tradingLedger||[]});
  if(closedPositionState.closedPositionIds.length){next.tradingPositions=closedPositionState.positions;next.tradingLedger=closedPositionState.ledger;}
- const ui={page:state.page,privacy:state.privacy,filter:state.filter,sort:state.sort,expenseView:state.expenseView,txEdit:null,prospectMode:state.prospectMode,tradingRange:state.tradingRange||"YTD"};
+ const ui={page:state.page==="trading"?"stocks":state.page,stockView:state.stockView||"investment",privacy:state.privacy,filter:state.filter,sort:state.sort,expenseView:state.expenseView,txEdit:null,prospectMode:state.prospectMode,tradingRange:state.tradingRange||"YTD"};
  Object.assign(state,next,ui);
  document.documentElement.dataset.theme=state.theme;
  localStorage.setItem("cvfinance-theme-cache",state.theme);
  localStorage.setItem("cvfinance-language-cache",state.language||"en");
  themeBtn.textContent=state.theme==="dark"?"☀":"☾";
  baseGrowth.value=state.baseGrowth;optimisticGrowth.value=state.optimisticGrowth;
+ const dividendStateChanged=advanceDividendLifecycle(state,new Date());
  updateModeToggleLabels();renderAllPreservingScroll();switchPage(state.page,{preserveScroll:true});
- if(repairedPositionState||closedPositionState.closedPositionIds.length){recordTradingSnapshot();queueMicrotask(()=>save({background:true}));}
+ if(repairedPositionState||closedPositionState.closedPositionIds.length||dividendStateChanged){recordTradingSnapshot();queueMicrotask(()=>save({background:true}));}
 }
 
 function updateSyncStatus(info){
@@ -1377,7 +1507,7 @@ async function showSignedIn(user){
   stockRefreshStarted=true;
   setTimeout(()=>refreshMarkets({silent:true}),500);
   fxRefreshTimer=setInterval(()=>refreshExchangeRate({silent:true}),5*60*1000);
-  tradingRefreshTimer=setInterval(()=>{if(state.page==="trading"&&!document.hidden)refreshTradingPrices({silent:true});},2*60*1000);
+  tradingRefreshTimer=setInterval(()=>{if(state.page==="stocks"&&state.stockView==="trading"&&!document.hidden)refreshTradingPrices({silent:true});},2*60*1000);
  }
 }
 

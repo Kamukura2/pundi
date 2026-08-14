@@ -13,6 +13,10 @@ for (const icon of manifest.icons) assert.ok(existsSync(resolve(root, "public", 
 const index = read("index.html");
 const css = read("styles.css");
 for (const tab of ["accumulation","cashflow","expenses","clients","stocks","trading","electricity","prospect","insights"]) assert.match(index, new RegExp(`id="${tab}"`));
+assert.equal((index.match(/data-page="stocks"/g)||[]).length,3,"Sidebar, mobile nav, and data menu must expose one Stocks destination");
+assert.doesNotMatch(index,/data-page="trading"/,"Trading must live inside Stocks instead of a separate route");
+assert.match(index,/data-stock-workspace="investment"/);assert.match(index,/data-stock-workspace="trading"/);
+assert.match(index,/id="dividendTickerList"/);assert.match(index,/id="investmentDepositBtn"/);
 assert.match(index, /manifest\.webmanifest/);
 assert.match(index, /authForm/);
 assert.match(index, /annualPerformanceDashboard/);
@@ -37,7 +41,7 @@ for (const key of ["FINNHUB_API_KEY","TWELVE_DATA_API_KEY","SUPABASE_URL","SUPAB
 const serviceWorker = read("public/sw.js");
 assert.match(serviceWorker, /pathname\.startsWith\("\/api\/"\)/);
 
-const jsFiles = ["app.js","api/config.js","api/_lib/rate-limit.js","api/stocks/fx.js","api/stocks/quote.js","api/stocks/validate.js","api/trading/quote.js","api/trading/benchmark.js","api/cron/refresh-stocks.js","src/data/default-data.js","src/data/finance-model.js","src/data/repository.js","src/lib/idb.js","src/lib/supabase.js","src/stocks/client.js","src/stocks/holding.js","src/trading/model.js","src/sync/sync-manager.js"];
+const jsFiles = ["app.js","api/config.js","api/_lib/rate-limit.js","api/_lib/dividends.js","api/stocks/dividends.js","api/stocks/fx.js","api/stocks/quote.js","api/stocks/validate.js","api/trading/quote.js","api/trading/benchmark.js","api/cron/refresh-stocks.js","src/data/default-data.js","src/data/finance-model.js","src/data/repository.js","src/lib/idb.js","src/lib/supabase.js","src/stocks/client.js","src/stocks/dividends.js","src/stocks/holding.js","src/trading/model.js","src/sync/sync-manager.js"];
 for (const file of jsFiles) execFileSync(process.execPath, ["--check", resolve(root, file)], { stdio:"pipe" });
 
 for (const file of jsFiles.map(read)) {
@@ -124,6 +128,23 @@ assert.doesNotMatch(migration011,/drop\s+table|truncate\s+|delete\s+from/i);
 const migration012 = read("supabase/migrations/012_trading_portfolio.sql");
 for (const marker of ["trading_positions","trading_ledger","trading_snapshots","external_flow_idr","realized_pl_idr","enable row level security"]) assert.match(migration012,new RegExp(marker));
 assert.doesNotMatch(migration012,/drop\s+table|truncate\s+|delete\s+from/i);
+const migration013 = read("supabase/migrations/013_investment_dividends.sql");
+for (const marker of ["investment_dividends","amount_per_share","eligible_shares","record_date","payment_date","credited_at","enable row level security","force row level security"]) assert.match(migration013,new RegExp(marker));
+assert.doesNotMatch(migration013,/drop\s+table|truncate\s+|delete\s+from/i);
+
+const { advanceDividendLifecycle, creditDividendToWallet, dividendReceivables, mergeDividendEvents, projectedDividendForMonth } = await import("../src/stocks/dividends.js");
+const dividendHolding={id:"h1",ticker:"BMRI",currency:"IDR",quantity:100};
+const dividendState={stocks:[dividendHolding],stockExtras:{netcashIdr:0,walletUsd:0},dividends:[{id:"d1",holdingId:"h1",eventKey:"bmri:test",ticker:"BMRI",type:"final",currency:"IDR",amountPerShare:10,eligibleShares:100,recordDate:"2026-08-10",paymentDate:"2026-08-20",status:"confirmed",eligibilityStatus:"pending",creditedAt:null}]};
+assert.equal(advanceDividendLifecycle(dividendState,new Date("2026-08-11T00:00:00Z")),true);
+assert.equal(dividendState.dividends[0].status,"receivable");assert.equal(dividendReceivables(dividendState.dividends,17000),1000);
+assert.equal(advanceDividendLifecycle(dividendState,new Date("2026-08-21T00:00:00Z")),true);
+assert.equal(dividendState.stockExtras.netcashIdr,1000);assert.equal(dividendState.dividends[0].status,"paid");
+assert.equal(advanceDividendLifecycle(dividendState,new Date("2026-08-22T00:00:00Z")),false,"Paid dividends must never be credited twice");
+const historicalEvents=[];
+assert.equal(mergeDividendEvents(historicalEvents,[{holdingId:"h1",eventKey:"old",type:"interim",currency:"IDR",amountPerShare:5,recordDate:"2026-01-07",paymentDate:"2026-01-14",status:"confirmed"}],[dividendHolding],()=>"old-id",new Date("2026-08-14T00:00:00Z")),true);
+assert.equal(historicalEvents[0].eligibilityStatus,"review","Past dividends require historical share review before wallet credit");
+assert.equal(creditDividendToWallet({stocks:[dividendHolding],stockExtras:{netcashIdr:0,walletUsd:0},dividends:historicalEvents},historicalEvents[0],new Date("2026-08-14T00:00:00Z")),true);
+assert.equal(projectedDividendForMonth([{currency:"USD",amountPerShare:1,eligibleShares:2,paymentDate:"2027-05-10",status:"confirmed",creditedAt:null}],2027,4,17000),34000);
 
 const { applyOpeningPosition, applyTrade, archiveClosedTradingPositions, cashEvent, performancePreview, performanceSeries, reconcileTradingPositions, removeTradingPositionData, tradingMetrics, tradingTargetSimulation, upsertDailySnapshot } = await import("../src/trading/model.js");
 const tradePosition={id:"p1",ticker:"MU",market:"NASDAQ",currency:"USD",quantity:0,avg:0,current:0};
@@ -327,11 +348,14 @@ assert.match(app, /<details class="year-card prospect-year-card">/, "Future Cash
 assert.match(app, /Financial Action Plan/);
 
 assert.match(app, /2\*60\*1000/, "Trading auto-refresh must use a quota-aware two-minute interval");
-assert.match(app, /state\.page==="trading"&&!document\.hidden/, "Trading auto-refresh must pause outside the visible Trading page");
+assert.match(app, /state\.page==="stocks"&&state\.stockView==="trading"&&!document\.hidden/, "Trading auto-refresh must pause outside Stocks → Trading");
+assert.match(app,/refreshInvestmentDividends/,"Investment dividend events must receive a daily provider refresh");
+assert.match(app,/advanceDividendLifecycle/,"Dividend receivable and payment states must advance automatically");
+assert.match(app,/Opening Cash \+ Investment \+ Trading \+ Income \+ Dividends − Expenses/,"Prospect must disclose confirmed dividend income in its visible equation");
 
 const syncSource = read("src/sync/sync-manager.js");
 assert.match(syncSource, /this\.pendingPersists/, "Realtime reloads must wait for queued local saves");
 assert.match(syncSource, /await this\.repository\.loadCloud\(\);\s*result = await this\.repository\.save\(snapshot\)/, "Transient optimistic-lock conflicts must retry the unchanged local snapshot");
 assert.doesNotMatch(syncSource, /if \(\/conflict\/i\.test\(error\.message \|\| \"\"\)\) \{\s*const cloud[\s\S]*this\.onState\(cloud\)/, "A sync conflict must never overwrite unsaved local target input");
 
-console.log("CVFinance checks passed: schema, RLS markers, PWA, 9 tabs, v7.9.6 closed-position sync tombstone, active-only cards and targets, same-ticker re-entry with a fresh cost basis, persistent desktop Trading SELL handler, Trading equity ledger reconciliation, Starting Funds label, mobile document scroll recovery, no background scrollTo on touch devices, compact mobile Trading, unrestricted manual Sell price, isolated Reset All, immediate sell feedback, realized-only accumulated Trading gain/loss, stable target sync, same-day SPY comparison, visible SPY API quote, safe ticker deletion, Twelve Data primary quotes, Finnhub fallback, separate Investment and Trading assets in Prospect, Trading Insights, PAID-or-nominal client cards, persistent transaction templates, monthly History archives, Financial Action Plan isolation, Yahoo FX validation, offline queue coalescing, and JavaScript syntax.");
+console.log("CVFinance checks passed: schema, RLS markers, PWA, unified Stocks workspace, unchanged Investment/Trading isolation, matching wallet controls, dynamic Investment dividends, historical eligibility review, one-time dividend credit, dividend Prospect income, closed-position sync tombstone, active-only Trading cards and targets, same-ticker re-entry, desktop SELL handler, Trading equity reconciliation, Starting Funds label, mobile document scroll recovery, compact mobile Trading, unrestricted manual Sell price, isolated Reset All, realized-only Trading gain/loss, stable target sync, same-day SPY comparison, visible SPY API quote, safe ticker deletion, Twelve Data primary quotes, Finnhub fallback, Trading Insights, PAID-or-nominal client cards, persistent transaction templates, monthly History archives, Financial Action Plan isolation, Yahoo FX validation, offline queue coalescing, and JavaScript syntax.");

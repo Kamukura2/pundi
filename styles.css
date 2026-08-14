@@ -1037,3 +1037,49 @@ select,input,.search{width:100%;min-width:0;height:46px;padding:0 12px;border-ra
  .trading-wallet-card strong{font-size:16px}
  .trading-wallet-card button{padding:6px 7px;font-size:8px}
 }
+
+/* v8.0.0 unified Stocks workspace and Investment dividend ledger */
+.stock-workspace-tabs{width:min(430px,100%);grid-template-columns:repeat(2,minmax(0,1fr));margin:0 0 22px;padding:6px}
+.stock-workspace-tabs button{font-weight:900;letter-spacing:.01em;cursor:pointer}
+.stock-workspace-tabs button.active{color:#fff;background:linear-gradient(135deg,#785eff,#27b9e8);box-shadow:0 10px 24px rgba(74,111,255,.23)}
+.stock-workspace-view{display:none;min-width:0}
+.stock-workspace-view.active{display:block}
+.investment-wallet-panel{margin-top:26px}
+.investment-wallet-grid .investment-wallet-card{min-height:96px}
+.dividend-panel{margin-top:28px}
+.dividend-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px}
+.dividend-summary-card{min-width:0;padding:16px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(145deg,color-mix(in srgb,var(--surface2) 92%,#735cff 8%),var(--surface2))}
+.dividend-summary-card small{display:block;color:var(--muted);font-size:9px;font-weight:900;letter-spacing:.08em;text-transform:uppercase}
+.dividend-summary-card strong{display:block;margin-top:7px;font-size:clamp(18px,2vw,25px);overflow-wrap:anywhere}
+.dividend-summary-card span{display:block;margin-top:5px;color:var(--muted);font-size:11px}
+.dividend-ticker-list{display:grid;gap:13px}
+.dividend-ticker-card{overflow:hidden;border:1px solid var(--line);border-radius:20px;background:var(--surface2)}
+.dividend-ticker-card>summary{display:grid;grid-template-columns:minmax(120px,.8fr) repeat(3,minmax(120px,1fr)) 36px;gap:12px;align-items:center;padding:16px;cursor:pointer;list-style:none}
+.dividend-ticker-card>summary::-webkit-details-marker{display:none}
+.dividend-ticker-title strong{display:block;font-size:23px}.dividend-ticker-title small{display:block;margin-top:4px;color:var(--muted)}
+.dividend-ticker-stat small{display:block;color:var(--muted);font-size:8px;font-weight:900;letter-spacing:.07em;text-transform:uppercase}.dividend-ticker-stat b{display:block;margin-top:5px;font-size:15px;overflow-wrap:anywhere}
+.dividend-toggle{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;background:var(--surface);border:1px solid var(--line);transition:transform .2s}
+.dividend-ticker-card[open] .dividend-toggle{transform:rotate(180deg)}
+.dividend-events{display:grid;gap:8px;padding:0 16px 16px}
+.dividend-event{display:grid;grid-template-columns:minmax(150px,1.2fr) repeat(3,minmax(100px,.8fr)) minmax(120px,.8fr) auto;gap:10px;align-items:center;padding:13px;border:1px solid var(--line);border-radius:15px;background:var(--surface)}
+.dividend-event-main b{display:block}.dividend-event-main small,.dividend-event-cell small{display:block;margin-top:3px;color:var(--muted);font-size:10px}.dividend-event-cell b{display:block;font-size:13px}
+.dividend-status{display:inline-flex;padding:6px 9px;border-radius:999px;background:rgba(89,122,255,.13);color:#6079e8;font-size:8px;font-weight:950;text-transform:uppercase}
+.dividend-status.paid{background:rgba(34,205,143,.14);color:var(--green)}.dividend-status.review{background:rgba(255,165,58,.15);color:#f29a32}.dividend-status.cancelled{background:rgba(255,79,113,.14);color:#ef476f}
+.dividend-event-actions{display:flex;gap:6px}.dividend-event-actions button{min-width:34px;height:34px;padding:0 9px;border:1px solid var(--line);border-radius:10px;background:var(--surface2);color:var(--text);font-weight:850;cursor:pointer}.dividend-event-actions .credit{color:var(--green)}
+.dividend-empty{padding:28px;border:1px dashed var(--line);border-radius:18px;text-align:center;color:var(--muted)}.dividend-empty b{display:block;margin-bottom:5px;color:var(--text);font-size:18px}
+[data-theme=dark] .dividend-summary-card,[data-theme=dark] .dividend-ticker-card{box-shadow:inset 0 1px rgba(255,255,255,.04)}
+
+@media(max-width:1024px){
+ .dividend-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .dividend-ticker-card>summary{grid-template-columns:minmax(120px,1fr) repeat(2,minmax(100px,.8fr)) 34px}.dividend-ticker-stat:nth-of-type(3){display:none}
+ .dividend-event{grid-template-columns:repeat(2,minmax(0,1fr))}.dividend-event-main,.dividend-event-actions{grid-column:1/-1}.dividend-event-actions{justify-content:flex-end}
+}
+@media(max-width:680px){
+ .stock-workspace-tabs{position:sticky;top:6px;z-index:28;margin-bottom:13px;border-radius:14px;background:color-mix(in srgb,var(--surface2) 92%,transparent);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+ .stock-workspace-tabs button{font-size:12px;padding:9px 7px}
+ .investment-wallet-panel{margin-top:10px;padding:14px!important;border-radius:19px}.investment-wallet-panel .panel-head{display:grid;grid-template-columns:1fr;gap:8px}.investment-wallet-panel .head-actions{display:grid;grid-template-columns:minmax(0,1fr) repeat(3,34px);gap:6px;width:100%}.investment-wallet-panel .fx-rate{min-width:0;padding:7px;font-size:7px;white-space:normal;overflow-wrap:anywhere}.investment-wallet-panel .primary-btn{grid-column:1/-1;height:36px;font-size:10px}.investment-wallet-grid{grid-template-columns:1fr!important;gap:8px}
+ .dividend-panel{margin-top:14px;padding:14px!important;border-radius:19px}.dividend-panel .panel-head{display:grid;grid-template-columns:1fr;gap:9px}.dividend-panel .head-actions{display:grid;grid-template-columns:minmax(0,1fr) 34px auto;width:100%;gap:6px}.dividend-panel .pill{min-width:0;padding:7px;font-size:7px;white-space:normal}.dividend-panel .primary-btn,.dividend-panel .ghost-btn{height:34px;min-height:34px;padding:0 9px;font-size:9px}
+ .dividend-summary{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-bottom:10px}.dividend-summary-card{padding:10px;border-radius:13px}.dividend-summary-card small{font-size:6px}.dividend-summary-card strong{font-size:14px}.dividend-summary-card span{font-size:8px}
+ .dividend-ticker-card{border-radius:15px}.dividend-ticker-card>summary{grid-template-columns:minmax(90px,1fr) minmax(95px,1fr) 30px;gap:7px;padding:11px}.dividend-ticker-title strong{font-size:18px}.dividend-ticker-title small{font-size:8px}.dividend-ticker-stat:nth-of-type(n+2){display:none}.dividend-ticker-stat small{font-size:6px}.dividend-ticker-stat b{font-size:11px}.dividend-toggle{width:29px;height:29px;border-radius:9px}
+ .dividend-events{padding:0 10px 10px}.dividend-event{grid-template-columns:1fr 1fr;gap:7px;padding:10px;border-radius:12px}.dividend-event-cell b{font-size:10px}.dividend-event-main small,.dividend-event-cell small{font-size:7px}.dividend-status{font-size:6px}.dividend-event-actions button{height:31px;font-size:8px}
+}

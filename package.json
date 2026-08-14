@@ -1,6 +1,6 @@
 {
   "name": "cvfinance",
-  "version": "7.9.6",
+  "version": "8.0.0",
   "private": true,
   "type": "module",
   "scripts": {

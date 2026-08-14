@@ -2,9 +2,8 @@
 
 1. Create a Supabase project and save its project URL, public anon/publishable key, and database password.
 2. Open **SQL Editor** and run these files in order:
-   - `supabase/migrations/001_initial_schema.sql`
-   - `supabase/migrations/002_seed_current_user.sql`
-   - `supabase/migrations/003_realtime.sql`
+   - New project: run every file in `supabase/migrations/` from `001` through `013` in numeric order.
+   - Existing v7.9.6 project: run only `supabase/migrations/013_investment_dividends.sql` before deploying v8.0.0.
 3. In **Authentication → Providers → Email**, keep email/password enabled and disable unrestricted new-user registration/sign-ups.
 4. In **Authentication → Users**, create and confirm one private user manually. Do not expose a sign-up page.
 5. In **Authentication → URL Configuration**, set the Vercel production URL as Site URL after the first deployment.

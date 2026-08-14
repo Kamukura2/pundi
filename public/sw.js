@@ -1,4 +1,4 @@
-const SHELL_CACHE = "cvfinance-shell-v7.9.6-closed-position-tombstone";
+const SHELL_CACHE = "cvfinance-shell-v8.0.0-stock-hub-dividends";
 const SHELL = ["/", "/index.html", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", event => {

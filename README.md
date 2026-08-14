@@ -1,4 +1,6 @@
-# CVFinance v7.9.6
+# CVFinance v8.0.0
+
+v8.0.0 consolidates Investment and Trading into one **Stocks** navigation destination with an in-page Investment/Trading switch. Both workspaces retain their existing isolated calculations and persistence, while their Netcash & USD Wallet cards now share one visual and interaction pattern. Stocks → Investment adds a dynamic confirmed-dividend ledger per active ticker, official/provider discovery, entitlement dates, receivables, one-time wallet crediting, and confirmed future dividend income in Prospect. The new Supabase migration `013_investment_dividends.sql` is required before deploying the application files.
 
 v7.9.6 prevents a fully sold Trading card from reappearing after a delayed Supabase realtime reload. A zero-share synchronized tombstone is retained internally, but only positions with open shares render in Active Trading Portfolio, Target Price Simulation, and price refreshes. Reopening the same ticker reuses that tombstone with a fresh quantity, entry date, target, and cost basis, while completed-cycle ledger records stay detached and permanent. No schema migration is required.
 
@@ -44,7 +46,7 @@ v7.1.0 adds a dedicated private Telegram webhook for fast CVFinance input. It wr
 
 The v7.0.2 delayed Yahoo Finance IDX pricing remains included. IDX quantities are entered as lots (1 lot = 100 shares), while US quantities remain shares and support fractions.
 
-Deployment-ready continuation of CVFinance v6.3.1. The nine-tab UI preserves every earlier module while Supabase remains the authoritative database.
+Deployment-ready continuation of CVFinance v6.3.1. Stocks now contains the unchanged Investment and Trading workspaces behind one switch while Supabase remains the authoritative database.
 
 ## Included
 
@@ -64,6 +66,7 @@ Deployment-ready continuation of CVFinance v6.3.1. The nine-tab UI preserves eve
 - Theme-aware vibrant cards without dark light-mode panels
 - Seven-button icon-only mobile navigation and compact stock editing cards
 - App-like Android installation through the existing PWA, with no second database or desktop process
+- Confirmed Investment dividend events with record/payment dates, eligibility locking, wallet crediting, and Prospect integration
 
 ## Commands
 
@@ -97,6 +100,7 @@ For local full-stack testing, use `vercel dev`; plain `npm run dev` does not emu
 - [Twelve Data primary Trading quotes v7.8.1 patch](docs/PATCH_v7_8_1_TWELVE_DATA_TRADING.md)
 - [Trading SPY baseline and Target Price v7.8.2 patch](docs/PATCH_v7_8_2_TRADING_SPY_TARGETS.md)
 - [Trading Target Sync Stability and Readability v7.8.3 patch](docs/PATCH_v7_8_3_TARGET_SYNC_READABILITY.md)
+- [Stock Hub and Investment Dividend Ledger v8.0.0 patch](docs/PATCH_v8_0_0_STOCK_HUB_DIVIDENDS.md)
 - [Second account setup](docs/SECOND_ACCOUNT_SETUP.md)
 - [Manual actions](docs/MANUAL_ACTIONS.md)
 - [Test checklist](docs/TEST_CHECKLIST.md)

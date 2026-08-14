@@ -157,7 +157,7 @@ export function remainingYearIncomeBreakdown({referenceDate = new Date(), client
   return {outstanding, recurring, additional, total:outstanding + recurring + additional};
 }
 
-export function buildMonthlyTimeline({referenceDate = new Date(), accountTotal, clients, budgets, yearly, events, credit, transactions, portfolioForYear}) {
+export function buildMonthlyTimeline({referenceDate = new Date(), accountTotal, clients, budgets, yearly, events, credit, transactions, portfolioForYear, plannedIncomeForMonth = () => 0}) {
   const year = referenceDate.getFullYear();
   const currentMonth = referenceDate.getMonth();
   const monthlyBudget = budgets.reduce((sum, item) => sum + expense(item.monthly), 0);
@@ -167,8 +167,8 @@ export function buildMonthlyTimeline({referenceDate = new Date(), accountTotal, 
   for (let month = currentMonth; month < 12; month += 1) {
     const isCurrent = month === currentMonth;
     const income = isCurrent ? getTotalOutstanding(clients, referenceDate) : fixedIncome;
-    // History is a ledger only. It cannot change projected cash.
-    const extraIncome = 0;
+    // History remains ledger-only. Only confirmed scheduled income (for example dividends) enters Prospect.
+    const extraIncome = number(plannedIncomeForMonth(year, month, isCurrent));
     const recurringExpense = isCurrent ? monthlyBudgetRemaining(budgets, transactions, referenceDate) : monthlyBudget;
     const yearlyExpense = dueYearly(yearly, year, month, year, currentMonth);
     const eventExpense = dueEvents(events, year, month);
@@ -181,10 +181,10 @@ export function buildMonthlyTimeline({referenceDate = new Date(), accountTotal, 
   return rows;
 }
 
-export function buildProjection({years, referenceDate = new Date(), accountTotal, clients, budgets = [], yearly, events, credit = [], transactions = [], portfolioForYear}) {
+export function buildProjection({years, referenceDate = new Date(), accountTotal, clients, budgets = [], yearly, events, credit = [], transactions = [], portfolioForYear, plannedIncomeForMonth = () => 0}) {
   const activeYear = referenceDate.getFullYear();
   const currentMonth = referenceDate.getMonth();
-  const monthly = buildMonthlyTimeline({referenceDate,accountTotal,clients,budgets,yearly,events,credit,transactions,portfolioForYear});
+  const monthly = buildMonthlyTimeline({referenceDate,accountTotal,clients,budgets,yearly,events,credit,transactions,portfolioForYear,plannedIncomeForMonth});
   const currentClosing = monthly.at(-1)?.cash ?? number(accountTotal);
   let cash = currentClosing;
   return years.map(year => {
@@ -204,13 +204,16 @@ export function buildProjection({years, referenceDate = new Date(), accountTotal
       remainingBreakdown.total=remainingBreakdown.currentMonth+remainingBreakdown.recurring+remainingBreakdown.yearly+remainingBreakdown.events+remainingBreakdown.credit;
       const portfolio = number(portfolioForYear(year));
       const incomeBreakdown = remainingYearIncomeBreakdown({referenceDate,clients,transactions});
+      incomeBreakdown.dividends=currentRows.reduce((sum,row)=>sum+number(row.extraIncome),0);
+      incomeBreakdown.total+=incomeBreakdown.dividends;
       return {year,opening,income,incomeBreakdown,expense,expenses:remainingBreakdown,eventExpense:remainingBreakdown.events,creditExpense:remainingBreakdown.credit,portfolio,closing:currentClosing,nw:opening + portfolio + incomeBreakdown.total - remainingBreakdown.total};
     }
     const opening = cash;
-    const annualIncome = getFixedIncome(clients) * 12;
+    const dividendIncome=Array.from({length:12},(_,month)=>number(plannedIncomeForMonth(year,month,false))).reduce((sum,value)=>sum+value,0);
+    const annualIncome = getFixedIncome(clients) * 12 + dividendIncome;
     cash += annualIncome - breakdown.total;
     const portfolio = number(portfolioForYear(year));
-    const incomeBreakdown = {outstanding:0,recurring:getFixedIncome(clients)*12,additional:annualIncome-getFixedIncome(clients)*12,total:annualIncome};
+    const incomeBreakdown = {outstanding:0,recurring:getFixedIncome(clients)*12,additional:0,dividends:dividendIncome,total:annualIncome};
     return {year,opening,income:annualIncome,incomeBreakdown,expense:breakdown.total,expenses:breakdown,eventExpense:breakdown.events,creditExpense:breakdown.credit,portfolio,closing:cash,nw:opening + portfolio + incomeBreakdown.total - breakdown.total};
   });
 }
