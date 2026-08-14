@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-  <title>CVFinance v8.0.1</title>
+  <title>CVFinance v8.0.2</title>
   <meta name="theme-color" content="#d6249f">
   <meta name="description" content="Private synchronized personal finance dashboard">
   <meta name="mobile-web-app-capable" content="yes">
@@ -354,12 +354,12 @@
           <article class="trading-wallet-card investment-wallet-card idr">
             <span class="stock-cash-icon">Rp</span>
             <div><small>NETCASH INDONESIA</small><strong id="stockNetcashValue" class="private">Rp0</strong></div>
-            <button type="button" data-investment-withdraw="IDR">Tarik dana</button>
+            <div class="wallet-card-actions"><button type="button" data-investment-edit="IDR">Edit</button><button type="button" data-investment-withdraw="IDR">Tarik dana</button></div>
           </article>
           <article class="trading-wallet-card investment-wallet-card usd">
             <span class="stock-cash-icon">$</span>
             <div><small>USD WALLET</small><strong id="stockWalletUsdValue" class="private">$0.00</strong><em id="stockWalletValue" class="private">Rp0</em></div>
-            <button type="button" data-investment-withdraw="USD">Tarik dana</button>
+            <div class="wallet-card-actions"><button type="button" data-investment-edit="USD">Edit</button><button type="button" data-investment-withdraw="USD">Tarik dana</button></div>
           </article>
         </div>
         <input id="stockNetcashIdr" type="hidden" value="0">
@@ -464,8 +464,8 @@
           <div class="head-actions"><span id="tradingQuoteSource" class="pill">TWELVE DATA PRIMARY</span><button id="tradingDepositBtn" class="primary-btn" type="button">＋ Add Funds</button></div>
         </div>
         <div class="trading-wallet-grid">
-          <article class="trading-wallet-card idr"><span class="stock-cash-icon">Rp</span><div><small>NETCASH INDONESIA</small><strong id="tradingCashIdr" class="private">Rp0</strong></div><button type="button" data-trading-withdraw="IDR">Tarik dana</button></article>
-          <article class="trading-wallet-card usd"><span class="stock-cash-icon">$</span><div><small>USD WALLET</small><strong id="tradingCashUsd" class="private">$0.00</strong><em id="tradingCashUsdIdr" class="private">Rp0</em></div><button type="button" data-trading-withdraw="USD">Tarik dana</button></article>
+          <article class="trading-wallet-card idr"><span class="stock-cash-icon">Rp</span><div><small>NETCASH INDONESIA</small><strong id="tradingCashIdr" class="private">Rp0</strong></div><div class="wallet-card-actions"><button type="button" data-trading-edit="IDR">Edit</button><button type="button" data-trading-withdraw="IDR">Tarik dana</button></div></article>
+          <article class="trading-wallet-card usd"><span class="stock-cash-icon">$</span><div><small>USD WALLET</small><strong id="tradingCashUsd" class="private">$0.00</strong><em id="tradingCashUsdIdr" class="private">Rp0</em></div><div class="wallet-card-actions"><button type="button" data-trading-edit="USD">Edit</button><button type="button" data-trading-withdraw="USD">Tarik dana</button></div></article>
         </div>
       </article>
 

@@ -17,6 +17,7 @@ assert.equal((index.match(/data-page="stocks"/g)||[]).length,3,"Sidebar, mobile 
 assert.doesNotMatch(index,/data-page="trading"/,"Trading must live inside Stocks instead of a separate route");
 assert.match(index,/data-stock-workspace="investment"/);assert.match(index,/data-stock-workspace="trading"/);
 assert.match(index,/id="dividendTickerList"/);assert.match(index,/id="investmentDepositBtn"/);
+for(const marker of ["data-investment-edit=\"IDR\"","data-investment-edit=\"USD\"","data-trading-edit=\"IDR\"","data-trading-edit=\"USD\""])assert.match(index,new RegExp(marker));
 assert.match(index, /manifest\.webmanifest/);
 assert.match(index, /authForm/);
 assert.match(index, /annualPerformanceDashboard/);
@@ -157,9 +158,15 @@ assert.equal(duplicateDividendState.dividends.length,1);assert.ok(Math.abs(dupli
 assert.equal(reverseDividendCredit(duplicateDividendState,duplicateDividendState.dividends[0],new Date("2026-08-14T00:00:00Z")),true);
 assert.ok(Math.abs(duplicateDividendState.stockExtras.netcashIdr)<.02,"Cancelling a dividend credit must reverse its exact wallet amount");
 
-const { applyOpeningPosition, applyTrade, archiveClosedTradingPositions, cashEvent, performancePreview, performanceSeries, reconcileTradingPositions, removeTradingPositionData, tradingMetrics, tradingTargetSimulation, upsertDailySnapshot } = await import("../src/trading/model.js");
+const { applyOpeningPosition, applyTrade, archiveClosedTradingPositions, cashEvent, performancePreview, performanceSeries, reconcileTradingPositions, removeTradingPositionData, setTradingWalletBalance, tradingMetrics, tradingTargetSimulation, tradingWallet, upsertDailySnapshot } = await import("../src/trading/model.js");
 const tradePosition={id:"p1",ticker:"MU",market:"NASDAQ",currency:"USD",quantity:0,avg:0,current:0};
 const tradingLedger=[cashEvent({type:"deposit",currency:"USD",amount:1000,date:"2026-01-02",fxRate:16000,id:"cash1"})];
+const editableWallet=[];
+assert.equal(setTradingWalletBalance({ledger:editableWallet,currency:"USD",target:250,date:"2026-01-02",fxRate:16000,id:"set1"}).type,"deposit");
+assert.equal(tradingWallet(editableWallet).usd,250,"Manual Trading wallet edit must set the exact requested balance");
+assert.equal(setTradingWalletBalance({ledger:editableWallet,currency:"USD",target:90,date:"2026-01-03",fxRate:16000,id:"set2"}).type,"withdraw");
+assert.equal(tradingWallet(editableWallet).usd,90,"Reducing a manual Trading wallet balance must create an adjustment, not a loss");
+assert.equal(setTradingWalletBalance({ledger:editableWallet,currency:"USD",target:90,date:"2026-01-04",fxRate:16000,id:"set3"}),null,"An unchanged wallet balance must not create ledger noise");
 tradingLedger.push(applyTrade({position:tradePosition,type:"buy",quantity:1,price:500,date:"2026-01-02",fxRate:16000,id:"buy1"}));
 tradePosition.current=600;
 let tradeMetrics=tradingMetrics({positions:[tradePosition],ledger:tradingLedger,fxRate:16000});

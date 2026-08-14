@@ -130,6 +130,16 @@ export function cashEvent({ type, currency, amount, date, fxRate, id, note = "" 
   };
 }
 
+export function setTradingWalletBalance({ ledger = [], currency, target, date, fxRate, id }) {
+  const wallet=tradingWallet(ledger),current=currency==="USD"?wallet.usd:wallet.idr;
+  const desired=Math.max(0,n(target)),delta=desired-current;
+  if(Math.abs(delta)<=1e-9)return null;
+  const type=delta>0?"deposit":"withdraw";
+  const event=cashEvent({type,currency,amount:Math.abs(delta),date,fxRate,id,note:"Manual wallet balance adjustment"});
+  ledger.push(event);
+  return event;
+}
+
 export function upsertDailySnapshot(snapshots = [], metrics, spyPrice, date = new Date()) {
   const snapshotDate = isoDay(date);
   const row = snapshots.find(item => item.date === snapshotDate);
