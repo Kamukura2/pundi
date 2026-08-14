@@ -125,7 +125,7 @@ const migration012 = read("supabase/migrations/012_trading_portfolio.sql");
 for (const marker of ["trading_positions","trading_ledger","trading_snapshots","external_flow_idr","realized_pl_idr","enable row level security"]) assert.match(migration012,new RegExp(marker));
 assert.doesNotMatch(migration012,/drop\s+table|truncate\s+|delete\s+from/i);
 
-const { applyOpeningPosition, applyTrade, cashEvent, performancePreview, performanceSeries, reconcileTradingPositions, removeTradingPositionData, tradingMetrics, tradingTargetSimulation, upsertDailySnapshot } = await import("../src/trading/model.js");
+const { applyOpeningPosition, applyTrade, archiveClosedTradingPositions, cashEvent, performancePreview, performanceSeries, reconcileTradingPositions, removeTradingPositionData, tradingMetrics, tradingTargetSimulation, upsertDailySnapshot } = await import("../src/trading/model.js");
 const tradePosition={id:"p1",ticker:"MU",market:"NASDAQ",currency:"USD",quantity:0,avg:0,current:0};
 const tradingLedger=[cashEvent({type:"deposit",currency:"USD",amount:1000,date:"2026-01-02",fxRate:16000,id:"cash1"})];
 tradingLedger.push(applyTrade({position:tradePosition,type:"buy",quantity:1,price:500,date:"2026-01-02",fxRate:16000,id:"buy1"}));
@@ -163,6 +163,10 @@ assert.equal(staleSoldPosition.quantity,0,"A fully sold Trading position must no
 const repairedSoldMetrics=tradingMetrics({positions:[staleSoldPosition],ledger:staleSoldLedger,fxRate:16000});
 assert.equal(repairedSoldMetrics.equity,1280000,"Sell proceeds must appear once in Trading equity, not again as a stale holding");
 assert.equal(repairedSoldMetrics.unrealized,0,"A fully sold position cannot retain unrealized P/L");
+const archivedSold=archiveClosedTradingPositions({positions:[staleSoldPosition],ledger:staleSoldLedger});
+assert.equal(archivedSold.positions.length,0,"A fully sold ticker must disappear from the active Trading portfolio");
+assert.ok(archivedSold.ledger.every(row=>row.positionId===null),"Closed ledger records must survive without retaining the deleted active-position foreign key");
+assert.equal(archivedSold.ledger.reduce((sum,row)=>sum+Number(row.realizedPlIdr||0),0),-320000,"Closing an active card must preserve its realized Trading P/L");
 
 const { normalizeStockMapping, quantityForDisplay, quantityForStorage } = await import("../src/stocks/holding.js");
 const idxHolding = {ticker:"BMRI",market:"IDX",provider:"finnhub",providerSymbol:"BMRI",currency:"IDR",quantity:10000};
@@ -293,6 +297,8 @@ assert.match(app, /switchPage\(state\.page,\{preserveScroll:true\}\)/, "Realtime
 assert.match(app, /if\(!window\.matchMedia\("\(max-width:1024px\)"\)\.matches\)requestAnimationFrame/, "Mobile background sync must never fight touch scrolling with scrollTo");
 assert.match(app, /performancePreview\(state\.tradingSnapshots,metrics,state\.spyQuote\?\.price/, "Trading benchmark must render a current preview without waiting for a sell");
 assert.match(app, /tradingPositions\.addEventListener\("click",handleTradingPositionAction\)/, "Trading actions must use a persistent delegated desktop click handler");
+assert.match(app, /archiveClosedTradingPositions\(\{positions:state\.tradingPositions,ledger:state\.tradingLedger\}\)/, "A full sell must archive the active card immediately");
+assert.match(app, /already has an active Trading position/, "Ticker duplication must block only another active position");
 assert.doesNotMatch(app, /\[data-trading-sell\]"\)\.forEach/, "SELL must not rely on a per-render button handler");
 assert.match(css, /\.trading-position-card::after\{[^}]*pointer-events:none/, "Trading card decoration must never intercept desktop clicks");
 assert.match(css, /\.trading-position-actions\{[^}]*z-index:5/, "Trading action row must stay above card decoration");
@@ -322,4 +328,4 @@ assert.match(syncSource, /this\.pendingPersists/, "Realtime reloads must wait fo
 assert.match(syncSource, /await this\.repository\.loadCloud\(\);\s*result = await this\.repository\.save\(snapshot\)/, "Transient optimistic-lock conflicts must retry the unchanged local snapshot");
 assert.doesNotMatch(syncSource, /if \(\/conflict\/i\.test\(error\.message \|\| \"\"\)\) \{\s*const cloud[\s\S]*this\.onState\(cloud\)/, "A sync conflict must never overwrite unsaved local target input");
 
-console.log("CVFinance checks passed: schema, RLS markers, PWA, 9 tabs, v7.9.4 persistent desktop Trading SELL handler, Trading equity ledger reconciliation, Starting Funds label, mobile document scroll recovery, no background scrollTo on touch devices, compact mobile Trading, unrestricted manual Sell price, isolated Reset All, immediate sell feedback, realized-only accumulated Trading gain/loss, stable target sync, same-day SPY comparison, visible SPY API quote, safe ticker deletion, Twelve Data primary quotes, Finnhub fallback, separate Investment and Trading assets in Prospect, Trading Insights, PAID-or-nominal client cards, persistent transaction templates, monthly History archives, Financial Action Plan isolation, Yahoo FX validation, offline queue coalescing, and JavaScript syntax.");
+console.log("CVFinance checks passed: schema, RLS markers, PWA, 9 tabs, v7.9.5 full-sell active-card closure and same-ticker re-entry, persistent desktop Trading SELL handler, Trading equity ledger reconciliation, Starting Funds label, mobile document scroll recovery, no background scrollTo on touch devices, compact mobile Trading, unrestricted manual Sell price, isolated Reset All, immediate sell feedback, realized-only accumulated Trading gain/loss, stable target sync, same-day SPY comparison, visible SPY API quote, safe ticker deletion, Twelve Data primary quotes, Finnhub fallback, separate Investment and Trading assets in Prospect, Trading Insights, PAID-or-nominal client cards, persistent transaction templates, monthly History archives, Financial Action Plan isolation, Yahoo FX validation, offline queue coalescing, and JavaScript syntax.");

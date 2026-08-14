@@ -52,6 +52,18 @@ export function reconcileTradingPositions(positions = [], ledger = []) {
   return changed;
 }
 
+export function archiveClosedTradingPositions({ positions = [], ledger = [] } = {}) {
+  const closedPositionIds = new Set(positions
+    .filter(position => n(position.quantity) <= 1e-9 && ledger.some(row => row.positionId === position.id && row.type === "sell"))
+    .map(position => position.id));
+  if (!closedPositionIds.size) return { positions, ledger, closedPositionIds:[] };
+  return {
+    positions:positions.filter(position => !closedPositionIds.has(position.id)),
+    ledger:ledger.map(row => closedPositionIds.has(row.positionId) ? { ...row, positionId:null } : row),
+    closedPositionIds:[...closedPositionIds]
+  };
+}
+
 export function tradingMetrics({ positions = [], ledger = [], fxRate = 0 } = {}) {
   const wallet = tradingWallet(ledger);
   const holdingsValue = positions.reduce((sum, row) => sum + tradingPositionValue(row, fxRate), 0);

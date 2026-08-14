@@ -1,4 +1,6 @@
-# CVFinance v7.9.4
+# CVFinance v7.9.5
+
+v7.9.5 completes the Trading position lifecycle. Selling every remaining share removes the ticker from Active Trading Portfolio and Target Price Simulation while retaining its OPEN/BUY/SELL ledger history, sale proceeds, and realized P/L. The closed position record is released so the same ticker can later be opened again with a new position id, opening date, quantity, and cost basis. Existing zero-share positions from earlier versions are repaired automatically.
 
 v7.9.4 makes the desktop Trading BUY, SELL, and DELETE controls resilient to quote refreshes and cloud re-renders. A permanent delegated click handler now lives on the Trading portfolio container, while the action row is layered above non-interactive card decoration. SELL still opens with the API price as an editable default and remains disabled only when the ledger-confirmed open quantity is zero.
 

@@ -4,7 +4,7 @@ import { SyncManager } from "./src/sync/sync-manager.js";
 import { fetchHoldingQuote, fetchTradingBenchmark, fetchTradingQuote, fetchUsdIdrRate, isPriceStale, validateHoldingSymbol } from "./src/stocks/client.js";
 import { normalizeStockMapping, quantityForDisplay, quantityForStorage, quantityUnit } from "./src/stocks/holding.js";
 import { getSupabase } from "./src/lib/supabase.js";
-import { applyOpeningPosition, applyTrade, cashEvent, performancePreview, performanceSeries, reconcileTradingPositions, removeTradingPositionData, tradingMetrics, tradingPositionCost, tradingPositionValue, tradingTargetSimulation, upsertDailySnapshot } from "./src/trading/model.js";
+import { applyOpeningPosition, applyTrade, archiveClosedTradingPositions, cashEvent, performancePreview, performanceSeries, reconcileTradingPositions, removeTradingPositionData, tradingMetrics, tradingPositionCost, tradingPositionValue, tradingTargetSimulation, upsertDailySnapshot } from "./src/trading/model.js";
 
 const COLORS=["#7F66FF","#39C3FF","#FF8F63","#36D695","#F4C24F","#FF6EA8","#62C8FF","#8D7AFF"];
 const COMPANY_EXPENSE_TAG="Expense Perusahaan";
@@ -636,7 +636,9 @@ function recordTradingOpeningSnapshot(position,date){
 
 function renderTrading(){
  const repairedPositionState=reconcileTradingPositions(state.tradingPositions,state.tradingLedger);
- if(repairedPositionState){recordTradingSnapshot();queueMicrotask(()=>save({background:true}));}
+ const closedPositionState=archiveClosedTradingPositions({positions:state.tradingPositions,ledger:state.tradingLedger});
+ if(closedPositionState.closedPositionIds.length){state.tradingPositions=closedPositionState.positions;state.tradingLedger=closedPositionState.ledger;}
+ if(repairedPositionState||closedPositionState.closedPositionIds.length){recordTradingSnapshot();queueMicrotask(()=>save({background:true}));}
  const metrics=tradingStats();
  const compactMobile=window.matchMedia("(max-width:680px)").matches;
  const money=value=>fmt(value,compactMobile);
@@ -731,7 +733,15 @@ function openTradingExecution(positionId,type){
  ],values=>{
   const wallet=tradingStats().wallet,nativeCost=Number(values.quantity)*Number(values.price);
   if(type==="buy"&&nativeCost>Number(position.currency==="USD"?wallet.usd:wallet.idr)+1e-8){alert(`Insufficient ${position.currency} Trading wallet. Add funds first.`);return false;}
-  try{const entry=applyTrade({position,type,quantity:values.quantity,price:values.price,date:values.date,fxRate:values.fxRate,id:createId()});entry.__createdAt=new Date().toISOString();state.tradingLedger.push(entry);position.current=Number(values.price);position.manualCurrent=Number(values.price);position.priceSource="execution";position.priceStatus=type==="sell"?"sold":"manual";position.priceAsOf=new Date().toISOString();recordTradingSnapshot();return {message:type==="sell"?`SELL ${position.ticker} recorded · P/L ${entry.realizedPlIdr>=0?"+":""}${fmt(entry.realizedPlIdr)}`:`BUY ${position.ticker} recorded`};}catch(error){alert(error.message);return false;}
+  try{
+   const entry=applyTrade({position,type,quantity:values.quantity,price:values.price,date:values.date,fxRate:values.fxRate,id:createId()});entry.__createdAt=new Date().toISOString();state.tradingLedger.push(entry);
+   position.current=Number(values.price);position.manualCurrent=Number(values.price);position.priceSource="execution";position.priceStatus=type==="sell"?"sold":"manual";position.priceAsOf=new Date().toISOString();
+   const closedState=archiveClosedTradingPositions({positions:state.tradingPositions,ledger:state.tradingLedger});
+   const fullyClosed=closedState.closedPositionIds.includes(position.id);
+   if(fullyClosed){state.tradingPositions=closedState.positions;state.tradingLedger=closedState.ledger;}
+   recordTradingSnapshot();
+   return {message:type==="sell"?`SELL ${position.ticker} recorded${fullyClosed?" · position closed":""} · P/L ${entry.realizedPlIdr>=0?"+":""}${fmt(entry.realizedPlIdr)}`:`BUY ${position.ticker} recorded`};
+  }catch(error){alert(error.message);return false;}
  });
 }
 
@@ -1290,7 +1300,7 @@ addTradingPositionBtn.onclick=()=>openSimple("Add Trading Position",[
  {key:"date",label:"Opening Date",type:"date",value:todayISO()}
 ],values=>{
  const ticker=String(values.ticker||"").trim().toUpperCase();
- if(state.tradingPositions.some(row=>row.ticker===ticker&&row.market===values.market)){alert(`${ticker} already exists in Trading.`);return false;}
+ if(state.tradingPositions.some(row=>row.ticker===ticker&&row.market===values.market&&Number(row.quantity)>1e-9)){alert(`${ticker} already has an active Trading position.`);return false;}
  if(!(Number(values.quantity)>0)||!(Number(values.avg)>=0)){alert("Enter a valid share quantity and entry price.");return false;}
  const position={id:createId(),ticker,displaySymbol:ticker,providerSymbol:ticker,market:values.market,currency:"USD",quantity:Number(values.quantity),avg:Number(values.avg),current:Number(values.avg),manualCurrent:Number(values.avg),targetPrice:0,stopLoss:0,priceSource:"saved entry",priceStatus:"waiting for API",priceAsOf:null,lastPriceFetchAt:null,__createdAt:new Date().toISOString()};
  state.tradingPositions.push(position);state.tradingLedger.push({...applyOpeningPosition({position,date:values.date,fxRate:state.usdIdr,id:createId()}),__createdAt:new Date().toISOString()});recordTradingOpeningSnapshot(position,values.date);queueMicrotask(()=>refreshTradingPrices({silent:true,force:true}));
@@ -1323,6 +1333,8 @@ function applyCloudState(next,{preserveUi=false}={}){
  if(preserveUi)return;
  if(hasActiveEditor())return;
  const repairedPositionState=reconcileTradingPositions(next.tradingPositions||[],next.tradingLedger||[]);
+ const closedPositionState=archiveClosedTradingPositions({positions:next.tradingPositions||[],ledger:next.tradingLedger||[]});
+ if(closedPositionState.closedPositionIds.length){next.tradingPositions=closedPositionState.positions;next.tradingLedger=closedPositionState.ledger;}
  const ui={page:state.page,privacy:state.privacy,filter:state.filter,sort:state.sort,expenseView:state.expenseView,txEdit:null,prospectMode:state.prospectMode,tradingRange:state.tradingRange||"YTD"};
  Object.assign(state,next,ui);
  document.documentElement.dataset.theme=state.theme;
@@ -1331,7 +1343,7 @@ function applyCloudState(next,{preserveUi=false}={}){
  themeBtn.textContent=state.theme==="dark"?"☀":"☾";
  baseGrowth.value=state.baseGrowth;optimisticGrowth.value=state.optimisticGrowth;
  updateModeToggleLabels();renderAllPreservingScroll();switchPage(state.page,{preserveScroll:true});
- if(repairedPositionState){recordTradingSnapshot();queueMicrotask(()=>save({background:true}));}
+ if(repairedPositionState||closedPositionState.closedPositionIds.length){recordTradingSnapshot();queueMicrotask(()=>save({background:true}));}
 }
 
 function updateSyncStatus(info){
