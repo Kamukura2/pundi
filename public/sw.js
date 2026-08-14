@@ -1,4 +1,4 @@
-const SHELL_CACHE = "cvfinance-shell-v8.1.0-mobile-workspace-redesign";
+const SHELL_CACHE = "cvfinance-shell-v8.1.1-simple-mobile-drawer";
 const SHELL = ["/", "/index.html", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", event => {

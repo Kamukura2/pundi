@@ -1384,7 +1384,19 @@ async function validateStockSymbols(){
  alert(results.join("\n"));
 }
 
-qa("[data-page]").forEach(b=>b.onclick=()=>switchPage(b.dataset.page));
+function setMobileMenu(open=false){
+ const enabled=window.matchMedia("(max-width:1024px)").matches;
+ const active=Boolean(open&&enabled);
+ document.body.classList.toggle("mobile-menu-open",active);
+ q("#mobileMenuBtn")?.setAttribute("aria-expanded",String(active));
+ q("#mobileMenuBackdrop")?.setAttribute("aria-hidden",String(!active));
+}
+
+q("#mobileMenuBtn")?.addEventListener("click",()=>setMobileMenu(!document.body.classList.contains("mobile-menu-open")));
+q("#mobileMenuBackdrop")?.addEventListener("click",()=>setMobileMenu(false));
+document.addEventListener("keydown",event=>{if(event.key==="Escape")setMobileMenu(false)});
+window.addEventListener("resize",()=>{if(!window.matchMedia("(max-width:1024px)").matches)setMobileMenu(false)});
+qa("[data-page]").forEach(b=>b.onclick=()=>{switchPage(b.dataset.page);if(b.closest(".sidebar"))setMobileMenu(false)});
 qa(".mobile-more [data-page]").forEach(b=>b.addEventListener("click",()=>dataModal.close()));
 qa("[data-go]").forEach(b=>b.onclick=()=>switchPage(b.dataset.go));
 qa("[data-stock-workspace]").forEach(button=>button.onclick=()=>setStockWorkspace(button.dataset.stockWorkspace));

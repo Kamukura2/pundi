@@ -13,7 +13,7 @@ for (const icon of manifest.icons) assert.ok(existsSync(resolve(root, "public", 
 const index = read("index.html");
 const css = read("styles.css");
 for (const tab of ["accumulation","cashflow","expenses","clients","stocks","trading","electricity","prospect","insights"]) assert.match(index, new RegExp(`id="${tab}"`));
-assert.equal((index.match(/data-page="stocks"/g)||[]).length,3,"Sidebar, mobile nav, and data menu must expose one Stocks destination");
+assert.equal((index.match(/data-page="stocks"/g)||[]).length,2,"Sidebar and data menu must expose one Stocks destination");
 assert.doesNotMatch(index,/data-page="trading"/,"Trading must live inside Stocks instead of a separate route");
 assert.match(index,/data-stock-workspace="investment"/);assert.match(index,/data-stock-workspace="trading"/);
 assert.match(index,/id="dividendTickerList"/);assert.match(index,/id="investmentDepositBtn"/);
@@ -33,10 +33,14 @@ assert.match(index,/data-page="clients"[^>]*>[\s\S]*?<span>Income<\/span>/,"Desk
 assert.match(index,/class="segmented workspace-tabs income-workspace-tabs"/,"Income must have a Stocks-style Clients subcategory switcher");
 assert.match(index,/class="segmented workspace-tabs history-workspace-tabs"/,"History filters must share the Stocks workspace tab design");
 assert.match(index,/id="sideAvailableBalance"/,"Desktop sidebar must show Accumulation Available Balance above projections");
-const mobileNav=index.slice(index.indexOf('<nav class="mobile-nav"'),index.indexOf('</nav>',index.indexOf('<nav class="mobile-nav"')));
-assert.equal((mobileNav.match(/<button/g)||[]).length,9,"Mobile navigation must expose all eight destinations plus the center transaction action");
-for(const marker of ["accumulation","cashflow","clients","expenses","stocks","electricity","insights","prospect"])assert.match(mobileNav,new RegExp(`data-page="${marker}"`));
-assert.match(css,/v8\.1\.0 mobile workspace redesign and navigation unification/);
+assert.match(index,/id="mobileMenuBtn"[^>]*aria-controls="primarySidebar"/,"Mobile header must expose an accessible hamburger control");
+assert.match(index,/id="mobileMenuBackdrop"/,"Mobile drawer must include a dismissible backdrop");
+assert.match(index,/class="mobile-add-transaction"[^>]*data-open-tx/,"Mobile must retain one floating transaction action");
+assert.doesNotMatch(index,/class="mobile-nav"/,"The crowded mobile bottom navigation must be removed");
+assert.match(index,/mobile-drawer\.css/);
+const drawerCss=read("mobile-drawer.css");
+assert.match(drawerCss,/v8\.1\.1 simple mobile drawer navigation/);
+assert.match(drawerCss,/body\.mobile-menu-open \.sidebar/);
 
 const sql = read("supabase/migrations/001_initial_schema.sql");
 for (const table of ["profiles","accounts","transactions","monthly_budgets","yearly_expenses","planned_events","credit_facilities","credit_items","clients","stock_holdings","stock_price_targets","electricity_readings","app_settings"]) {
@@ -321,6 +325,8 @@ assert.equal(retriedTarget,1200,"Conflict retry must preserve the user's local t
 assert.equal(targetSync.pendingPersists,0,"The queued-save guard must clear after target persistence");
 
 const appSource = read("app.js");
+assert.match(appSource,/function setMobileMenu\(open=false\)/,"Mobile drawer state must have one explicit controller");
+assert.match(appSource,/event\.key==="Escape"/,"Escape must dismiss the mobile drawer");
 assert.doesNotMatch(appSource, /<input[^>]*type=\"number\"[^>]*data-target=/, "Target-price editors must not use native number steppers");
 assert.match(appSource, /class=\"target-price-input\" type=\"text\" inputmode=\"decimal\"/, "Target-price inputs must preserve editable text drafts");
 assert.match(appSource, /backdropPress/, "Dialog dismissal must distinguish backdrop clicks from drag-selection gestures");

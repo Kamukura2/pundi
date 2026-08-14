@@ -1,4 +1,6 @@
-# CVFinance v8.1.0
+# CVFinance v8.1.1
+
+v8.1.1 replaces the crowded mobile/tablet bottom navigation with a compact hamburger drawer that reuses the complete desktop sidebar. A single floating transaction button remains at the lower-right, the drawer closes after navigation, backdrop taps, or Escape, and phone headers receive clearer vertical spacing. Desktop layout and financial behavior are unchanged.
 
 v8.1.0 rebuilds the phone and tablet workspace around compact, readable cards and a nine-action floating navigation bar that mirrors the desktop section icons. The Clients destination is now the Income workspace with a Clients subcategory, History filters share the Stocks tab design, Available Balance appears above desktop sidebar projections, dividend review uses `✓ Confirm`, and individual Trading Ledger records can be removed with their wallet, position, P/L, and performance effects recalculated. Desktop financial functions and the isolated Investment/Trading workspaces remain unchanged.
 
