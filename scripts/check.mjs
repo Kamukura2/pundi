@@ -164,7 +164,10 @@ const repairedSoldMetrics=tradingMetrics({positions:[staleSoldPosition],ledger:s
 assert.equal(repairedSoldMetrics.equity,1280000,"Sell proceeds must appear once in Trading equity, not again as a stale holding");
 assert.equal(repairedSoldMetrics.unrealized,0,"A fully sold position cannot retain unrealized P/L");
 const archivedSold=archiveClosedTradingPositions({positions:[staleSoldPosition],ledger:staleSoldLedger});
-assert.equal(archivedSold.positions.length,0,"A fully sold ticker must disappear from the active Trading portfolio");
+assert.equal(archivedSold.positions.length,1,"A closed ticker must retain one reusable sync tombstone");
+assert.equal(archivedSold.positions[0].quantity,0,"The closed-position tombstone must never retain open shares");
+assert.equal(archivedSold.positions[0].targetPrice,0,"Closing a position must clear its obsolete target price");
+assert.equal(archivedSold.positions[0].priceStatus,"closed","A closed ticker must be explicit in synchronized state");
 assert.ok(archivedSold.ledger.every(row=>row.positionId===null),"Closed ledger records must survive without retaining the deleted active-position foreign key");
 assert.equal(archivedSold.ledger.reduce((sum,row)=>sum+Number(row.realizedPlIdr||0),0),-320000,"Closing an active card must preserve its realized Trading P/L");
 
@@ -299,6 +302,9 @@ assert.match(app, /performancePreview\(state\.tradingSnapshots,metrics,state\.sp
 assert.match(app, /tradingPositions\.addEventListener\("click",handleTradingPositionAction\)/, "Trading actions must use a persistent delegated desktop click handler");
 assert.match(app, /archiveClosedTradingPositions\(\{positions:state\.tradingPositions,ledger:state\.tradingLedger\}\)/, "A full sell must archive the active card immediately");
 assert.match(app, /already has an active Trading position/, "Ticker duplication must block only another active position");
+assert.match(app, /activeTradingPositions=state\.tradingPositions\.filter\(position=>Number\(position\.quantity\)>1e-9\)/, "Trading cards and targets must render active shares only");
+assert.match(app, /const reusable=state\.tradingPositions\.find/, "A closed ticker must be reusable for a later position cycle");
+assert.match(app, /if\(reusable\)Object\.assign\(reusable,position\)/, "Re-entry must replace the closed tombstone with a new cost basis");
 assert.doesNotMatch(app, /\[data-trading-sell\]"\)\.forEach/, "SELL must not rely on a per-render button handler");
 assert.match(css, /\.trading-position-card::after\{[^}]*pointer-events:none/, "Trading card decoration must never intercept desktop clicks");
 assert.match(css, /\.trading-position-actions\{[^}]*z-index:5/, "Trading action row must stay above card decoration");
@@ -328,4 +334,4 @@ assert.match(syncSource, /this\.pendingPersists/, "Realtime reloads must wait fo
 assert.match(syncSource, /await this\.repository\.loadCloud\(\);\s*result = await this\.repository\.save\(snapshot\)/, "Transient optimistic-lock conflicts must retry the unchanged local snapshot");
 assert.doesNotMatch(syncSource, /if \(\/conflict\/i\.test\(error\.message \|\| \"\"\)\) \{\s*const cloud[\s\S]*this\.onState\(cloud\)/, "A sync conflict must never overwrite unsaved local target input");
 
-console.log("CVFinance checks passed: schema, RLS markers, PWA, 9 tabs, v7.9.5 full-sell active-card closure and same-ticker re-entry, persistent desktop Trading SELL handler, Trading equity ledger reconciliation, Starting Funds label, mobile document scroll recovery, no background scrollTo on touch devices, compact mobile Trading, unrestricted manual Sell price, isolated Reset All, immediate sell feedback, realized-only accumulated Trading gain/loss, stable target sync, same-day SPY comparison, visible SPY API quote, safe ticker deletion, Twelve Data primary quotes, Finnhub fallback, separate Investment and Trading assets in Prospect, Trading Insights, PAID-or-nominal client cards, persistent transaction templates, monthly History archives, Financial Action Plan isolation, Yahoo FX validation, offline queue coalescing, and JavaScript syntax.");
+console.log("CVFinance checks passed: schema, RLS markers, PWA, 9 tabs, v7.9.6 closed-position sync tombstone, active-only cards and targets, same-ticker re-entry with a fresh cost basis, persistent desktop Trading SELL handler, Trading equity ledger reconciliation, Starting Funds label, mobile document scroll recovery, no background scrollTo on touch devices, compact mobile Trading, unrestricted manual Sell price, isolated Reset All, immediate sell feedback, realized-only accumulated Trading gain/loss, stable target sync, same-day SPY comparison, visible SPY API quote, safe ticker deletion, Twelve Data primary quotes, Finnhub fallback, separate Investment and Trading assets in Prospect, Trading Insights, PAID-or-nominal client cards, persistent transaction templates, monthly History archives, Financial Action Plan isolation, Yahoo FX validation, offline queue coalescing, and JavaScript syntax.");

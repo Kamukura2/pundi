@@ -1,4 +1,6 @@
-# CVFinance v7.9.5
+# CVFinance v7.9.6
+
+v7.9.6 prevents a fully sold Trading card from reappearing after a delayed Supabase realtime reload. A zero-share synchronized tombstone is retained internally, but only positions with open shares render in Active Trading Portfolio, Target Price Simulation, and price refreshes. Reopening the same ticker reuses that tombstone with a fresh quantity, entry date, target, and cost basis, while completed-cycle ledger records stay detached and permanent. No schema migration is required.
 
 v7.9.5 completes the Trading position lifecycle. Selling every remaining share removes the ticker from Active Trading Portfolio and Target Price Simulation while retaining its OPEN/BUY/SELL ledger history, sale proceeds, and realized P/L. The closed position record is released so the same ticker can later be opened again with a new position id, opening date, quantity, and cost basis. Existing zero-share positions from earlier versions are repaired automatically.
 

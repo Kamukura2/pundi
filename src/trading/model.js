@@ -58,7 +58,9 @@ export function archiveClosedTradingPositions({ positions = [], ledger = [] } = 
     .map(position => position.id));
   if (!closedPositionIds.size) return { positions, ledger, closedPositionIds:[] };
   return {
-    positions:positions.filter(position => !closedPositionIds.has(position.id)),
+    positions:positions.map(position => closedPositionIds.has(position.id) ? {
+      ...position, quantity:0, targetPrice:0, stopLoss:0, priceStatus:"closed"
+    } : position),
     ledger:ledger.map(row => closedPositionIds.has(row.positionId) ? { ...row, positionId:null } : row),
     closedPositionIds:[...closedPositionIds]
   };
