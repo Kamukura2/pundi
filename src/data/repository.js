@@ -95,7 +95,15 @@ function rowsToState(rows) {
   return state;
 }
 
-function stateToRows(state, userId) {
+const dividendAuditFields=["credited_amount_native","credited_currency","credit_reversed_at"];
+const withoutDividendAuditFields=row=>{
+  const payload={...row};
+  dividendAuditFields.forEach(field=>delete payload[field]);
+  return payload;
+};
+const missingDividendAuditSchema=error=>/credited_amount_native|credited_currency|credit_reversed_at/i.test(String(error?.message||""))&&/column|schema cache|field/i.test(String(error?.message||""));
+
+function stateToRows(state, userId, { dividendCreditAudit = true } = {}) {
   const stamp = row => ({ created_at:row.__createdAt, updated_at:row.__updatedAt });
   const owned = row => ({ ...row, user_id:userId });
   const facilityBySource = new Map(state.creditFacilities.map(item => [item.source, item.id]));
@@ -137,7 +145,7 @@ function stateToRows(state, userId) {
       announcement_date:row.announcementDate||null,ex_date:row.exDate||null,record_date:row.recordDate||null,payment_date:row.paymentDate||null,
       dividend_status:row.status||"confirmed",eligibility_status:row.eligibilityStatus||"pending",source_provider:row.sourceProvider||"manual",
       source_url:row.sourceUrl||"",is_manual:Boolean(row.manual),fx_rate:Number(row.fxRate||0),credited_at:row.creditedAt||null,
-      credited_amount_native:Number(row.creditedAmountNative||0),credited_currency:row.creditedCurrency||null,credit_reversed_at:row.creditReversedAt||null,...stamp(row)
+      ...(dividendCreditAudit?{credited_amount_native:Number(row.creditedAmountNative||0),credited_currency:row.creditedCurrency||null,credit_reversed_at:row.creditReversedAt||null}:{}),...stamp(row)
     })),
     trading_positions: (state.tradingPositions || []).map(row => owned({
       id:row.id,display_symbol:row.displaySymbol || row.ticker,market:row.market,provider_symbol:row.providerSymbol || row.ticker,
@@ -198,6 +206,8 @@ export class FinanceRepository {
     this.user = user;
     this.rows = Object.fromEntries(SAVE_TABLES.map(table => [table, []]));
     this.cacheKey = `snapshot:${user.id}`;
+    this.supportsDividendCreditAudit = true;
+    this.schemaFallbackUsed = false;
   }
 
   async fetchRows() {
@@ -211,6 +221,8 @@ export class FinanceRepository {
 
   async loadCloud() {
     this.rows = await this.fetchRows();
+    const dividendSample=this.rows.investment_dividends?.[0];
+    if(dividendSample)this.supportsDividendCreditAudit=Object.prototype.hasOwnProperty.call(dividendSample,"credited_amount_native");
     const state = rowsToState(this.rows);
     await cachePut(this.cacheKey, { rows:this.rows, savedAt:new Date().toISOString() });
     return state;
@@ -224,24 +236,28 @@ export class FinanceRepository {
   }
 
   buildOperations(state) {
-    const nextRows = stateToRows(state, this.user.id);
+    const nextRows = stateToRows(state, this.user.id, {dividendCreditAudit:this.supportsDividendCreditAudit});
     return { nextRows, operations:diffRows(nextRows, this.rows) };
   }
 
   async applyOperation(operation) {
-    const payload = operation.row ? stripServerFields(operation.row) : null;
-    if (operation.action === "insert") {
-      const { error } = await this.supabase.from(operation.table).insert(payload);
-      if (error) throw error;
-      return;
+    let payload = operation.row ? stripServerFields(operation.row) : null;
+    if(operation.table==="investment_dividends"&&!this.supportsDividendCreditAudit&&payload)payload=withoutDividendAuditFields(payload);
+    const run=async body=>{
+      if(operation.action==="insert")return this.supabase.from(operation.table).insert(body);
+      let query=operation.action==="delete"
+        ?this.supabase.from(operation.table).delete().eq("id",operation.id).eq("user_id",this.user.id)
+        :this.supabase.from(operation.table).update(body).eq("id",operation.id).eq("user_id",this.user.id);
+      if(operation.previousUpdatedAt)query=query.eq("updated_at",operation.previousUpdatedAt);
+      return query.select("id");
+    };
+    let result=await run(payload);
+    if(result.error&&operation.table==="investment_dividends"&&payload&&missingDividendAuditSchema(result.error)){
+      this.supportsDividendCreditAudit=false;this.schemaFallbackUsed=true;
+      result=await run(withoutDividendAuditFields(payload));
     }
-    let query = operation.action === "delete"
-      ? this.supabase.from(operation.table).delete().eq("id", operation.id).eq("user_id", this.user.id)
-      : this.supabase.from(operation.table).update(payload).eq("id", operation.id).eq("user_id", this.user.id);
-    if (operation.previousUpdatedAt) query = query.eq("updated_at", operation.previousUpdatedAt);
-    const { data, error } = await query.select("id");
-    if (error) throw error;
-    if (!data?.length) throw new Error(`Synchronization conflict in ${operation.table}. Cloud data was reloaded.`);
+    if(result.error)throw result.error;
+    if(operation.action!=="insert"&&!result.data?.length)throw new Error(`Synchronization conflict in ${operation.table}. Cloud data was reloaded.`);
   }
 
   async queueOperation(operation) {
@@ -279,7 +295,7 @@ export class FinanceRepository {
       }
     }
     const fresh = await this.loadCloud();
-    return { state:fresh, pending:0 };
+    return { state:fresh, pending:0, warning:this.supportsDividendCreditAudit?null:"Supabase migration 014 is not active. Saved in compatibility mode." };
   }
 
   async flushQueue() {

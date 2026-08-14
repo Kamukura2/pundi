@@ -1,4 +1,4 @@
-const SHELL_CACHE = "cvfinance-shell-v8.0.2-wallet-edit-idx-lots";
+const SHELL_CACHE = "cvfinance-shell-v8.0.3-wallet-sync-compatibility";
 const SHELL = ["/", "/index.html", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", event => {

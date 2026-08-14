@@ -75,8 +75,8 @@ export class SyncManager {
         }
         this.onState(result.state, { preserveUi:true });
         if (!background || result.offline) {
-          this.status(result.offline ? "offline" : "saved", result.offline ? `${result.pending} unsynced` : "Saved", {
-            lastSynced:result.offline ? null : new Date().toISOString(), pending:result.pending
+          this.status(result.offline ? "offline" : "saved", result.offline ? `${result.pending} unsynced` : result.warning ? "Saved · setup needed" : "Saved", {
+            lastSynced:result.offline ? null : new Date().toISOString(), pending:result.pending, detail:result.warning||""
           });
         }
       } catch (error) {
