@@ -52,7 +52,7 @@ function yahooSymbol(holding) {
 }
 
 async function yahooEvents(holding) {
-  const now = Math.floor(Date.now()/1000), from = Math.floor(new Date(`${currentYear()-2}-01-01T00:00:00Z`).getTime()/1000), to = Math.floor(new Date(`${currentYear()+2}-12-31T23:59:59Z`).getTime()/1000);
+  const now = Math.floor(Date.now()/1000), from = Math.floor(new Date(`${currentYear()}-01-01T00:00:00Z`).getTime()/1000), to = Math.floor(new Date(`${currentYear()+2}-12-31T23:59:59Z`).getTime()/1000);
   const hosts = ["https://query1.finance.yahoo.com","https://query2.finance.yahoo.com"];
   let lastError;
   for (const host of hosts) {
@@ -72,21 +72,33 @@ async function yahooEvents(holding) {
 }
 
 function dedupe(events) {
-  const ordered=[...events].sort((a,b)=>(a.sourceProvider?.includes(" IR")?-1:0)-(b.sourceProvider?.includes(" IR")?-1:0));
+  const priority=event=>event.sourceProvider?.includes(" IR")?3:event.sourceProvider==="Twelve Data"?2:1;
+  const dates=event=>[event.paymentDate,event.recordDate,event.exDate,event.announcementDate].filter(Boolean);
+  const distance=(a,b)=>Math.abs(new Date(`${a}T00:00:00Z`)-new Date(`${b}T00:00:00Z`))/86400000;
+  const ordered=[...events].sort((a,b)=>priority(b)-priority(a));
   const result=[];
   ordered.forEach(event=>{
-    const duplicate=result.some(row=>Math.abs(Number(row.amountPerShare)-Number(event.amountPerShare))<0.000001&&[row.paymentDate,row.recordDate,row.exDate].filter(Boolean).some(date=>[event.paymentDate,event.recordDate,event.exDate].includes(date)));
-    if(!duplicate)result.push(event);
+    const duplicate=result.find(row=>{
+      const tolerance=Math.max(.000001,Math.max(Math.abs(Number(row.amountPerShare)),Math.abs(Number(event.amountPerShare)))*.00001);
+      return row.currency===event.currency&&Math.abs(Number(row.amountPerShare)-Number(event.amountPerShare))<=tolerance&&dates(row).some(a=>dates(event).some(b=>distance(a,b)<=45));
+    });
+    if(!duplicate){result.push(event);return;}
+    for(const field of ["announcementDate","exDate","recordDate","paymentDate","sourceUrl"]){
+      if(!duplicate[field]&&event[field])duplicate[field]=event[field];
+    }
   });
   return result;
 }
 
 export async function fetchDividendEvents(holding) {
   const events=[...officialEvents(holding)],failures=[];
-  try{events.push(...await twelveDataEvents(holding));}catch(error){failures.push(`Twelve Data: ${error.message}`);}
-  try{events.push(...await yahooEvents(holding));}catch(error){failures.push(`Yahoo: ${error.message}`);}
+  let providerRows=[];
+  try{providerRows=await twelveDataEvents(holding);events.push(...providerRows);}catch(error){failures.push(`Twelve Data: ${error.message}`);}
+  if(!providerRows.length){
+    try{events.push(...await yahooEvents(holding));}catch(error){failures.push(`Yahoo: ${error.message}`);}
+  }
   const rows=dedupe(events);
-  if(!rows.length&&failures.length===2)throw Object.assign(new Error(failures.join(" | ")),{code:"dividends_unavailable",status:502});
-  return {events:rows,coverage:[...new Set(rows.map(row=>row.sourceProvider))].join(" + ")||"No confirmed dividend",warnings:failures};
+  if(!rows.length&&failures.length>=2)throw Object.assign(new Error(failures.join(" | ")),{code:"dividends_unavailable",status:502});
+  const primary=rows.some(row=>row.sourceProvider?.includes(" IR"))?"Official issuer":rows.some(row=>row.sourceProvider==="Twelve Data")?"Twelve Data":"Provider fallback";
+  return {events:rows,coverage:rows.length?primary:"No confirmed dividend",warnings:failures};
 }
-

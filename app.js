@@ -3,7 +3,7 @@ import { annualExpenseBreakdown, annualOperatingPerformance, buildMonthlyTimelin
 import { SyncManager } from "./src/sync/sync-manager.js";
 import { fetchHoldingDividends, fetchHoldingQuote, fetchTradingBenchmark, fetchTradingQuote, fetchUsdIdrRate, isPriceStale, validateHoldingSymbol } from "./src/stocks/client.js";
 import { normalizeStockMapping, quantityForDisplay, quantityForStorage, quantityUnit } from "./src/stocks/holding.js";
-import { advanceDividendLifecycle, creditDividendToWallet, dividendEventYear, dividendGross, dividendNativeGross, dividendReceivables, mergeDividendEvents, projectedDividendForMonth, summarizeDividends } from "./src/stocks/dividends.js";
+import { advanceDividendLifecycle, creditDividendToWallet, dividendEventYear, dividendGross, dividendNativeGross, dividendReceivables, mergeDividendEvents, projectedDividendForMonth, reconcileDividendState, reverseDividendCredit, summarizeDividends } from "./src/stocks/dividends.js";
 import { getSupabase } from "./src/lib/supabase.js";
 import { applyOpeningPosition, applyTrade, archiveClosedTradingPositions, cashEvent, performancePreview, performanceSeries, reconcileTradingPositions, removeTradingPositionData, tradingMetrics, tradingPositionCost, tradingPositionValue, tradingTargetSimulation, upsertDailySnapshot } from "./src/trading/model.js";
 
@@ -644,33 +644,49 @@ function formatDividendNative(value,currency){
  return new Intl.NumberFormat(currency==="USD"?"en-US":"id-ID",{style:"currency",currency,maximumFractionDigits:currency==="USD"?4:2}).format(Number(value||0));
 }
 
+function dividendSourceLabel(event){
+ const source=String(event?.sourceProvider||"Provider");
+ if(source.includes("Bank Mandiri"))return "Bank Mandiri";
+ if(source.includes("Twelve"))return "Twelve Data";
+ if(source.includes("Yahoo"))return "Market provider";
+ if(source.includes("Manual"))return "Manual";
+ return source;
+}
+
 function renderDividends(){
- const events=state.dividends||[],year=currentYear(),summary=summarizeDividends(events,year,state.usdIdr,new Date());
- const paidRows=events.filter(event=>dividendEventYear(event)===year&&(event.status==="paid"||event.creditedAt));
- if(!state.stocks.length){dividendSummary.innerHTML="";dividendTickerList.innerHTML=`<div class="dividend-empty"><b>No Investment holdings</b><span>Dividend rows appear dynamically after you add an Investment ticker.</span></div>`;addDividendBtn.disabled=true;dividendSyncMeta.textContent="No Investment tickers";return;}
+ const year=currentYear();
+ if(reconcileDividendState(state,{year}))queueMicrotask(()=>save({background:true}));
+ const events=state.dividends||[],summary=summarizeDividends(events,year,state.usdIdr,new Date());
+ const paidRows=events.filter(event=>event.creditedAt).sort((a,b)=>String(b.creditedAt).localeCompare(String(a.creditedAt)));
+ if(!state.stocks.length){dividendSummary.innerHTML="";dividendTickerList.innerHTML=`<div class="dividend-empty"><b>No Investment holdings</b><span>Dividend rows appear dynamically after you add an Investment ticker.</span></div>`;dividendCreditHistory.innerHTML="";addDividendBtn.disabled=true;dividendSyncMeta.textContent="No Investment tickers";return;}
  const nextDate=summary.next?.paymentDate||summary.next?.recordDate||summary.next?.exDate||"—";
  dividendSummary.innerHTML=[
   ["Remaining this year",fmt(summary.remaining),summary.remaining?"Confirmed + receivable":"No remaining confirmed dividend"],
   ["Receivable",fmt(summary.receivable),summary.receivable?"Entitlement already locked":"Nothing awaiting payment"],
-  [`Total dividend ${year}`,fmt(summary.total),`${summary.rows.length} confirmed event${summary.rows.length===1?"":"s"}`],
+  [`Total dividend ${year}`,fmt(summary.total),`${summary.rows.length} unique confirmed event${summary.rows.length===1?"":"s"}`],
   ["Next payment",nextDate,summary.next?`${summary.next.ticker} · ${formatDividendNative(summary.next.amountPerShare,summary.next.currency)} / share`:"No scheduled payment"]
  ].map(([label,value,note])=>`<article class="dividend-summary-card"><small>${label}</small><strong class="private">${value}</strong><span>${note}</span></article>`).join("");
  addDividendBtn.disabled=false;
  dividendTickerList.innerHTML=state.stocks.map(holding=>{
   const rows=events.filter(event=>event.holdingId===holding.id).sort((a,b)=>String(b.paymentDate||b.recordDate||b.exDate).localeCompare(String(a.paymentDate||a.recordDate||a.exDate)));
   const currentRows=rows.filter(event=>dividendEventYear(event)===year&&event.status!=="cancelled"),perShare=currentRows.reduce((sum,event)=>sum+Number(event.amountPerShare||0),0),holdingTotal=currentRows.reduce((sum,event)=>sum+dividendGross(event,state.usdIdr),0);
-  const remaining=currentRows.filter(event=>!["paid","cancelled"].includes(event.status)&&!event.creditedAt).reduce((sum,event)=>sum+dividendGross(event,state.usdIdr),0);
-  const eventHtml=rows.length?rows.map(event=>{
+  const today=todayISO(),remaining=currentRows.filter(event=>!event.creditedAt&&(event.status==="receivable"||String(event.paymentDate||event.recordDate||event.exDate)>=today)).reduce((sum,event)=>sum+dividendGross(event,state.usdIdr),0);
+  const activeRows=rows.filter(event=>!event.creditedAt&&event.status!=="cancelled"&&dividendEventYear(event)>=year);
+  const eventHtml=activeRows.length?activeRows.map(event=>{
    const native=dividendNativeGross(event),date=event.paymentDate||event.recordDate||event.exDate||"Date unavailable",review=event.eligibilityStatus==="review"&&!event.creditedAt;
-   const sourceUrl=safeExternalUrl(event.sourceUrl);
-   return `<div class="dividend-event"><div class="dividend-event-main"><b>${escapeHtml(event.type.toUpperCase())} · ${formatDividendNative(event.amountPerShare,event.currency)} / share</b><small>${escapeHtml(event.sourceProvider||"Manual")} · ${escapeHtml(date)}</small>${sourceUrl?`<small><a href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener noreferrer">View source</a></small>`:""}</div><div class="dividend-event-cell"><small>ELIGIBLE SHARES</small><b>${Number(event.eligibleShares||0).toLocaleString("en-US",{maximumFractionDigits:6})}</b></div><div class="dividend-event-cell"><small>GROSS DIVIDEND</small><b class="private">${formatDividendNative(native,event.currency)}</b></div><div class="dividend-event-cell"><small>PAYMENT DATE</small><b>${escapeHtml(event.paymentDate||"—")}</b></div><div><span class="dividend-status ${event.status} ${review?"review":""}">${review?"Review eligibility":event.status}</span></div><div class="dividend-event-actions">${review?`<button type="button" class="credit" data-credit-dividend="${event.id}" title="Confirm eligible shares and credit wallet">✓ Credit</button>`:""}<button type="button" data-edit-dividend="${event.id}" title="Edit dividend">✎</button><button type="button" data-delete-dividend="${event.id}" title="Delete dividend">🗑</button></div></div>`;
-  }).join(""):`<div class="dividend-empty"><b>0 confirmed dividend</b><span>No confirmed dividend event is stored for ${escapeHtml(holding.ticker)}.</span></div>`;
+   return `<div class="dividend-event"><div class="dividend-event-main"><b>${escapeHtml(event.type.toUpperCase())} · ${formatDividendNative(event.amountPerShare,event.currency)} / share</b><small>${escapeHtml(dividendSourceLabel(event))} · ${escapeHtml(date)}</small></div><div class="dividend-event-cell" title="Shares owned on the dividend record date"><small>SHARES AT RECORD DATE</small><b>${Number(event.eligibleShares||0).toLocaleString("en-US",{maximumFractionDigits:6})}</b></div><div class="dividend-event-cell"><small>GROSS DIVIDEND</small><b class="private">${formatDividendNative(native,event.currency)}</b></div><div class="dividend-event-cell"><small>PAYMENT DATE</small><b>${escapeHtml(event.paymentDate||"—")}</b></div><div><span class="dividend-status ${event.status} ${review?"review":""}">${review?"Confirm shares":event.status}</span></div><div class="dividend-event-actions">${review?`<button type="button" class="credit" data-credit-dividend="${event.id}" title="Confirm shares owned on record date and credit wallet">✓ Credit</button>`:""}<button type="button" data-edit-dividend="${event.id}" title="Edit dividend">✎</button><button type="button" data-delete-dividend="${event.id}" title="Delete dividend">🗑</button></div></div>`;
+  }).join(""):`<div class="dividend-empty"><b>0 upcoming dividend</b><span>No active confirmed dividend is stored for ${escapeHtml(holding.ticker)}.</span></div>`;
   return `<details class="dividend-ticker-card" ${rows.length?"open":""}><summary><div class="dividend-ticker-title"><strong>${escapeHtml(holding.ticker)}</strong><small>${holding.market} · ${holding.currency}</small></div><div class="dividend-ticker-stat"><small>${year} per share</small><b>${formatDividendNative(perShare,holding.currency)}</b></div><div class="dividend-ticker-stat"><small>${year} entitlement</small><b class="private">${fmt(holdingTotal)}</b></div><div class="dividend-ticker-stat"><small>Remaining</small><b class="private">${fmt(remaining)}</b></div><span class="dividend-toggle">⌄</span></summary><div class="dividend-events">${eventHtml}</div></details>`;
  }).join("");
+ dividendCreditHistory.innerHTML=`<section class="dividend-history"><div class="dividend-history-head"><div><p>CONFIRMED RECEIPTS</p><h4>Dividend Credit History</h4></div><span class="pill">${paidRows.length} credited</span></div>${paidRows.length?`<div class="dividend-history-list">${paidRows.map(event=>{
+  const creditedNative=Number(event.creditedAmountNative||dividendNativeGross(event)),creditedDate=String(event.creditedAt).slice(0,10);
+  return `<article class="dividend-history-row"><div><strong>${escapeHtml(event.ticker)} · ${escapeHtml(event.type.toUpperCase())}</strong><small>${escapeHtml(dividendSourceLabel(event))} · credited ${escapeHtml(creditedDate)}</small></div><div><small>SHARES AT RECORD DATE</small><b>${Number(event.eligibleShares||0).toLocaleString("en-US",{maximumFractionDigits:6})}</b></div><div><small>RECEIVED</small><b class="positive private">${formatDividendNative(creditedNative,event.creditedCurrency||event.currency)}</b></div><button type="button" class="danger-btn" data-reverse-dividend="${event.id}">Cancel credit & delete</button></article>`;
+ }).join("")}</div>`:`<div class="dividend-empty"><b>No credited dividends</b><span>Only dividends actually credited to the Investment wallet appear here.</span></div>`}</section>`;
  qa("[data-edit-dividend]").forEach(button=>button.onclick=()=>openDividendEditor(button.dataset.editDividend));
- qa("[data-delete-dividend]").forEach(button=>button.onclick=()=>{const event=events.find(row=>row.id===button.dataset.deleteDividend);if(!event||!confirm(`Delete ${event.ticker} dividend record?`))return;state.dividends=events.filter(row=>row.id!==event.id);save();renderAll();toastMsg("Dividend record deleted");});
- qa("[data-credit-dividend]").forEach(button=>button.onclick=()=>{const event=events.find(row=>row.id===button.dataset.creditDividend);if(!event)return;const shares=prompt(`Eligible ${event.ticker} shares on record date`,String(event.eligibleShares||0));if(shares===null)return;event.eligibleShares=Math.max(0,Number(shares||0));if(!creditDividendToWallet(state,event))return toastMsg("Dividend amount is zero");save();renderAll();toastMsg(`${event.ticker} dividend credited to Investment wallet`);});
- dividendSyncMeta.textContent=paidRows.length?`${paidRows.length} paid · official & provider data`:"Official & provider data";
+ qa("[data-delete-dividend]").forEach(button=>button.onclick=()=>{const event=events.find(row=>row.id===button.dataset.deleteDividend);if(!event||!confirm(`Delete ${event.ticker} dividend record?`))return;if(event.creditedAt)reverseDividendCredit(state,event);state.dividends=events.filter(row=>row.id!==event.id);save();renderAll();toastMsg("Dividend record deleted");});
+ qa("[data-credit-dividend]").forEach(button=>button.onclick=()=>{const event=events.find(row=>row.id===button.dataset.creditDividend);if(!event)return;const shares=prompt(`${event.ticker} shares you owned on the record date`,String(event.eligibleShares||0));if(shares===null)return;event.eligibleShares=Math.max(0,Number(shares||0));if(!creditDividendToWallet(state,event))return toastMsg("Dividend amount is zero");save();renderAll();toastMsg(`${event.ticker} dividend credited to Investment wallet`);});
+ qa("[data-reverse-dividend]").forEach(button=>button.onclick=()=>{const event=events.find(row=>row.id===button.dataset.reverseDividend);if(!event||!confirm(`Cancel ${event.ticker} dividend credit, subtract it from the Investment wallet, and delete its record?`))return;if(!reverseDividendCredit(state,event))return;state.dividends=events.filter(row=>row.id!==event.id);save();renderAll();toastMsg(`${event.ticker} dividend credit cancelled and removed from wallet`);});
+ dividendSyncMeta.textContent=paidRows.length?`${paidRows.length} credited · one source per event`:"One source per event";
 }
 
 function openDividendEditor(eventId){
@@ -690,7 +706,7 @@ function openDividendEditor(eventId){
  ],values=>{
   const holdingId=String(values.holding).split(" · ").at(-1),selected=state.stocks.find(row=>row.id===holdingId);if(!selected)return false;
   const amount=Math.max(0,Number(values.amount||0)),payment=values.paymentDate||values.recordDate||values.exDate||values.announcementDate||todayISO();
-  const row=existing||{id:createId(),creditedAt:null};
+  const row=existing||{id:createId(),creditedAt:null,creditedAmountNative:0,creditedCurrency:"",creditReversedAt:null};
   Object.assign(row,{holdingId:selected.id,ticker:selected.ticker,eventKey:existing?.eventKey||`manual:${selected.ticker}:${payment}:${amount}:${values.type}:${createId()}`,type:values.type,currency:selected.currency,amountPerShare:amount,eligibleShares:Math.max(0,Number(values.shares||0)),announcementDate:values.announcementDate||"",exDate:values.exDate||"",recordDate:values.recordDate||"",paymentDate:values.paymentDate||"",status:values.status,eligibilityStatus:values.status==="receivable"||values.status==="paid"?"locked":new Date(`${values.recordDate||values.exDate||payment}T00:00:00`)<new Date()?"review":"pending",sourceProvider:"Manual official record",sourceUrl:values.sourceUrl||"",manual:true,fxRate:selected.currency==="USD"?state.usdIdr:0});
   if(!existing)state.dividends.push(row);
   if(values.status==="paid"&&!row.creditedAt)creditDividendToWallet(state,row);
@@ -1227,13 +1243,14 @@ async function refreshInvestmentDividends({silent=false,force=false}={}){
    }catch{failed++;}
   }
   const merged=mergeDividendEvents(state.dividends||(state.dividends=[]),incoming,state.stocks,createId,new Date());
+  const reconciled=reconcileDividendState(state,{year:currentYear()});
   const advanced=advanceDividendLifecycle(state,new Date());
   if(succeeded)localStorage.setItem(refreshKey,"done");
-  if(merged||advanced)await save({background:silent});
+  if(merged||reconciled||advanced)await save({background:silent});
   if(!hasActiveEditor()){renderStocks();renderAccumulation();renderProspect();renderInsights();attachTips();applyLanguage();}
-  if(typeof dividendSyncMeta!=="undefined")dividendSyncMeta.textContent=coverage.size?[...coverage].join(" + "):succeeded?"No confirmed dividend found":"Provider unavailable · saved data retained";
+  if(typeof dividendSyncMeta!=="undefined")dividendSyncMeta.textContent=succeeded?"Best available source per event":"Provider unavailable · saved data retained";
   if(!silent)toastMsg(`${succeeded} ticker${succeeded===1?"":"s"} checked${failed?` · ${failed} saved data`:""}`);
-  return merged||advanced;
+  return merged||reconciled||advanced;
  })().finally(()=>{if(typeof refreshDividendsBtn!=="undefined")refreshDividendsBtn.disabled=false;dividendRefreshPromise=null;});
  return dividendRefreshPromise;
 }

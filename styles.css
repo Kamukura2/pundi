@@ -1067,12 +1067,17 @@ select,input,.search{width:100%;min-width:0;height:46px;padding:0 12px;border-ra
 .dividend-status.paid{background:rgba(34,205,143,.14);color:var(--green)}.dividend-status.review{background:rgba(255,165,58,.15);color:#f29a32}.dividend-status.cancelled{background:rgba(255,79,113,.14);color:#ef476f}
 .dividend-event-actions{display:flex;gap:6px}.dividend-event-actions button{min-width:34px;height:34px;padding:0 9px;border:1px solid var(--line);border-radius:10px;background:var(--surface2);color:var(--text);font-weight:850;cursor:pointer}.dividend-event-actions .credit{color:var(--green)}
 .dividend-empty{padding:28px;border:1px dashed var(--line);border-radius:18px;text-align:center;color:var(--muted)}.dividend-empty b{display:block;margin-bottom:5px;color:var(--text);font-size:18px}
+.dividend-history{margin-top:20px;padding-top:18px;border-top:1px solid var(--line)}
+.dividend-history-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.dividend-history-head p{margin:0;color:var(--muted);font-size:9px;font-weight:900;letter-spacing:.09em}.dividend-history-head h4{margin:4px 0 0;font-size:21px}
+.dividend-history-list{display:grid;gap:8px}.dividend-history-row{display:grid;grid-template-columns:minmax(170px,1.2fr) minmax(130px,.8fr) minmax(150px,.8fr) auto;gap:12px;align-items:center;padding:13px;border:1px solid var(--line);border-radius:15px;background:var(--surface)}
+.dividend-history-row strong,.dividend-history-row b{display:block}.dividend-history-row small{display:block;margin-top:3px;color:var(--muted);font-size:9px}.dividend-history-row .danger-btn{min-height:36px;padding:8px 12px;font-size:10px}
 [data-theme=dark] .dividend-summary-card,[data-theme=dark] .dividend-ticker-card{box-shadow:inset 0 1px rgba(255,255,255,.04)}
 
 @media(max-width:1024px){
  .dividend-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
  .dividend-ticker-card>summary{grid-template-columns:minmax(120px,1fr) repeat(2,minmax(100px,.8fr)) 34px}.dividend-ticker-stat:nth-of-type(3){display:none}
  .dividend-event{grid-template-columns:repeat(2,minmax(0,1fr))}.dividend-event-main,.dividend-event-actions{grid-column:1/-1}.dividend-event-actions{justify-content:flex-end}
+ .dividend-history-row{grid-template-columns:repeat(2,minmax(0,1fr))}.dividend-history-row .danger-btn{grid-column:1/-1}
 }
 @media(max-width:680px){
  .stock-workspace-tabs{position:sticky;top:6px;z-index:28;margin-bottom:13px;border-radius:14px;background:color-mix(in srgb,var(--surface2) 92%,transparent);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
@@ -1082,4 +1087,5 @@ select,input,.search{width:100%;min-width:0;height:46px;padding:0 12px;border-ra
  .dividend-summary{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-bottom:10px}.dividend-summary-card{padding:10px;border-radius:13px}.dividend-summary-card small{font-size:6px}.dividend-summary-card strong{font-size:14px}.dividend-summary-card span{font-size:8px}
  .dividend-ticker-card{border-radius:15px}.dividend-ticker-card>summary{grid-template-columns:minmax(90px,1fr) minmax(95px,1fr) 30px;gap:7px;padding:11px}.dividend-ticker-title strong{font-size:18px}.dividend-ticker-title small{font-size:8px}.dividend-ticker-stat:nth-of-type(n+2){display:none}.dividend-ticker-stat small{font-size:6px}.dividend-ticker-stat b{font-size:11px}.dividend-toggle{width:29px;height:29px;border-radius:9px}
  .dividend-events{padding:0 10px 10px}.dividend-event{grid-template-columns:1fr 1fr;gap:7px;padding:10px;border-radius:12px}.dividend-event-cell b{font-size:10px}.dividend-event-main small,.dividend-event-cell small{font-size:7px}.dividend-status{font-size:6px}.dividend-event-actions button{height:31px;font-size:8px}
+ .dividend-history{margin-top:13px;padding-top:13px}.dividend-history-head h4{font-size:16px}.dividend-history-row{grid-template-columns:1fr 1fr;gap:8px;padding:10px}.dividend-history-row>div:first-child,.dividend-history-row .danger-btn{grid-column:1/-1}.dividend-history-row small{font-size:7px}.dividend-history-row b{font-size:11px}.dividend-history-row .danger-btn{min-height:34px;font-size:9px}
 }

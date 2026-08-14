@@ -131,8 +131,11 @@ assert.doesNotMatch(migration012,/drop\s+table|truncate\s+|delete\s+from/i);
 const migration013 = read("supabase/migrations/013_investment_dividends.sql");
 for (const marker of ["investment_dividends","amount_per_share","eligible_shares","record_date","payment_date","credited_at","enable row level security","force row level security"]) assert.match(migration013,new RegExp(marker));
 assert.doesNotMatch(migration013,/drop\s+table|truncate\s+|delete\s+from/i);
+const migration014 = read("supabase/migrations/014_dividend_credit_reversal.sql");
+for (const marker of ["credited_amount_native","credited_currency","credit_reversed_at","investment_dividends_user_credited_idx"]) assert.match(migration014,new RegExp(marker));
+assert.doesNotMatch(migration014,/drop\s+table|truncate\s+|delete\s+from/i);
 
-const { advanceDividendLifecycle, creditDividendToWallet, dividendReceivables, mergeDividendEvents, projectedDividendForMonth } = await import("../src/stocks/dividends.js");
+const { advanceDividendLifecycle, creditDividendToWallet, dividendReceivables, mergeDividendEvents, projectedDividendForMonth, reconcileDividendState, reverseDividendCredit } = await import("../src/stocks/dividends.js");
 const dividendHolding={id:"h1",ticker:"BMRI",currency:"IDR",quantity:100};
 const dividendState={stocks:[dividendHolding],stockExtras:{netcashIdr:0,walletUsd:0},dividends:[{id:"d1",holdingId:"h1",eventKey:"bmri:test",ticker:"BMRI",type:"final",currency:"IDR",amountPerShare:10,eligibleShares:100,recordDate:"2026-08-10",paymentDate:"2026-08-20",status:"confirmed",eligibilityStatus:"pending",creditedAt:null}]};
 assert.equal(advanceDividendLifecycle(dividendState,new Date("2026-08-11T00:00:00Z")),true);
@@ -145,6 +148,14 @@ assert.equal(mergeDividendEvents(historicalEvents,[{holdingId:"h1",eventKey:"old
 assert.equal(historicalEvents[0].eligibilityStatus,"review","Past dividends require historical share review before wallet credit");
 assert.equal(creditDividendToWallet({stocks:[dividendHolding],stockExtras:{netcashIdr:0,walletUsd:0},dividends:historicalEvents},historicalEvents[0],new Date("2026-08-14T00:00:00Z")),true);
 assert.equal(projectedDividendForMonth([{currency:"USD",amountPerShare:1,eligibleShares:2,paymentDate:"2027-05-10",status:"confirmed",creditedAt:null}],2027,4,17000),34000);
+const duplicateDividendState={stockExtras:{netcashIdr:7539138.78,walletUsd:0},dividends:[
+ {id:"official",holdingId:"h1",ticker:"BMRI",eventKey:"official",type:"final",currency:"IDR",amountPerShare:376.956939,eligibleShares:10000,exDate:"2026-05-11",paymentDate:"2026-05-25",status:"paid",eligibilityStatus:"locked",sourceProvider:"Bank Mandiri IR",creditedAt:"2026-05-25T00:00:00Z",creditedAmountNative:3769569.39},
+ {id:"yahoo",holdingId:"h1",ticker:"BMRI",eventKey:"yahoo",type:"regular",currency:"IDR",amountPerShare:376.95694,eligibleShares:10000,exDate:"2026-05-11",status:"paid",eligibilityStatus:"locked",sourceProvider:"Yahoo corporate actions",creditedAt:"2026-05-25T00:00:00Z",creditedAmountNative:3769569.4}
+]};
+assert.equal(reconcileDividendState(duplicateDividendState,{year:2026}),true,"The same issuer dividend from two providers must collapse into one event");
+assert.equal(duplicateDividendState.dividends.length,1);assert.ok(Math.abs(duplicateDividendState.stockExtras.netcashIdr-3769569.39)<.02,"A duplicate credited dividend must also be removed from wallet balance");
+assert.equal(reverseDividendCredit(duplicateDividendState,duplicateDividendState.dividends[0],new Date("2026-08-14T00:00:00Z")),true);
+assert.ok(Math.abs(duplicateDividendState.stockExtras.netcashIdr)<.02,"Cancelling a dividend credit must reverse its exact wallet amount");
 
 const { applyOpeningPosition, applyTrade, archiveClosedTradingPositions, cashEvent, performancePreview, performanceSeries, reconcileTradingPositions, removeTradingPositionData, tradingMetrics, tradingTargetSimulation, upsertDailySnapshot } = await import("../src/trading/model.js");
 const tradePosition={id:"p1",ticker:"MU",market:"NASDAQ",currency:"USD",quantity:0,avg:0,current:0};

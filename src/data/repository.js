@@ -55,7 +55,8 @@ function rowsToState(rows) {
     currency:row.currency,amountPerShare:Number(row.amount_per_share),eligibleShares:Number(row.eligible_shares),
     announcementDate:row.announcement_date||"",exDate:row.ex_date||"",recordDate:row.record_date||"",paymentDate:row.payment_date||"",
     status:row.dividend_status,eligibilityStatus:row.eligibility_status,sourceProvider:row.source_provider,
-    sourceUrl:row.source_url||"",manual:Boolean(row.is_manual),fxRate:Number(row.fx_rate||0),creditedAt:row.credited_at,...meta(row)
+    sourceUrl:row.source_url||"",manual:Boolean(row.is_manual),fxRate:Number(row.fx_rate||0),creditedAt:row.credited_at,
+    creditedAmountNative:Number(row.credited_amount_native||0),creditedCurrency:row.credited_currency||"",creditReversedAt:row.credit_reversed_at||null,...meta(row)
   }));
   state.tradingPositions = (rows.trading_positions || []).map(row => ({
     id:row.id,ticker:row.display_symbol,displaySymbol:row.display_symbol,market:row.market,
@@ -135,7 +136,8 @@ function stateToRows(state, userId) {
       currency:row.currency,amount_per_share:Number(row.amountPerShare||0),eligible_shares:Number(row.eligibleShares||0),
       announcement_date:row.announcementDate||null,ex_date:row.exDate||null,record_date:row.recordDate||null,payment_date:row.paymentDate||null,
       dividend_status:row.status||"confirmed",eligibility_status:row.eligibilityStatus||"pending",source_provider:row.sourceProvider||"manual",
-      source_url:row.sourceUrl||"",is_manual:Boolean(row.manual),fx_rate:Number(row.fxRate||0),credited_at:row.creditedAt||null,...stamp(row)
+      source_url:row.sourceUrl||"",is_manual:Boolean(row.manual),fx_rate:Number(row.fxRate||0),credited_at:row.creditedAt||null,
+      credited_amount_native:Number(row.creditedAmountNative||0),credited_currency:row.creditedCurrency||null,credit_reversed_at:row.creditReversedAt||null,...stamp(row)
     })),
     trading_positions: (state.tradingPositions || []).map(row => owned({
       id:row.id,display_symbol:row.displaySymbol || row.ticker,market:row.market,provider_symbol:row.providerSymbol || row.ticker,
