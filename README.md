@@ -1,6 +1,10 @@
-# CVFinance v7.7.6
+# CVFinance v7.7.8
 
-v7.7.6 fills the remaining Insights space with a read-only Financial Action Plan, increases contrast on colored summary-card labels, and removes internal Target Price scrolling. Ticker and Current now use merged blocks beside the complete 2027–2036 target list. The v7.7.5 P/L percentages, fuchsia identity, Decision Metrics, History isolation, and Prospect formulas remain unchanged.
+v7.7.8 turns History into a true monthly ledger workspace: the former Income/Expense/Net cards become one Total Expense This Month headline; totals, category mix, channel mix, Budget Pace, and the active transaction list automatically start fresh when the calendar month changes. Nothing is deleted—older transactions move into permanent monthly Archive cards. Category and channel donuts both show nominal values and percentages. History remains ledger-only and cannot change Balance, Net Worth, Cash, or Prospect.
+
+v7.7.7 makes client payment status immediately readable (`0 outstanding` or the remaining nominal plus `outstanding left`), compacts each stock's Target Prices into two year-target cards per row, and turns every Future Cash + Assets year into a click-to-expand detail card. Financial formulas, target save behavior, History isolation, and Prospect calculations remain unchanged.
+
+v7.7.6 fills the remaining Insights space with a read-only Financial Action Plan, increases contrast on colored summary-card labels, and removes internal Target Price scrolling. Ticker and Current use grouped blocks beside the complete 2027–2036 target list. The v7.7.5 P/L percentages, fuchsia identity, Decision Metrics, History isolation, and Prospect formulas remain unchanged.
 
 v7.7.2 removes fragile Google HTML scraping and reads the `IDR=X` quote from Yahoo Finance JSON with two-host fallback, safe-rate validation, and last-valid/manual fallback. It also highlights Yearly costs due this month, enlarges the Expense Perusahaan dashboard, brightens Fixed Monthly, and turns Transaction Budget/Channel tags into rounded toggle filters.
 
@@ -66,6 +70,8 @@ For local full-stack testing, use `vercel dev`; plain `npm run dev` does not emu
 - [Auditable projection and stock cash v7.6.0 patch](docs/PATCH_v7_6_0_AUDITABLE_PROJECTION.md)
 - [Google-only FX and dashboard v7.7.0 patch](docs/PATCH_v7_7_0_GOOGLE_STATUS_DASHBOARDS.md)
 - [Annual operating performance v7.7.3 patch](docs/PATCH_v7_7_3_ANNUAL_OPERATING_PERFORMANCE.md)
+- [Compact targets and Prospect dropdowns v7.7.7 patch](docs/PATCH_v7_7_7_COMPACT_TARGETS_PROSPECT_DROPDOWNS.md)
+- [Monthly History and expense mix v7.7.8 patch](docs/PATCH_v7_7_8_MONTHLY_HISTORY_EXPENSE_MIX.md)
 - [Second account setup](docs/SECOND_ACCOUNT_SETUP.md)
 - [Manual actions](docs/MANUAL_ACTIONS.md)
 - [Test checklist](docs/TEST_CHECKLIST.md)

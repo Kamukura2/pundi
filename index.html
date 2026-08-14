@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-  <title>CVFinance v7.7.6</title>
+  <title>CVFinance v7.7.8</title>
   <meta name="theme-color" content="#d6249f">
   <meta name="description" content="Private synchronized personal finance dashboard">
   <meta name="mobile-web-app-capable" content="yes">
@@ -155,13 +155,17 @@
         </div>
       </div>
 
-      <div class="grid-3 compact">
-        <article class="metric-card tint-green"><small>Recorded Income</small><strong id="cashIncome" class="private">Rp0</strong></article>
-        <article class="metric-card tint-red"><small>Recorded Expense</small><strong id="cashExpense" class="private">Rp0</strong></article>
-        <article class="metric-card tint-purple"><small>Recorded Net</small><strong id="cashNet" class="private">Rp0</strong></article>
-      </div>
+      <article class="history-expense-hero">
+        <div>
+          <small id="cashMonthLabel">CURRENT MONTH</small>
+          <h3>Total Expense This Month</h3>
+          <p>Ledger only · automatically starts fresh each month without deleting the previous archive.</p>
+        </div>
+        <strong id="cashMonthExpense" class="private">Rp0</strong>
+        <span>History never changes Balance, Net Worth, Cash, or Prospect.</span>
+      </article>
 
-      <div class="grid-2 gap-lg">
+      <div class="history-overview-grid gap-lg">
         <article class="panel">
           <div class="panel-head"><div><p>Mix</p><h3>Expense Categories</h3></div></div>
           <div class="donut-layout vertical">
@@ -171,6 +175,14 @@
         </article>
 
         <article class="panel">
+          <div class="panel-head"><div><p>Channel Mix</p><h3>Expense Channels</h3></div></div>
+          <div class="donut-layout vertical">
+            <div id="cashChannelDonut"></div>
+            <div id="cashChannelLegend" class="legend"></div>
+          </div>
+        </article>
+
+        <article class="panel history-budget-panel">
           <div class="panel-head">
             <div><p>Budget Pace</p><h3>Budget</h3></div>
             <button class="ghost-btn" data-go="expenses" title="Open">↗</button>
@@ -374,7 +386,7 @@
               <input id="baseGrowth" class="mini-input" type="number" value="8" step=".1"><span>%</span>
             </div>
           </div>
-          <div class="table-wrap target-table-scroll"><table class="target-price-table"><thead id="baseHead"></thead><tbody id="baseBody"></tbody></table></div>
+          <div class="target-price-board"><div id="baseHead" class="target-board-caption"></div><div id="baseBody" class="target-stock-groups"></div></div>
         </article>
 
         <article class="panel">
@@ -385,7 +397,7 @@
               <input id="optimisticGrowth" class="mini-input" type="number" value="14" step=".1"><span>%</span>
             </div>
           </div>
-          <div class="table-wrap target-table-scroll"><table class="target-price-table"><thead id="optimisticHead"></thead><tbody id="optimisticBody"></tbody></table></div>
+          <div class="target-price-board"><div id="optimisticHead" class="target-board-caption"></div><div id="optimisticBody" class="target-stock-groups"></div></div>
         </article>
       </div>
     </section>

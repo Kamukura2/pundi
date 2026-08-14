@@ -16,8 +16,12 @@ assert.match(index, /manifest\.webmanifest/);
 assert.match(index, /authForm/);
 assert.match(index, /annualPerformanceDashboard/);
 assert.match(index, /Decision Metrics/);
-assert.match(index, /target-table-scroll/);
+assert.match(index, /target-price-board/);
 assert.match(index, /insightActionPlan/);
+assert.match(index, /id="cashMonthExpense"/, "History must show one current-month expense headline");
+assert.doesNotMatch(index, /id="cashIncome"|id="cashExpense"|id="cashNet"/, "The old three History summary cards must be removed");
+assert.match(index, /id="cashChannelDonut"/);
+assert.match(index, /id="cashChannelLegend"/);
 
 const sql = read("supabase/migrations/001_initial_schema.sql");
 for (const table of ["profiles","accounts","transactions","monthly_budgets","yearly_expenses","planned_events","credit_facilities","credit_items","clients","stock_holdings","stock_price_targets","electricity_readings","app_settings"]) {
@@ -46,7 +50,7 @@ assert.equal(seed.stocks.find(row => row.ticker === "WDC").quantity, 2.8033875);
 assert.equal(seed.rateKwh, 1740);
 assert.ok(seed.budgets.some(row => row.category === "Food") && seed.budgets.some(row => row.category === "Coffee"));
 
-const { annualOperatingPerformance, buildMonthlyTimeline, buildProjection, getBudgetProgress, getClientPaidThisMonth, getCurrentNetWorth, getEntrustedDeduction, getFixedIncome, getTotalOutstanding, remainingYearExpenseBreakdown, remainingYearIncomeBreakdown } = await import("../src/data/finance-model.js");
+const { annualOperatingPerformance, buildMonthlyTimeline, buildProjection, getBudgetProgress, getClientPaidThisMonth, getCurrentNetWorth, getEntrustedDeduction, getFixedIncome, getTotalOutstanding, remainingYearExpenseBreakdown, remainingYearIncomeBreakdown, transactionsForMonth } = await import("../src/data/finance-model.js");
 const modelClients = [
   {monthly:1000000,paid:300000,carry:0,status:"pending",clientType:"recurring"},
   {monthly:2000000,paid:0,carry:0,status:"pending",clientType:"ending",endingPaid:false},
@@ -61,6 +65,9 @@ assert.equal(getEntrustedDeduction(entrusted),2250000,"Only active entrusted fun
 assert.equal(getEntrustedDeduction(entrusted,"cash"),1500000,"Cash and stock entrusted deductions remain separate");
 assert.equal(getCurrentNetWorth(10000000-getEntrustedDeduction(entrusted,"cash"),5000000-getEntrustedDeduction(entrusted,"stocks")),12750000,"Entrusted funds reduce their selected asset source exactly once");
 const referenceDate=new Date("2026-08-07T12:00:00+07:00");
+const monthlyLedger=[{id:"jul",type:"expense",amount:700000,date:"2026-07-31",category:"Food",channel:"GoFood"},{id:"aug",type:"expense",amount:800000,date:"2026-08-01",category:"Food",channel:"GrabFood"}];
+assert.deepEqual(transactionsForMonth(monthlyLedger,2026,7).map(row=>row.id),["aug"],"A new History month must start from only its own dated records");
+assert.equal(monthlyLedger.length,2,"Monthly History reset must never delete archived transactions");
 const rolledClient={monthly:1000000,paid:1000000,carry:0,status:"paid",clientType:"recurring",trackingMonth:"2026-07"};
 assert.equal(getClientPaidThisMonth(rolledClient,referenceDate),0,"Recurring client paid state must reset automatically in a new month");
 assert.equal(getTotalOutstanding([rolledClient],referenceDate),1000000,"A new month must restore the recurring invoice without deleting history");
@@ -191,11 +198,18 @@ assert.match(appSource, /fixedYearlyIncomeTotal\.textContent=fmt\(fixedIncome\(\
 assert.match(appSource, /meta\?\.provider==="yahoo"\?"YAHOO FINANCE"/, "The FX badge must identify Yahoo Finance honestly");
 assert.match(appSource, /due due-current/, "Yearly expenses due this month must receive the luminous current-month class");
 assert.match(appSource, /data-tx-tag-kind/, "Transaction category and channel chips must act as tag filters");
+assert.match(appSource, /currentMonthTransactions/, "History summaries must be scoped to the active month");
+assert.match(appSource, /groupExpenses\("category"\).*groupExpenses\("channel"\)/s, "Current expenses must be grouped independently by category and channel");
+assert.match(appSource, /tx-current-month/, "The active History month must be visually separate from archives");
+assert.match(appSource, /tx-history-archive/, "Previous History months must remain available in Archive");
 
 const app = read("app.js");
 assert.match(app, /portfolioPL\.textContent=`\$\{fmt\(pl\)\} · \$\{percent\(pl,inv\)\}`/);
 assert.match(app, /const decisionMetrics=/);
-assert.match(app, /rowspan="\$\{targetYears\.length\}"/);
+assert.match(app, /paid\?"0 outstanding":`\$\{fmt\(outstanding\)\} outstanding left`/, "Client cards must use concise outstanding copy");
+assert.match(app, /class="target-years-grid"/, "Target Price groups must use a compact two-up year grid");
+assert.match(app, /class="target-year-card"/, "Each future year and target must remain one stable edit card");
+assert.match(app, /<details class="year-card prospect-year-card">/, "Future Cash + Assets details must be collapsed until clicked");
 assert.match(app, /Financial Action Plan/);
 
-console.log("CVFinance checks passed: schema, RLS markers, PWA, 8 tabs, v7.7.6 Financial Action Plan isolation, full Target Price groups without internal scrolling, white OLED summary labels, P/L percentages, unique Decision Metrics, annual and monthly operating dashboard isolation, Yahoo FX validation, ledger-only History, dynamic Budget meters, toggleable Transaction tags, current-month Yearly styling, safe dialog dismissal, client status palette, auditable projections, one-time dated credit, optional stock cash assets, sorting invariants, stock provider abstraction, offline queue coalescing, and JavaScript syntax.");
+console.log("CVFinance checks passed: schema, RLS markers, PWA, 8 tabs, v7.7.8 monthly History reset without deletion, one Total Expense headline, category and channel expense charts, permanent monthly archives, concise client outstanding labels, two-up Target Price cards, collapsed Prospect year details, Financial Action Plan isolation, P/L percentages, annual and monthly operating dashboard isolation, Yahoo FX validation, ledger-only History, dynamic Budget meters, toggleable Transaction tags, safe dialog dismissal, auditable projections, one-time dated credit, optional stock cash assets, sorting invariants, stock provider abstraction, offline queue coalescing, and JavaScript syntax.");

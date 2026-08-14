@@ -71,7 +71,7 @@ const clientOutstanding=(c)=>getClientOutstanding(c);
 const receivableClients=()=>getReceivableClients(state.clients);
 const totalOutstanding=()=>getTotalOutstanding(state.clients);
 const totalPaid=()=>getTotalPaid(state.clients);
-const txTotals=()=>state.transactions.reduce((a,t)=>(a[t.type]+=Number(t.amount),a),{income:0,expense:0});
+const currentMonthTransactions=()=>state.transactions.filter(isCurrentMonthTx);
 const monthlyBudget=()=>state.budgets.reduce((a,b)=>a+Number(b.monthly),0);
 const budgetRemaining=()=>monthlyBudgetRemaining(state.budgets,state.transactions,new Date());
 const yearlyTotal=()=>state.yearly.reduce((a,b)=>a+Number(b.amount),0);
@@ -112,7 +112,7 @@ const ID_TRANSLATIONS={
  "Available Balance":"Saldo Tersedia","Outstanding Client Income":"Piutang Klien","Balances":"Saldo","Cash, Bank & Wallets":"Tunai, Bank & Dompet","Payment Status":"Status Pembayaran",
  "Pending Expenses":"Kewajiban Mendatang","Where the Money Sits":"Distribusi Aset","Planned vs Actual":"Rencana vs Aktual","All":"Semua","Expense":"Pengeluaran","Income":"Pemasukan",
  "Newest":"Terbaru","Category":"Kategori","Amount":"Nominal","Recorded Income":"Pemasukan Tercatat","Recorded Expense":"Pengeluaran Tercatat","Recorded Net":"Net Tercatat",
- "Expense Categories":"Kategori Pengeluaran","Budget Pace":"Laju Anggaran","Transactions":"Transaksi","Monthly Budget":"Anggaran Bulanan","Yearly Expense":"Pengeluaran Tahunan","Events":"Acara",
+ "Total Expense This Month":"Total Pengeluaran Bulan Ini","Expense Categories":"Kategori Pengeluaran","Expense Channels":"Channel Pengeluaran","Channel Mix":"Komposisi Channel","Budget Pace":"Laju Anggaran","Transactions":"Transaksi","Monthly Budget":"Anggaran Bulanan","Yearly Expense":"Pengeluaran Tahunan","Events":"Acara",
  "Remaining Expense This Year":"Sisa Pengeluaran Tahun Ini","Dynamic estimate from this month through December. History is tracking only and excluded from projection.":"Estimasi dinamis dari bulan ini sampai Desember. Riwayat hanya untuk pencatatan dan tidak masuk proyeksi.",
  "Monthly Remaining":"Sisa Bulanan","Events + Credit":"Acara + Kredit","Editable Budgets":"Anggaran yang Dapat Diedit","Category Breakdown":"Rincian Kategori","Credit Card & PayLater":"Kartu Kredit & PayLater","Entrusted Funds":"Titipan Dana","Non-recurring liability":"Kewajiban non-berulang","Budget Tag":"Tag Anggaran","Cash Balance":"Saldo Kas","Settled":"Selesai","Active":"Aktif",
  "Paid Items":"Item Lunas","Paid This Month":"Dibayar Bulan Ini","Outstanding":"Belum Dibayar","Fixed Monthly":"Tetap Bulanan","Recurring Clients":"Klien Berulang","Ending Clients":"Klien Berakhir","Estimated Income This Year":"Estimasi Pemasukan Tahun Ini","Outstanding Now":"Piutang Saat Ini",
@@ -275,13 +275,16 @@ function renderAccumulation(){
 }
 
 function renderCashflow(){
- const totals=txTotals();
- cashIncome.textContent=fmt(totals.income);
- cashExpense.textContent=fmt(totals.expense);
- cashNet.textContent=fmt(totals.income-totals.expense);
- const entries=Object.entries(state.transactions.filter(t=>t.type==="expense").reduce((o,t)=>((o[t.category]=(o[t.category]||0)+Number(t.amount)),o),{})).sort((a,b)=>b[1]-a[1]);
- cashDonut.innerHTML=donut(entries.length?entries:[["No expense",1]],fmt(totals.expense,true));
- cashLegend.innerHTML=entries.length?legend(entries):`<div class="list-row"><div class="list-ic">ℹ</div><div class="list-meta"><b>No data</b><small>Add expense transactions</small></div></div>`;
+ const now=new Date(),activeMonthKey=monthKey(now),currentRows=currentMonthTransactions(),expenseRows=currentRows.filter(t=>t.type==="expense"),totalExpense=expenseRows.reduce((sum,t)=>sum+Number(t.amount),0);
+ const activeMonthLabel=new Intl.DateTimeFormat(state.language==="id"?"id-ID":"en-US",{month:"long",year:"numeric"}).format(now);
+ cashMonthLabel.textContent=activeMonthLabel.toUpperCase();
+ cashMonthExpense.textContent=fmt(totalExpense);
+ const groupExpenses=field=>Object.entries(expenseRows.reduce((groups,row)=>{const fallback=field==="channel"?"Offline":"Uncategorized",key=String(row[field]||fallback).trim()||fallback;groups[key]=(groups[key]||0)+Number(row.amount);return groups;},{})).sort((a,b)=>b[1]-a[1]);
+ const categoryEntries=groupExpenses("category"),channelEntries=groupExpenses("channel"),emptyLegend=`<div class="list-row"><div class="list-ic">ℹ</div><div class="list-meta"><b>No expense this month</b><small>New expenses will appear here automatically</small></div></div>`;
+ cashDonut.innerHTML=donut(categoryEntries.length?categoryEntries:[["No expense",1]],fmt(totalExpense,true));
+ cashLegend.innerHTML=categoryEntries.length?legend(categoryEntries):emptyLegend;
+ cashChannelDonut.innerHTML=donut(channelEntries.length?channelEntries:[["No expense",1]],fmt(totalExpense,true));
+ cashChannelLegend.innerHTML=channelEntries.length?legend(channelEntries):emptyLegend;
  const pace=[...state.budgets].sort((a,b)=>Number(a.sortOrder||0)-Number(b.sortOrder||0)).map(item=>[item.category,recordedExpenseForBudget(item,state.transactions,new Date()),Number(item.monthly)]);
  budgetPace.innerHTML=pace.map(([name,spent,budget])=>{
   const pct=budget?spent/budget*100:0, cls=pct>100?"over":pct>80?"warn":"";
@@ -291,23 +294,25 @@ function renderCashflow(){
  const search=(txSearch.value||"").toLowerCase();
  list=list.filter(t=>state.filter==="all"||t.type===state.filter).filter(t=>(`${t.description} ${t.category} ${t.channel}`).toLowerCase().includes(search));
  if(transactionTagFilter)list=list.filter(t=>String(t[transactionTagFilter.kind]||"")===transactionTagFilter.value);
+ const sortRows=rows=>{if(state.sort==="category")rows.sort((a,b)=>a.category.localeCompare(b.category));else if(state.sort==="amount")rows.sort((a,b)=>b.amount-a.amount);else rows.sort((a,b)=>b.date.localeCompare(a.date));return rows;};
+ const visibleCurrent=sortRows(list.filter(t=>String(t.date).slice(0,7)===activeMonthKey));
  const groups=new Map();
- list.forEach(t=>{const key=String(t.date).slice(0,7)||"unknown";if(!groups.has(key))groups.set(key,[]);groups.get(key).push(t);});
+ list.filter(t=>String(t.date).slice(0,7)!==activeMonthKey).forEach(t=>{const key=String(t.date).slice(0,7)||"unknown";if(!groups.has(key))groups.set(key,[]);groups.get(key).push(t);});
  const tagChip=(kind,value)=>{
   const active=transactionTagFilter?.kind===kind&&transactionTagFilter.value===String(value||"");
   return `<button type="button" class="tx-filter-chip ${kind} ${active?"active":""}" data-tx-tag-kind="${kind}" data-tx-tag-value="${encodeURIComponent(String(value||""))}">${escapeHtml(value||"—")}</button>`;
  };
  const row=t=>`<div class="tx-row"><div class="tx-badge ${t.type}"><span>${t.type==="income" ? "+" : "−"}</span></div><div class="tx-main"><b>${escapeHtml(t.description)}</b></div><div class="tx-meta">${tagChip("category",t.category)}${tagChip("channel",t.channel)}<span class="tx-date">${escapeHtml(t.date)}</span></div><div class="tx-amt ${t.type==="income"?"positive":"negative"} private">${t.type==="income"?"+":"−"}${fmt(t.amount)}</div><button class="icon-mini tx-edit" data-id="${t.id}" title="Edit">✎</button><button class="icon-mini tx-delete" data-delete-tx="${t.id}" title="Delete">🗑</button></div>`;
+ const currentIncome=visibleCurrent.filter(t=>t.type==="income").reduce((sum,t)=>sum+Number(t.amount),0),currentExpense=visibleCurrent.filter(t=>t.type==="expense").reduce((sum,t)=>sum+Number(t.amount),0);
+ const currentSection=`<section class="tx-current-month"><div class="tx-period-head"><span><small>CURRENT MONTH</small><b>${activeMonthLabel}</b></span><span class="archive-totals private"><em class="positive">+${fmt(currentIncome)}</em><em class="negative">−${fmt(currentExpense)}</em><small>${visibleCurrent.length} transactions</small></span></div><div class="tx-current-list">${visibleCurrent.length?visibleCurrent.map(row).join(""):`<div class="list-row"><div class="list-ic">ℹ</div><div class="list-meta"><b>No matching transactions this month</b><small>The active month starts fresh automatically; previous records remain in Archive.</small></div></div>`}</div></section>`;
  const keys=[...groups.keys()].sort((a,b)=>b.localeCompare(a));
- txList.innerHTML=keys.map((key,index)=>{
-  const rows=groups.get(key);
-  if(state.sort==="category")rows.sort((a,b)=>a.category.localeCompare(b.category));
-  else if(state.sort==="amount")rows.sort((a,b)=>b.amount-a.amount);
-  else rows.sort((a,b)=>b.date.localeCompare(a.date));
+ const archiveSection=`<section class="tx-history-archive"><div class="tx-archive-heading"><div><small>ARCHIVE</small><h4>Previous Months</h4></div><p>Stored permanently and excluded from the current-month totals.</p></div>${keys.map(key=>{
+  const rows=sortRows(groups.get(key));
   const [year,month]=key.split("-").map(Number),label=Number.isFinite(month)?new Intl.DateTimeFormat(state.language==="id"?"id-ID":"en-US",{month:"long",year:"numeric"}).format(new Date(year,month-1,1)):key;
   const income=rows.filter(t=>t.type==="income").reduce((sum,t)=>sum+Number(t.amount),0),expense=rows.filter(t=>t.type==="expense").reduce((sum,t)=>sum+Number(t.amount),0);
-  return `<details class="tx-archive" ${index===0?"open":""}><summary><span><small>MONTHLY ARCHIVE</small><b>${label}</b></span><span class="archive-totals private"><em class="positive">+${fmt(income)}</em><em class="negative">−${fmt(expense)}</em><small>${rows.length} transactions</small></span></summary><div class="tx-archive-list">${rows.map(row).join("")}</div></details>`;
- }).join("") || `<div class="list-row"><div class="list-ic">ℹ</div><div class="list-meta"><b>No transactions</b><small>Add a transaction to get started</small></div></div>`;
+  return `<details class="tx-archive"><summary><span><small>MONTHLY ARCHIVE</small><b>${label}</b></span><span class="archive-totals private"><em class="positive">+${fmt(income)}</em><em class="negative">−${fmt(expense)}</em><small>${rows.length} transactions</small></span></summary><div class="tx-archive-list">${rows.map(row).join("")}</div></details>`;
+ }).join("")||`<div class="list-row"><div class="list-ic">✓</div><div class="list-meta"><b>No previous-month archive yet</b><small>When the month changes, this month's records move here automatically.</small></div></div>`}</section>`;
+ txList.innerHTML=currentSection+archiveSection;
  qa("[data-tx-tag-kind]").forEach(button=>button.onclick=()=>{
   const next={kind:button.dataset.txTagKind,value:decodeURIComponent(button.dataset.txTagValue||"")};
   transactionTagFilter=transactionTagFilter?.kind===next.kind&&transactionTagFilter.value===next.value?null:next;
@@ -519,7 +524,7 @@ function renderClients(){
  clientIncomeOutstanding.textContent=fmt(income.outstanding);
  clientIncomeRecurring.textContent=fmt(income.recurring);
  clientIncomeRemainingMonths.textContent=`${Math.max(0,11-new Date().getMonth())} remaining months`;
- const card=(c)=>{const i=state.clients.indexOf(c),ending=c.clientType==="ending",paid=ending?c.endingPaid:clientOutstanding(c)===0,visual=ending?(paid?"ending-paid":"ending-unpaid"):paid?"paid":"outstanding",statusIcon=ending?"⚑":paid?"✓":"⏳";return `<div class="client-card ${visual} ${ending?"ending":"recurring"}" data-client-id="${c.id}" title="Drag card to reorder or move between sections"><div class="status-icon ${paid?"paid":"pending"}" title="${ending?`ending client · ${paid?"paid":"unpaid"}`:paid?"paid":"outstanding"}">${statusIcon}</div><h4>${c.name}</h4><small>${ending?"Final payment":"Recurring monthly"} · ${fmt(c.monthly)}</small><strong class="private">${ending?(c.endingPaid?"Paid":"Unpaid"):`${fmt(getClientPaidThisMonth(c))} paid`}</strong><small>${ending?`Remaining: ${fmt(clientOutstanding(c))}`:`Previous: ${fmt(c.carry)}<br>Outstanding: ${fmt(clientOutstanding(c))}`}</small><div class="client-actions"><button class="icon-mini" data-edit-client="${i}" title="Edit">✎</button><button class="icon-mini" data-status-client="${i}" title="Status">◉</button><button class="icon-mini" data-remove-client="${i}" title="Remove">🗑</button></div></div>`;};
+ const card=(c)=>{const i=state.clients.indexOf(c),ending=c.clientType==="ending",outstanding=clientOutstanding(c),paid=ending?c.endingPaid:outstanding===0,visual=ending?(paid?"ending-paid":"ending-unpaid"):paid?"paid":"outstanding",statusIcon=ending?"⚑":paid?"✓":"⏳",statusText=paid?"0 outstanding":`${fmt(outstanding)} outstanding left`,meta=ending?(paid?"Final payment completed":"Final payment pending"):`Paid this month: ${fmt(getClientPaidThisMonth(c))} · Previous: ${fmt(c.carry)}`;return `<div class="client-card ${visual} ${ending?"ending":"recurring"}" data-client-id="${c.id}" title="Drag card to reorder or move between sections"><div class="status-icon ${paid?"paid":"pending"}" title="${ending?`ending client · ${paid?"paid":"unpaid"}`:paid?"paid":"outstanding"}">${statusIcon}</div><h4>${escapeHtml(c.name)}</h4><small>${ending?"Final payment":"Recurring monthly"} · ${fmt(c.monthly)}</small><strong class="private client-outstanding-copy">${statusText}</strong><small class="client-payment-meta private">${meta}</small><div class="client-actions"><button class="icon-mini" data-edit-client="${i}" title="Edit">✎</button><button class="icon-mini" data-status-client="${i}" title="Status">◉</button><button class="icon-mini" data-remove-client="${i}" title="Remove">🗑</button></div></div>`;};
  const recurring=[...recurringClients()].sort((a,b)=>Number(a.sortOrder||0)-Number(b.sortOrder||0)),ending=[...endingClients()].sort((a,b)=>Number(a.sortOrder||0)-Number(b.sortOrder||0));
  recurringClientCount.textContent=recurring.length;endingClientCount.textContent=ending.length;
  recurringClientGrid.innerHTML=recurring.map(card).join("")||emptyLane("No recurring clients");
@@ -591,12 +596,8 @@ function renderStocks(){
 function renderTargetTable(mode,headEl,bodyEl){
  const useMode=mode==="base"?state.baseMode:state.optimisticMode;
  const targetYears=YEARS.filter(y=>y!==currentYear());
- headEl.innerHTML=`<tr><th>Ticker</th><th>Current</th><th>Year</th><th>Target</th></tr>`;
- bodyEl.innerHTML=state.stocks.flatMap((s,i)=>targetYears.map((y,rowIndex)=>{
-  const val=useMode==="auto"?stockPrice(s,y,mode):Number(s[mode][y]??s.current);
-  const stockCells=rowIndex===0?`<td data-label="Ticker" rowspan="${targetYears.length}" class="target-stock-cell"><div class="target-static-box"><small>Ticker</small><strong>${escapeHtml(s.ticker)}</strong></div></td><td data-label="Current" rowspan="${targetYears.length}" class="target-stock-cell target-current"><div class="target-static-box"><small>Current</small><strong>${plainNumber(s.current)}</strong></div></td>`:"";
-  return `<tr class="target-price-row ${rowIndex===0?"ticker-start":""}">${stockCells}<td data-label="Year"><span class="target-year-box">${y}</span></td><td data-label="Target"><input class="target-price-input" type="text" inputmode="decimal" autocomplete="off" ${useMode==="auto"?"disabled":""} data-target="${mode}" data-stock="${i}" data-year="${y}" value="${plainNumber(val)}"></td></tr>`;
- })).join("");
+ headEl.innerHTML=`<span>STOCK TARGETS</span><span>Two years per row · ${useMode==="auto"?"automatic growth":"manual values"}</span>`;
+ bodyEl.innerHTML=state.stocks.map((s,i)=>`<section class="target-stock-group"><div class="target-stock-summary"><div class="target-static-box"><small>Ticker</small><strong>${escapeHtml(s.ticker)}</strong></div><div class="target-static-box"><small>Current</small><strong>${plainNumber(s.current)}</strong></div></div><div class="target-years-grid">${targetYears.map(y=>{const val=useMode==="auto"?stockPrice(s,y,mode):Number(s[mode][y]??s.current);return `<label class="target-year-card"><span>${y}</span><input class="target-price-input" type="text" inputmode="decimal" autocomplete="off" ${useMode==="auto"?"disabled":""} data-target="${mode}" data-stock="${i}" data-year="${y}" value="${plainNumber(val)}"></label>`;}).join("")}</div></section>`).join("");
  qa(`[data-target="${mode}"]`).forEach(el=>{
   const commit=()=>{
    const i=Number(el.dataset.stock),y=Number(el.dataset.year),value=Number(String(el.value).replace(/,/g,""));
@@ -703,7 +704,7 @@ function renderProspect(){
    </div>
    <p>Monthly Income − Monthly Expense · read-only</p>
   </div>`;
- yearGrid.innerHTML=pr.map(y=>{const ages=ageTriplet(y.year).join(", "),current=y.year===currentYear(),hasCredit=Number(y.expenses.credit)>0; return `<div class="year-card"><div class="year-head"><small>${y.year}</small><span class="age-triplet">${ages}</span></div><h4 class="private ${moneyClass(y.nw)}">${fmt(y.nw)}</h4><small class="year-equation">Opening Cash + Stocks + Income − Expenses</small><small class="year-split private"><span>Opening Cash <b class="${moneyClass(y.opening)}">${fmt(y.opening)}</b></span><span>Stocks <b class="${moneyClass(y.portfolio)}">${fmt(y.portfolio)}</b></span><span>${current?"Remaining recurring income":"Recurring income"} <b class="positive">+${fmt(y.incomeBreakdown.recurring)}</b></span>${y.incomeBreakdown.outstanding?`<span>Current receivables <b class="positive">+${fmt(y.incomeBreakdown.outstanding)}</b></span>`:""}${current?`<span>This month remaining <b class="negative">−${fmt(y.expenses.currentMonth)}</b></span>`:""}<span>Recurring expense <b class="negative">−${fmt(y.expenses.recurring)}</b></span><span>Yearly expense <b class="negative">−${fmt(y.expenses.yearly)}</b></span><span>Events <b class="negative">−${fmt(y.expenses.events)}</b></span>${hasCredit?`<span>Credit & PayLater <b class="negative">−${fmt(y.expenses.credit)}</b></span>`:""}</small></div>`;}).join("");
+ yearGrid.innerHTML=pr.map(y=>{const ages=ageTriplet(y.year).join(", "),current=y.year===currentYear(),hasCredit=Number(y.expenses.credit)>0; return `<details class="year-card prospect-year-card"><summary><div class="year-head"><small>${y.year}</small><span class="age-triplet">${ages}</span></div><div class="year-summary-value"><h4 class="private ${moneyClass(y.nw)}">${fmt(y.nw)}</h4><span class="year-toggle">⌄</span></div><small class="year-equation">Opening Cash + Stocks + Income − Expenses</small></summary><div class="year-details"><small class="year-split private"><span>Opening Cash <b class="${moneyClass(y.opening)}">${fmt(y.opening)}</b></span><span>Stocks <b class="${moneyClass(y.portfolio)}">${fmt(y.portfolio)}</b></span><span>${current?"Remaining recurring income":"Recurring income"} <b class="positive">+${fmt(y.incomeBreakdown.recurring)}</b></span>${y.incomeBreakdown.outstanding?`<span>Current receivables <b class="positive">+${fmt(y.incomeBreakdown.outstanding)}</b></span>`:""}${current?`<span>This month remaining <b class="negative">−${fmt(y.expenses.currentMonth)}</b></span>`:""}<span>Recurring expense <b class="negative">−${fmt(y.expenses.recurring)}</b></span><span>Yearly expense <b class="negative">−${fmt(y.expenses.yearly)}</b></span><span>Events <b class="negative">−${fmt(y.expenses.events)}</b></span>${hasCredit?`<span>Credit & PayLater <b class="negative">−${fmt(y.expenses.credit)}</b></span>`:""}</small></div></details>`;}).join("");
 }
 
 function renderInsights(){

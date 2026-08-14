@@ -827,3 +827,55 @@ select,input,.search{width:100%;min-width:0;height:46px;padding:0 12px;border-ra
  .target-price-table .target-stock-cell{padding:9px 4px}.target-static-box{top:8px;min-height:66px;padding:9px 8px;border-radius:12px}.target-static-box strong{font-size:12px}.target-year-box{min-height:40px;border-radius:12px}
  .insight-action-plan{padding:15px;border-radius:20px}.action-plan-item{grid-template-columns:39px minmax(0,1fr);padding:11px}.action-plan-icon{width:39px;height:39px;border-radius:12px}.action-plan-item>strong{grid-column:2}.action-plan-head h3{font-size:19px}
 }
+
+/* v7.7.7 concise client balances, two-up target cards and Prospect accordions */
+.client-outstanding-copy{font-size:clamp(23px,2.35vw,34px)!important;line-height:1.02;letter-spacing:-.045em}
+.client-payment-meta{max-width:100%;line-height:1.45;overflow-wrap:anywhere}
+
+.target-price-board{display:grid;gap:13px}
+.target-board-caption{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 2px;color:var(--muted);font-size:8px;font-weight:900;letter-spacing:.09em;text-transform:uppercase}
+.target-board-caption span:last-child{text-align:right;letter-spacing:.03em;text-transform:none}
+.target-stock-groups{display:grid;gap:18px}
+.target-stock-group{padding:14px;border:1px solid var(--line);border-radius:20px;background:linear-gradient(145deg,color-mix(in srgb,var(--surface2) 92%,#665cff 8%),var(--surface2));box-shadow:inset 0 1px 0 rgba(255,255,255,.07)}
+.target-stock-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:11px}
+.target-stock-summary .target-static-box{position:static;top:auto;min-height:66px;padding:10px 12px;border-radius:14px}
+.target-years-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.target-year-card{display:grid;grid-template-columns:1fr;gap:7px;min-width:0;padding:9px;border:1px solid var(--line);border-radius:15px;background:color-mix(in srgb,var(--surface) 82%,var(--surface2) 18%)}
+.target-year-card>span{display:grid;place-items:center;min-height:30px;border-radius:10px;background:linear-gradient(135deg,rgba(111,91,242,.12),rgba(46,172,226,.10));color:var(--text);font-size:11px;font-weight:950;font-variant-numeric:tabular-nums}
+.target-year-card .target-price-input{width:100%;min-width:0;text-align:center;font-weight:850;font-variant-numeric:tabular-nums}
+.target-year-card .target-price-input:disabled{opacity:.75}
+[data-theme=dark] .target-stock-group{background:linear-gradient(145deg,#17233a,#111c30);border-color:rgba(135,159,228,.16)}
+[data-theme=dark] .target-year-card{background:linear-gradient(145deg,#1a2942,#142139);border-color:rgba(139,166,235,.15)}
+[data-theme=dark] .target-year-card>span{background:linear-gradient(135deg,rgba(121,98,255,.25),rgba(45,179,232,.18));color:#fff}
+
+.prospect-year-card{min-height:0!important;padding:0!important;overflow:hidden;transition:border-color .18s,box-shadow .18s,transform .18s}
+.prospect-year-card>summary{display:block;padding:17px 18px;list-style:none;cursor:pointer;user-select:none}
+.prospect-year-card>summary::-webkit-details-marker{display:none}
+.prospect-year-card>summary::marker{display:none;content:""}
+.year-summary-value{display:grid;grid-template-columns:minmax(0,1fr) 34px;gap:10px;align-items:center}
+.year-summary-value h4{margin-top:11px!important}
+.year-toggle{width:34px;height:34px;display:grid;place-items:center;border:1px solid var(--line);border-radius:11px;background:linear-gradient(135deg,rgba(111,91,242,.12),rgba(46,172,226,.11));color:var(--muted);font-size:18px;font-weight:950;transition:transform .18s,background .18s,color .18s}
+.prospect-year-card[open]{border-color:color-mix(in srgb,var(--purple) 32%,var(--line));box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 18px 38px rgba(40,66,136,.11)}
+.prospect-year-card[open] .year-toggle{transform:rotate(180deg);background:linear-gradient(135deg,#765cff,#2eb4e8);color:#fff;border-color:transparent}
+.year-details{padding:0 18px 18px;border-top:1px solid var(--line)}
+.year-details .year-split{margin-top:3px}
+[data-theme=dark] .prospect-year-card{background:linear-gradient(145deg,#17243a,#111c30)}
+[data-theme=dark] .prospect-year-card[open]{border-color:rgba(119,142,255,.42);box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 18px 38px rgba(0,0,0,.34)}
+
+@media (max-width:680px){
+ .client-outstanding-copy{font-size:23px!important}
+ .target-stock-group{padding:11px;border-radius:17px}.target-board-caption{align-items:flex-start;flex-direction:column;gap:3px}.target-board-caption span:last-child{text-align:left}.target-stock-summary .target-static-box{min-height:58px;padding:9px}.target-years-grid{gap:7px}.target-year-card{padding:7px;border-radius:13px}.target-year-card>span{min-height:27px}.target-year-card .target-price-input{padding-left:7px;padding-right:7px}
+ .prospect-year-card{min-height:0!important}.prospect-year-card>summary{padding:15px}.year-details{padding:0 15px 15px}.year-summary-value{grid-template-columns:minmax(0,1fr) 32px}.year-toggle{width:32px;height:32px}
+}
+
+/* v7.7.8 monthly History workspace and category/channel expense mix */
+.history-expense-hero{position:relative;display:grid;grid-template-columns:minmax(260px,1fr) auto;gap:8px 28px;align-items:center;margin-bottom:18px;padding:24px 26px;border:1px solid rgba(255,255,255,.27);border-radius:26px;overflow:hidden;color:#fff;background:linear-gradient(135deg,#ef5d7e,#d83398 50%,#7158ee);box-shadow:0 20px 44px rgba(192,50,133,.22),inset 0 1px 0 rgba(255,255,255,.25)}
+.history-expense-hero::after{content:"";position:absolute;width:230px;height:230px;right:-90px;top:-130px;border-radius:50%;background:rgba(255,255,255,.17)}
+.history-expense-hero>div,.history-expense-hero>strong,.history-expense-hero>span{position:relative;z-index:1}.history-expense-hero small{font-size:9px;font-weight:950;letter-spacing:.13em;opacity:.82}.history-expense-hero h3{margin:6px 0 0;font-size:clamp(23px,2.2vw,34px);letter-spacing:-.045em}.history-expense-hero p{margin:7px 0 0;font-size:10px;line-height:1.45;opacity:.78}.history-expense-hero>strong{grid-column:2;grid-row:1;font-size:clamp(30px,3.6vw,52px);line-height:.95;letter-spacing:-.055em;text-align:right;overflow-wrap:anywhere}.history-expense-hero>span{grid-column:2;grid-row:2;text-align:right;font-size:9px;opacity:.78}
+.history-overview-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;align-items:start}.history-overview-grid .panel{min-width:0}.history-overview-grid .donut-svg{width:min(240px,100%);height:auto;aspect-ratio:1}.history-overview-grid .legend-row{grid-template-columns:10px minmax(0,1fr) auto auto}.history-overview-grid .legend-row span{min-width:0;overflow-wrap:anywhere}.history-overview-grid .metric-idr{min-width:0}
+.tx-current-month{margin-bottom:24px;padding:14px;border:1px solid color-mix(in srgb,var(--cyan) 24%,var(--line));border-radius:22px;background:linear-gradient(145deg,rgba(51,193,226,.08),rgba(108,91,238,.06))}.tx-period-head{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:2px 3px 13px}.tx-period-head>span:first-child{display:grid;gap:4px}.tx-period-head small,.tx-archive-heading small{color:var(--muted);font-size:8px;font-weight:950;letter-spacing:.12em}.tx-period-head b{font-size:18px}.tx-current-list .tx-row:last-child{margin-bottom:0}
+.tx-history-archive{padding-top:20px;border-top:1px dashed var(--line)}.tx-archive-heading{display:flex;align-items:end;justify-content:space-between;gap:20px;margin-bottom:13px}.tx-archive-heading h4{margin:4px 0 0;font-size:21px}.tx-archive-heading p{margin:0;color:var(--muted);font-size:9px;text-align:right}.tx-history-archive .tx-archive{background:color-mix(in srgb,var(--surface2) 92%,var(--surface) 8%)}
+[data-theme=dark] .history-expense-hero{background:linear-gradient(135deg,#c83b66,#a82384 52%,#563bc4);box-shadow:0 20px 44px rgba(153,30,113,.22),inset 0 1px 0 rgba(255,255,255,.22)}
+[data-theme=dark] .tx-current-month{background:linear-gradient(145deg,#13283b,#171d39);border-color:rgba(84,179,232,.22)}
+@media (max-width:1350px){.history-overview-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.history-budget-panel{grid-column:1/-1}#budgetPace{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}#budgetPace .progress-row{margin-bottom:0}}
+@media (max-width:720px){.history-expense-hero{grid-template-columns:1fr;padding:19px}.history-expense-hero>strong,.history-expense-hero>span{grid-column:1;grid-row:auto;text-align:left}.history-expense-hero>strong{margin-top:7px;font-size:36px}.history-overview-grid{grid-template-columns:1fr}.history-budget-panel{grid-column:auto}#budgetPace{grid-template-columns:1fr}.tx-period-head,.tx-archive-heading{align-items:flex-start;flex-direction:column}.tx-period-head .archive-totals{text-align:left}.tx-archive-heading p{text-align:left}}
