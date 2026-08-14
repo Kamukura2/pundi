@@ -33,6 +33,10 @@ export function createEmptyState() {
     entrustedFunds: [],
     stockExtras: { netcashIdr: 0, walletUsd: 0 },
     stocks: [],
+    tradingPositions: [],
+    tradingLedger: [],
+    tradingSnapshots: [],
+    tradingRange: "YTD",
     electricity: []
   };
 }
@@ -106,6 +110,9 @@ export function createMvpSeed() {
     ],
     entrustedFunds: [],
     stockExtras: { netcashIdr: 0, walletUsd: 0 },
+    tradingPositions: [],
+    tradingLedger: [],
+    tradingSnapshots: [],
     stocks,
     electricity: [
       {id:createId(),date:"2026-08-06",time:"19:00",remaining:500},

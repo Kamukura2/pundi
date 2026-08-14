@@ -1,6 +1,6 @@
 # CVFinance v7 handoff
 
-Baseline: v6.3.1. v7.7.0 keeps all eight modules, renames Cashflow to History in the UI, and uses an auditable month-aware projection engine for Accumulation and Prospect.
+Baseline: v6.3.1. v7.8.1 keeps every existing module, renames Stocks to Investment in navigation, adds an isolated Trading workspace, and uses an auditable month-aware projection engine for Accumulation and Prospect.
 
 Implemented:
 
@@ -30,6 +30,8 @@ Implemented:
 - v7.7.7 requires no migration. Client cards now state either `0 outstanding` or the remaining nominal plus `outstanding left`; Target Price years render as two compact year-target cards per row; Future Cash + Assets cards are collapsed by default and reveal their existing auditable detail on click. Target persistence and all financial formulas remain unchanged.
 - v7.7.8 requires no migration. History now has one current-month Total Expense headline, separate category and channel donuts with nominal/percentage legends, a dedicated current-month transaction area, and collapsed permanent archives for prior months. Calendar rollover changes the active month filter but never deletes a transaction. History remains ledger-only and is excluded from Balance, Net Worth, Cash, and Prospect.
 - v7.7.9 requires no migration. Client card headlines show `PAID` or only the outstanding nominal. Add Transaction places Description before Amount and uses the newest synchronized transaction as the complete template for the next batch entry, preserving type, description, amount, category, channel, and date. Both History donuts are larger. All History isolation and projection rules remain unchanged.
+- v7.8.0 requires migration `012_trading_portfolio.sql`. It adds user-owned Trading positions, an execution/cash ledger, and daily equity/SPY snapshots. Existing Investment tables are untouched. Trading sell proceeds enter the isolated Trading wallet, withdrawals are external flows rather than losses, and Prospect discloses Investment Stocks and Trading Stocks separately. Alpaca Free/IEX is an optional live extended-hours source; Finnhub remains the no-Alpaca fallback.
+- v7.8.1 requires no additional migration. Trading uses server-only Twelve Data first and Finnhub automatically when Twelve Data is unavailable or returns only a previous close during an active session. Auto-refresh runs every two minutes only while Trading is visible, duplicate ticker requests are collapsed, and explicit session labels prevent stale closes from being shown as live pre-market prices.
 - Separate Supabase Auth users have isolated empty datasets through per-table RLS. The Telegram bot remains intentionally assigned to the single `CVFINANCE_OWNER_USER_ID` configured in Vercel.
 
 Not performed inside this package: creating third-party accounts/bots, entering private API keys, applying SQL to the user's Supabase project, pushing to the user's GitHub, registering the Telegram webhook, or deploying to the user's Vercel. Follow `docs/TELEGRAM_SETUP.md` for those credentialed steps.

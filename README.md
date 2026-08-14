@@ -1,4 +1,8 @@
-# CVFinance v7.7.9
+# CVFinance v7.8.1
+
+v7.8.1 replaces the inaccessible Alpaca integration with Twelve Data as the primary server-side Trading quote provider and keeps Finnhub as an automatic fallback. Trading quote requests are de-duplicated, cached for approximately two minutes, paused when the Trading page is hidden, and can still be force-refreshed manually. Position badges distinguish `pre-market`, `real-time`, `after-hours`, `previous-close`, and `market-closed` without pretending that an old regular-session close is a live extended-hours price. Twelve Data Basic provides real-time regular-session US equities; live real-time extended-hours access is plan-dependent, so Finnhub remains the best-effort free fallback during pre/post sessions.
+
+v7.8.0 renames the existing Stocks navigation to Investment without changing its holdings, targets, wallet, pricing, or projection behavior. It adds a separate optional Trading workspace with persistent positions, USD/IDR trading cash, opening cost basis, buy-more and sell execution dialogs, realized and unrealized P/L, withdrawal-neutral performance, take-profit/stop-loss plans, permanent execution ledger, and a 1W/1M/3M/YTD/ALL equity comparison against SPY. Trading assets are persisted in three new RLS-protected Supabase tables and appear separately from Investment Stocks in Prospect. Insights now report Trading alpha, realized/unrealized performance, and win rate.
 
 v7.7.9 simplifies client cards to `PAID` or the remaining nominal value only, swaps the Add Transaction form so Description sits above Amount, and pre-fills every new entry from the latest saved transaction for faster batch input. The remembered template includes type, description, amount, category, channel, and date and is recovered from the synchronized transaction record itself. History category/channel donuts are enlarged. No financial formula or projection rule changes.
 
@@ -26,7 +30,7 @@ v7.1.0 adds a dedicated private Telegram webhook for fast CVFinance input. It wr
 
 The v7.0.2 delayed Yahoo Finance IDX pricing remains included. IDX quantities are entered as lots (1 lot = 100 shares), while US quantities remain shares and support fractions.
 
-Deployment-ready continuation of CVFinance v6.3.1. The existing eight-tab UI and calculations are preserved while Supabase replaces browser `localStorage` as the authoritative database.
+Deployment-ready continuation of CVFinance v6.3.1. The nine-tab UI preserves every earlier module while Supabase remains the authoritative database.
 
 ## Included
 
@@ -75,6 +79,8 @@ For local full-stack testing, use `vercel dev`; plain `npm run dev` does not emu
 - [Compact targets and Prospect dropdowns v7.7.7 patch](docs/PATCH_v7_7_7_COMPACT_TARGETS_PROSPECT_DROPDOWNS.md)
 - [Monthly History and expense mix v7.7.8 patch](docs/PATCH_v7_7_8_MONTHLY_HISTORY_EXPENSE_MIX.md)
 - [Sticky transaction entry and larger donuts v7.7.9 patch](docs/PATCH_v7_7_9_STICKY_TRANSACTION_LARGE_DONUTS.md)
+- [Investment, isolated Trading ledger and SPY benchmark v7.8.0 patch](docs/PATCH_v7_8_0_INVESTMENT_TRADING_SPY.md)
+- [Twelve Data primary Trading quotes v7.8.1 patch](docs/PATCH_v7_8_1_TWELVE_DATA_TRADING.md)
 - [Second account setup](docs/SECOND_ACCOUNT_SETUP.md)
 - [Manual actions](docs/MANUAL_ACTIONS.md)
 - [Test checklist](docs/TEST_CHECKLIST.md)

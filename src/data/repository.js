@@ -4,11 +4,12 @@ import { createEmptyState, createId, YEARS } from "./default-data.js";
 export const DATA_TABLES = [
   "profiles", "accounts", "transactions", "monthly_budgets", "yearly_expenses",
   "planned_events", "credit_facilities", "credit_items", "clients", "stock_holdings",
-  "stock_price_targets", "electricity_readings", "entrusted_funds", "app_settings"
+  "stock_price_targets", "trading_positions", "trading_ledger", "trading_snapshots",
+  "electricity_readings", "entrusted_funds", "app_settings"
 ];
 
 const SAVE_TABLES = DATA_TABLES.filter(table => table !== "profiles");
-const parentFirst = ["accounts","transactions","monthly_budgets","yearly_expenses","planned_events","credit_facilities","credit_items","clients","stock_holdings","stock_price_targets","electricity_readings","entrusted_funds","app_settings"];
+const parentFirst = ["accounts","transactions","monthly_budgets","yearly_expenses","planned_events","credit_facilities","credit_items","clients","stock_holdings","stock_price_targets","trading_positions","trading_ledger","trading_snapshots","electricity_readings","entrusted_funds","app_settings"];
 const deleteFirst = [...parentFirst].reverse();
 const meta = row => ({ __createdAt: row.created_at, __updatedAt: row.updated_at });
 const clean = value => JSON.parse(JSON.stringify(value));
@@ -49,6 +50,25 @@ function rowsToState(rows) {
       base:target.base,optimistic:target.optimistic,targetIds:target.ids,...meta(row)
     };
   });
+  state.tradingPositions = (rows.trading_positions || []).map(row => ({
+    id:row.id,ticker:row.display_symbol,displaySymbol:row.display_symbol,market:row.market,
+    providerSymbol:row.provider_symbol,currency:row.currency,quantity:Number(row.quantity),
+    avg:Number(row.avg_purchase_price),current:Number(row.current_price),manualCurrent:Number(row.manual_current_price),
+    targetPrice:Number(row.target_price),stopLoss:Number(row.stop_loss_price),priceSource:row.price_source,
+    priceStatus:row.price_status,priceAsOf:row.price_as_of,lastPriceFetchAt:row.last_price_fetch_at,...meta(row)
+  }));
+  state.tradingLedger = (rows.trading_ledger || []).map(row => ({
+    id:row.id,type:row.entry_type,positionId:row.position_id,ticker:row.ticker,quantity:Number(row.quantity),
+    price:Number(row.execution_price),currency:row.currency,fxRate:Number(row.fx_rate),
+    cashDeltaIdr:Number(row.cash_delta_idr),cashDeltaUsd:Number(row.cash_delta_usd),
+    externalFlowIdr:Number(row.external_flow_idr),realizedPlIdr:Number(row.realized_pl_idr),
+    date:row.trade_date,note:row.note,...meta(row)
+  }));
+  state.tradingSnapshots = (rows.trading_snapshots || []).map(row => ({
+    id:row.id,date:row.snapshot_date,equityIdr:Number(row.equity_idr),
+    netContributionsIdr:Number(row.net_contributions_idr),holdingsValueIdr:Number(row.holdings_value_idr),
+    cashValueIdr:Number(row.cash_value_idr),spyPrice:Number(row.spy_price),...meta(row)
+  })).sort((a,b)=>a.date.localeCompare(b.date));
   state.electricity = rows.electricity_readings.map(row => ({id:row.id,date:row.reading_date,time:String(row.reading_time).slice(0,5),remaining:Number(row.remaining_kwh),...meta(row)}));
   const settings = rows.app_settings[0];
   if (settings) {
@@ -103,6 +123,23 @@ function stateToRows(state, userId) {
       price_as_of:row.priceAsOf || null,last_price_fetch_at:row.lastPriceFetchAt || null,...stamp(row)
     })),
     stock_price_targets: targets,
+    trading_positions: (state.tradingPositions || []).map(row => owned({
+      id:row.id,display_symbol:row.displaySymbol || row.ticker,market:row.market,provider_symbol:row.providerSymbol || row.ticker,
+      currency:row.currency,quantity:Number(row.quantity),avg_purchase_price:Number(row.avg),current_price:Number(row.current),
+      manual_current_price:Number(row.manualCurrent ?? row.current),target_price:Number(row.targetPrice||0),stop_loss_price:Number(row.stopLoss||0),
+      price_source:row.priceSource || "manual",price_status:row.priceStatus || "manual",price_as_of:row.priceAsOf || null,
+      last_price_fetch_at:row.lastPriceFetchAt || null,...stamp(row)
+    })),
+    trading_ledger: (state.tradingLedger || []).map(row => owned({
+      id:row.id,position_id:row.positionId || null,entry_type:row.type,ticker:row.ticker || "",quantity:Number(row.quantity||0),
+      execution_price:Number(row.price||0),currency:row.currency || "IDR",fx_rate:Number(row.fxRate||0),
+      cash_delta_idr:Number(row.cashDeltaIdr||0),cash_delta_usd:Number(row.cashDeltaUsd||0),external_flow_idr:Number(row.externalFlowIdr||0),
+      realized_pl_idr:Number(row.realizedPlIdr||0),trade_date:row.date,note:row.note || "",...stamp(row)
+    })),
+    trading_snapshots: (state.tradingSnapshots || []).map(row => owned({
+      id:row.id,snapshot_date:row.date,equity_idr:Number(row.equityIdr||0),net_contributions_idr:Number(row.netContributionsIdr||0),
+      holdings_value_idr:Number(row.holdingsValueIdr||0),cash_value_idr:Number(row.cashValueIdr||0),spy_price:Number(row.spyPrice||0),...stamp(row)
+    })),
     electricity_readings: state.electricity.map(row => owned({id:row.id,reading_date:row.date,reading_time:row.time,remaining_kwh:Number(row.remaining),...stamp(row)})),
     app_settings: [owned({
       id:state.settingsId,theme:state.theme,language:state.language||"en",base_mode:state.baseMode,optimistic_mode:state.optimisticMode,
@@ -280,5 +317,8 @@ export function validateBackup(value) {
   const required = ["accounts","transactions","budgets","yearly","events","creditFacilities","credit","clients","stocks","electricity"];
   required.forEach(key => { if (!Array.isArray(value.data[key])) throw new Error(`Backup is missing ${key}.`); });
   if (!Array.isArray(value.data.entrustedFunds)) value.data.entrustedFunds = [];
+  if (!Array.isArray(value.data.tradingPositions)) value.data.tradingPositions = [];
+  if (!Array.isArray(value.data.tradingLedger)) value.data.tradingLedger = [];
+  if (!Array.isArray(value.data.tradingSnapshots)) value.data.tradingSnapshots = [];
   return { ...createEmptyState(), ...value.data, settingsId:createId() };
 }

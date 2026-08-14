@@ -6,6 +6,7 @@
    - `SUPABASE_URL`
    - `SUPABASE_ANON_KEY`
    - `FINNHUB_API_KEY`
+   - `TWELVE_DATA_API_KEY`
 4. For the optional scheduled stock refresh, also add server-only `SUPABASE_SERVICE_ROLE_KEY` and `CRON_SECRET`. Never prefix or expose the service-role value to the frontend.
 5. For the private Telegram integration, add the dedicated variables listed in [TELEGRAM_SETUP.md](TELEGRAM_SETUP.md), then deploy before registering the webhook.
 5. Leave `STOCK_SYMBOL_ALLOWLIST` unset when tickers should be added dynamically inside the authenticated app. A fixed deployment may optionally set a comma-separated hard allowlist.

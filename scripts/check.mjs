@@ -11,7 +11,7 @@ assert.equal(manifest.display, "standalone");
 for (const icon of manifest.icons) assert.ok(existsSync(resolve(root, "public", icon.src.replace(/^\//, ""))), `Missing ${icon.src}`);
 
 const index = read("index.html");
-for (const tab of ["accumulation","cashflow","expenses","clients","stocks","electricity","prospect","insights"]) assert.match(index, new RegExp(`id="${tab}"`));
+for (const tab of ["accumulation","cashflow","expenses","clients","stocks","trading","electricity","prospect","insights"]) assert.match(index, new RegExp(`id="${tab}"`));
 assert.match(index, /manifest\.webmanifest/);
 assert.match(index, /authForm/);
 assert.match(index, /annualPerformanceDashboard/);
@@ -32,11 +32,11 @@ assert.match(sql, /enable row level security/);
 assert.match(sql, /auth\.uid\(\)/);
 
 const env = read(".env.example");
-for (const key of ["FINNHUB_API_KEY","SUPABASE_URL","SUPABASE_ANON_KEY"]) assert.match(env, new RegExp(`^${key}=`, "m"));
+for (const key of ["FINNHUB_API_KEY","TWELVE_DATA_API_KEY","SUPABASE_URL","SUPABASE_ANON_KEY"]) assert.match(env, new RegExp(`^${key}=`, "m"));
 const serviceWorker = read("public/sw.js");
 assert.match(serviceWorker, /pathname\.startsWith\("\/api\/"\)/);
 
-const jsFiles = ["app.js","api/config.js","api/_lib/rate-limit.js","api/stocks/fx.js","api/stocks/quote.js","api/stocks/validate.js","api/cron/refresh-stocks.js","src/data/default-data.js","src/data/finance-model.js","src/data/repository.js","src/lib/idb.js","src/lib/supabase.js","src/stocks/client.js","src/stocks/holding.js","src/sync/sync-manager.js"];
+const jsFiles = ["app.js","api/config.js","api/_lib/rate-limit.js","api/stocks/fx.js","api/stocks/quote.js","api/stocks/validate.js","api/trading/quote.js","api/trading/benchmark.js","api/cron/refresh-stocks.js","src/data/default-data.js","src/data/finance-model.js","src/data/repository.js","src/lib/idb.js","src/lib/supabase.js","src/stocks/client.js","src/stocks/holding.js","src/trading/model.js","src/sync/sync-manager.js"];
 for (const file of jsFiles) execFileSync(process.execPath, ["--check", resolve(root, file)], { stdio:"pipe" });
 
 for (const file of jsFiles.map(read)) {
@@ -120,6 +120,28 @@ assert.doesNotMatch(migration010,/drop\s+table|truncate\s+|delete\s+from/i);
 const migration011 = read("supabase/migrations/011_stock_cash_wallet.sql");
 for (const marker of ["stock_netcash_idr","stock_wallet_usd","app_settings"]) assert.match(migration011,new RegExp(marker));
 assert.doesNotMatch(migration011,/drop\s+table|truncate\s+|delete\s+from/i);
+const migration012 = read("supabase/migrations/012_trading_portfolio.sql");
+for (const marker of ["trading_positions","trading_ledger","trading_snapshots","external_flow_idr","realized_pl_idr","enable row level security"]) assert.match(migration012,new RegExp(marker));
+assert.doesNotMatch(migration012,/drop\s+table|truncate\s+|delete\s+from/i);
+
+const { applyOpeningPosition, applyTrade, cashEvent, performanceSeries, tradingMetrics, upsertDailySnapshot } = await import("../src/trading/model.js");
+const tradePosition={id:"p1",ticker:"MU",market:"NASDAQ",currency:"USD",quantity:0,avg:0,current:0};
+const tradingLedger=[cashEvent({type:"deposit",currency:"USD",amount:1000,date:"2026-01-02",fxRate:16000,id:"cash1"})];
+tradingLedger.push(applyTrade({position:tradePosition,type:"buy",quantity:1,price:500,date:"2026-01-02",fxRate:16000,id:"buy1"}));
+tradePosition.current=600;
+let tradeMetrics=tradingMetrics({positions:[tradePosition],ledger:tradingLedger,fxRate:16000});
+assert.equal(tradeMetrics.totalPl,1600000,"Trading deposits fund equity but never count as gain");
+tradingLedger.push(cashEvent({type:"withdraw",currency:"USD",amount:100,date:"2026-02-02",fxRate:16000,id:"cash2"}));
+tradeMetrics=tradingMetrics({positions:[tradePosition],ledger:tradingLedger,fxRate:16000});
+assert.equal(tradeMetrics.totalPl,1600000,"Trading withdrawals must not become losses");
+tradingLedger.push(applyTrade({position:tradePosition,type:"sell",quantity:1,price:700,date:"2026-02-02",fxRate:16000,id:"sell1"}));
+tradeMetrics=tradingMetrics({positions:[tradePosition],ledger:tradingLedger,fxRate:16000});
+assert.equal(tradeMetrics.realized,3200000,"Sell execution must realize P/L using the stored cost basis and FX rate");
+const snapshots=[];upsertDailySnapshot(snapshots,{equity:16000000,externalFlows:16000000,holdingsValue:16000000,cashValue:0},500,"2026-01-02");
+upsertDailySnapshot(snapshots,{equity:17600000,externalFlows:16000000,holdingsValue:17600000,cashValue:0},550,"2026-02-02");
+const comparison=performanceSeries(snapshots,"ALL",new Date("2026-02-02"));
+assert.ok(Math.abs(comparison.portfolioReturn-10)<1e-9);assert.ok(Math.abs(comparison.spyReturn-10)<1e-9);
+assert.ok(applyOpeningPosition({position:{id:"p2",ticker:"MU",currency:"USD",quantity:1,avg:978},date:"2026-01-01",fxRate:16000,id:"open"}).externalFlowIdr>0);
 
 const { normalizeStockMapping, quantityForDisplay, quantityForStorage } = await import("../src/stocks/holding.js");
 const idxHolding = {ticker:"BMRI",market:"IDX",provider:"finnhub",providerSymbol:"BMRI",currency:"IDR",quantity:10000};
@@ -132,13 +154,25 @@ assert.equal(quantityForStorage("NASDAQ", 2.8033875), 2.8033875);
 process.env.FINNHUB_API_KEY = "test";
 process.env.STOCK_SYMBOL_ALLOWLIST = "WDC,BMRI:IDX";
 const realFetch = globalThis.fetch;
-const { fetchQuote, fetchUsdIdrQuote, validateMapping } = await import("../api/_lib/providers.js");
+const { fetchQuote, fetchTradingQuote:fetchProviderTradingQuote, fetchUsdIdrQuote, validateMapping } = await import("../api/_lib/providers.js");
 validateMapping({provider:"finnhub",provider_symbol:"WDC",market:"NASDAQ"});
 validateMapping({provider:"yahoo",provider_symbol:"BMRI",market:"IDX"});
 globalThis.fetch = async () => new Response(JSON.stringify({c:123.45,t:Math.floor(Date.now()/1000)}), {status:200,headers:{"content-type":"application/json"}});
 const quote = await fetchQuote({provider:"finnhub",provider_symbol:"WDC",market:"NASDAQ"});
 assert.equal(quote.price, 123.45);
 assert.equal(quote.provider, "finnhub");
+process.env.TWELVE_DATA_API_KEY="twelve-test";
+globalThis.fetch = async url => {assert.match(String(url),/api\.twelvedata\.com\/quote\?symbol=MU&prepost=true&apikey=twelve-test/);return new Response(JSON.stringify({symbol:"MU",close:"120",timestamp:Math.floor(Date.now()/1000),is_extended_hours:true}),{status:200,headers:{"content-type":"application/json"}})};
+const liveTradingQuote=await fetchProviderTradingQuote("MU");
+assert.equal(liveTradingQuote.price,120);assert.equal(liveTradingQuote.provider,"twelve-data");assert.match(liveTradingQuote.coverage,/Twelve Data/);
+globalThis.fetch = async url => {
+  if(String(url).includes("api.twelvedata.com"))return new Response(JSON.stringify({status:"error",code:429,message:"API credits exhausted"}),{status:200,headers:{"content-type":"application/json"}});
+  assert.match(String(url),/finnhub\.io\/api\/v1\/quote\?symbol=MU/);
+  return new Response(JSON.stringify({c:121,t:Math.floor(Date.now()/1000)}),{status:200,headers:{"content-type":"application/json"}});
+};
+const fallbackTradingQuote=await fetchProviderTradingQuote("MU");
+assert.equal(fallbackTradingQuote.price,121);assert.equal(fallbackTradingQuote.provider,"finnhub");assert.match(fallbackTradingQuote.coverage,/Finnhub fallback/);
+delete process.env.TWELVE_DATA_API_KEY;
 globalThis.fetch = async url => {
   assert.match(String(url), /\/BMRI\.JK\?/);
   return new Response(JSON.stringify({chart:{result:[{meta:{regularMarketPrice:4220,regularMarketTime:Math.floor(Date.now()/1000)},timestamp:[Math.floor(Date.now()/1000)],indicators:{quote:[{close:[4220]}]}}],error:null}}), {status:200,headers:{"content-type":"application/json"}});
@@ -206,6 +240,11 @@ assert.match(appSource, /tx-history-archive/, "Previous History months must rema
 
 const app = read("app.js");
 assert.match(app, /portfolioPL\.textContent=`\$\{fmt\(pl\)\} · \$\{percent\(pl,inv\)\}`/);
+assert.match(app, /function renderTrading\(\)/);
+assert.match(app, /Portfolio vs S&amp;P 500 \/ SPY|tradingPerformanceChart/);
+assert.match(app, /Investment Stocks[\s\S]*Trading Stocks/);
+assert.match(app, /externalFlows/);
+assert.match(app, /openTradingExecution/);
 assert.match(app, /const decisionMetrics=/);
 assert.match(app, /statusText=paid\?"PAID":fmt\(outstanding\)/, "Paid clients must show PAID while unpaid clients show only the nominal value");
 assert.doesNotMatch(app, /0 outstanding|outstanding left/, "Client headline copy must not include outstanding wording");
@@ -217,4 +256,7 @@ assert.match(app, /class="target-year-card"/, "Each future year and target must 
 assert.match(app, /<details class="year-card prospect-year-card">/, "Future Cash + Assets details must be collapsed until clicked");
 assert.match(app, /Financial Action Plan/);
 
-console.log("CVFinance checks passed: schema, RLS markers, PWA, 8 tabs, v7.7.9 PAID-or-nominal client cards, Description-before-Amount transaction form, persistent latest-entry templates, larger category/channel donuts, monthly History reset without deletion, permanent monthly archives, two-up Target Price cards, collapsed Prospect year details, Financial Action Plan isolation, P/L percentages, annual and monthly operating dashboard isolation, Yahoo FX validation, ledger-only History, dynamic Budget meters, toggleable Transaction tags, safe dialog dismissal, auditable projections, one-time dated credit, optional stock cash assets, sorting invariants, stock provider abstraction, offline queue coalescing, and JavaScript syntax.");
+assert.match(app, /2\*60\*1000/, "Trading auto-refresh must use a quota-aware two-minute interval");
+assert.match(app, /state\.page==="trading"&&!document\.hidden/, "Trading auto-refresh must pause outside the visible Trading page");
+
+console.log("CVFinance checks passed: schema, RLS markers, PWA, 9 tabs, v7.8.1 isolated Trading ledger, withdrawal-neutral P/L, realized sell gains, SPY comparison, Twelve Data primary quotes, Finnhub fallback, quota-aware visible-page refresh, separate Investment and Trading assets in Prospect, Trading Insights, PAID-or-nominal client cards, persistent transaction templates, monthly History archives, target-price cards, Financial Action Plan isolation, Yahoo FX validation, offline queue coalescing, and JavaScript syntax.");

@@ -25,6 +25,8 @@ async function authenticatedRequest(path) {
 export const fetchHoldingQuote = holdingId => request("/api/stocks/quote", holdingId);
 export const validateHoldingSymbol = holdingId => request("/api/stocks/validate", holdingId);
 export const fetchUsdIdrRate = ({force=false}={}) => authenticatedRequest(`/api/stocks/fx${force?`?refresh=1&t=${Date.now()}`:""}`);
+export const fetchTradingQuote = (symbol,{force=false}={}) => authenticatedRequest(`/api/trading/quote?symbol=${encodeURIComponent(symbol)}${force?`&refresh=1&t=${Date.now()}`:""}`);
+export const fetchTradingBenchmark = () => authenticatedRequest("/api/trading/benchmark");
 
 export function isPriceStale(stock) {
   if (!stock.priceAsOf) return true;

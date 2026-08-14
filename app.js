@@ -1,9 +1,10 @@
 import { createEmptyState, createId, createMvpSeed, readLegacyLocalStorage, YEARS } from "./src/data/default-data.js";
 import { annualExpenseBreakdown, annualOperatingPerformance, buildMonthlyTimeline, buildProjection, getBudgetProgress, getClientOutstanding, getClientPaidThisMonth, getCurrentNetWorth, getEndingClients, getEntrustedDeduction, getFixedIncome, getReceivableClients, getRecurringClients, getTotalOutstanding, getTotalPaid, getYearlyProjectionTotal, monthKey, monthlyBudgetRemaining, recordedExpenseForBudget, remainingYearExpenseBreakdown, remainingYearIncomeBreakdown } from "./src/data/finance-model.js";
 import { SyncManager } from "./src/sync/sync-manager.js";
-import { fetchHoldingQuote, fetchUsdIdrRate, isPriceStale, validateHoldingSymbol } from "./src/stocks/client.js";
+import { fetchHoldingQuote, fetchTradingBenchmark, fetchTradingQuote, fetchUsdIdrRate, isPriceStale, validateHoldingSymbol } from "./src/stocks/client.js";
 import { normalizeStockMapping, quantityForDisplay, quantityForStorage, quantityUnit } from "./src/stocks/holding.js";
 import { getSupabase } from "./src/lib/supabase.js";
+import { applyOpeningPosition, applyTrade, cashEvent, performanceSeries, tradingMetrics, tradingPositionCost, tradingPositionValue, upsertDailySnapshot } from "./src/trading/model.js";
 
 const COLORS=["#7F66FF","#39C3FF","#FF8F63","#36D695","#F4C24F","#FF6EA8","#62C8FF","#8D7AFF"];
 const COMPANY_EXPENSE_TAG="Expense Perusahaan";
@@ -22,7 +23,9 @@ state.language=localStorage.getItem("cvfinance-language-cache")||"en";
 let syncManager;
 let stockRefreshStarted=false;
 let fxRefreshTimer=null;
+let tradingRefreshTimer=null;
 let fxRefreshPromise=null;
+let tradingRefreshPromise=null;
 let transactionTagFilter=null;
 const currentYear=()=>new Date().getFullYear();
 const escapeHtml=value=>String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));
@@ -103,12 +106,15 @@ const stockExtrasValue=()=>Math.max(0,Number(state.stockExtras?.netcashIdr||0))+
 const holdingsPortfolio=(y=currentYear(),mode="base")=>state.stocks.reduce((a,s)=>a+stockValue(s,y,mode),0);
 const portfolio=(y=currentYear(),mode="base")=>holdingsPortfolio(y,mode)+stockExtrasValue();
 const netPortfolio=(y=currentYear(),mode="base")=>portfolio(y,mode)-entrustedTotal("stocks");
-const currentNW=()=>getCurrentNetWorth(netAccountTotal(),netPortfolio());
+const tradingStats=()=>tradingMetrics({positions:state.tradingPositions,ledger:state.tradingLedger,fxRate:state.usdIdr});
+const tradingAssets=()=>tradingStats().equity;
+const combinedPortfolio=(y=currentYear(),mode="base")=>netPortfolio(y,mode)+tradingAssets();
+const currentNW=()=>getCurrentNetWorth(netAccountTotal(),combinedPortfolio());
 const AGE_BASE=[33,30,0];
 const ageTriplet=(year)=>AGE_BASE.map(v=>v+(year-2026));
 const moneyClass=(n)=>Number(n)<0?"negative":"";
 const ID_TRANSLATIONS={
- "Accumulation":"Akumulasi","History":"Riwayat","Expenses":"Pengeluaran","Clients":"Klien","Stocks":"Saham","Electricity":"Listrik","Prospect":"Proyeksi","Insights":"Insight",
+ "Accumulation":"Akumulasi","History":"Riwayat","Expenses":"Pengeluaran","Clients":"Klien","Investment":"Investasi","Trading":"Trading","Stocks":"Saham","Electricity":"Listrik","Prospect":"Proyeksi","Insights":"Insight",
  "Available Balance":"Saldo Tersedia","Outstanding Client Income":"Piutang Klien","Balances":"Saldo","Cash, Bank & Wallets":"Tunai, Bank & Dompet","Payment Status":"Status Pembayaran",
  "Pending Expenses":"Kewajiban Mendatang","Where the Money Sits":"Distribusi Aset","Planned vs Actual":"Rencana vs Aktual","All":"Semua","Expense":"Pengeluaran","Income":"Pemasukan",
  "Newest":"Terbaru","Category":"Kategori","Amount":"Nominal","Recorded Income":"Pemasukan Tercatat","Recorded Expense":"Pengeluaran Tercatat","Recorded Net":"Net Tercatat",
@@ -171,11 +177,11 @@ function normalizeStockMappings() {
 function projection(mode="base"){
  return buildProjection({
   years:YEARS,referenceDate:new Date(),accountTotal:netAccountTotal(),clients:state.clients,budgets:state.budgets,yearly:state.yearly,
-  events:state.events,credit:state.credit,transactions:[],portfolioForYear:year=>netPortfolio(year,mode)
+  events:state.events,credit:state.credit,transactions:[],portfolioForYear:year=>combinedPortfolio(year,mode)
  });
 }
 function monthlyTimeline(mode="base"){
- return buildMonthlyTimeline({referenceDate:new Date(),accountTotal:netAccountTotal(),clients:state.clients,budgets:state.budgets,yearly:state.yearly,events:state.events,credit:state.credit,transactions:[],portfolioForYear:year=>netPortfolio(year,mode)});
+ return buildMonthlyTimeline({referenceDate:new Date(),accountTotal:netAccountTotal(),clients:state.clients,budgets:state.budgets,yearly:state.yearly,events:state.events,credit:state.credit,transactions:[],portfolioForYear:year=>combinedPortfolio(year,mode)});
 }
 
 function donut(entries,label){
@@ -240,9 +246,10 @@ function switchPage(p){
  state.page=p;
  qa(".page").forEach(x=>x.classList.toggle("active",x.id===p));
  qa("[data-page]").forEach(x=>x.classList.toggle("active",x.dataset.page===p));
- const map={accumulation:["FINANCIAL COMMAND CENTER","Accumulation"],cashflow:["HISTORICAL RECORD","History"],expenses:["EDITABLE BUDGET & COSTS","Expenses"],clients:["RETAINERS & RECEIVABLES","Clients"],stocks:["PORTFOLIO & TARGETS","Stocks"],electricity:["UTILITY COST MONITOR","Electricity"],prospect:["READ-ONLY FUTURE PROJECTION","Prospect"],insights:["INFOGRAPHIC SUMMARY","Insights"]};
+ const map={accumulation:["FINANCIAL COMMAND CENTER","Accumulation"],cashflow:["HISTORICAL RECORD","History"],expenses:["EDITABLE BUDGET & COSTS","Expenses"],clients:["RETAINERS & RECEIVABLES","Clients"],stocks:["LONG-TERM PORTFOLIO & TARGETS","Investment"],trading:["ACTIVE PORTFOLIO & PERFORMANCE","Trading"],electricity:["UTILITY COST MONITOR","Electricity"],prospect:["READ-ONLY FUTURE PROJECTION","Prospect"],insights:["INFOGRAPHIC SUMMARY","Insights"]};
  kicker.textContent=map[p][0]; title.textContent=map[p][1];
  applyLanguage();
+ if(p==="trading"&&stockRefreshStarted)queueMicrotask(()=>refreshTradingPrices({silent:true}));
  if(window.matchMedia("(max-width:1024px)").matches)window.scrollTo({top:0,left:0,behavior:"auto"});
 }
 
@@ -269,8 +276,9 @@ function renderAccumulation(){
   {icon:"📥",name:"Outstanding clients",sub:"Recurring + ending, unpaid only",value:fmt(current.income),cls:"positive"},
   {icon:"📓",name:"History entries",sub:"Tracking only · excluded from assets and projection",value:"Ledger only"},
   {icon:"🧾",name:"Remaining expenses",sub:"Monthly + yearly + events + credit",value:`−${fmt(current.expenses)}`,cls:"negative"},
-  {icon:"📈",name:"Stocks",sub:"Market value after entrusted funds",value:fmt(current.portfolio),cls:current.portfolio<0?"negative":"positive"},
-  {icon:"💎",name:"Projected month-end net worth",sub:"Cash after obligations + stocks",value:fmt(projected),cls:projected<0?"negative":"positive"}
+  {icon:"📈",name:"Investment Stocks",sub:"Long-term holdings + optional liquid assets",value:fmt(netPortfolio()),cls:netPortfolio()<0?"negative":"positive"},
+  {icon:"⚡",name:"Trading Stocks",sub:"Active positions + Trading wallets",value:fmt(tradingAssets()),cls:tradingAssets()<0?"negative":"positive"},
+  {icon:"💎",name:"Projected month-end net worth",sub:"Cash after obligations + Investment + Trading",value:fmt(projected),cls:projected<0?"negative":"positive"}
  ]);
 }
 
@@ -610,6 +618,101 @@ function renderTargetTable(mode,headEl,bodyEl){
   el.addEventListener("blur",commit);
  });
 }
+
+function recordTradingSnapshot(spyPrice=Number(state.spyQuote?.price||state.tradingSnapshots.at(-1)?.spyPrice||0)){
+ if(!state.tradingLedger.length&&!state.tradingPositions.length)return null;
+ const row=upsertDailySnapshot(state.tradingSnapshots,tradingStats(),spyPrice,new Date());
+ row.id ||= createId();
+ return row;
+}
+function recordTradingOpeningSnapshot(position,date){
+ const snapshotDate=String(date||todayISO()).slice(0,10),cost=tradingPositionCost(position,state.usdIdr);
+ if(snapshotDate===todayISO())return recordTradingSnapshot();
+ let row=state.tradingSnapshots.find(item=>item.date===snapshotDate);
+ if(!row){row={id:createId(),date:snapshotDate,equityIdr:0,netContributionsIdr:0,holdingsValueIdr:0,cashValueIdr:0,spyPrice:0};state.tradingSnapshots.push(row);}
+ row.equityIdr=Number(row.equityIdr||0)+cost;row.netContributionsIdr=Number(row.netContributionsIdr||0)+cost;row.holdingsValueIdr=Number(row.holdingsValueIdr||0)+cost;
+ state.tradingSnapshots.sort((a,b)=>a.date.localeCompare(b.date));return row;
+}
+
+function renderTrading(){
+ const metrics=tradingStats();
+ const totalPct=metrics.externalFlows?metrics.totalPl/Math.abs(metrics.externalFlows)*100:0;
+ tradingEquity.textContent=fmt(metrics.equity);
+ tradingContributions.textContent=fmt(metrics.externalFlows);
+ tradingTotalPl.textContent=`${metrics.totalPl>=0?"+":""}${fmt(metrics.totalPl)} · ${totalPct>=0?"+":""}${totalPct.toFixed(2)}%`;
+ tradingRealizedPl.textContent=`${metrics.realized>=0?"+":""}${fmt(metrics.realized)}`;
+ tradingUnrealizedPl.textContent=`${metrics.unrealized>=0?"+":""}${fmt(metrics.unrealized)}`;
+ [tradingTotalPl,tradingRealizedPl,tradingUnrealizedPl].forEach((el,index)=>{const value=[metrics.totalPl,metrics.realized,metrics.unrealized][index];el.className=`private ${value<0?"negative":value>0?"positive":""}`;});
+ tradingCashIdr.textContent=fmt(metrics.wallet.idr);
+ tradingCashUsd.textContent=new Intl.NumberFormat("en-US",{style:"currency",currency:"USD",maximumFractionDigits:2}).format(metrics.wallet.usd);
+ tradingCashUsdIdr.textContent=fmt(metrics.wallet.usd*Number(state.usdIdr||0));
+ tradingQuoteSource.textContent=state.tradingQuoteMeta?.coverage||"TWELVE DATA PRIMARY · FINNHUB BACKUP";
+
+ const snapshots=state.tradingSnapshots.map(row=>({...row}));
+ if(state.tradingLedger.length||state.tradingPositions.length){const current=upsertDailySnapshot(snapshots,metrics,state.spyQuote?.price||snapshots.at(-1)?.spyPrice||0,new Date());current.id ||= "preview";}
+ const series=performanceSeries(snapshots,state.tradingRange||"YTD",new Date());
+ const alpha=series.portfolioReturn-series.spyReturn;
+ tradingPeriodReturn.textContent=`${series.portfolioReturn>=0?"+":""}${series.portfolioReturn.toFixed(2)}%`;
+ spyPeriodReturn.textContent=`${series.spyReturn>=0?"+":""}${series.spyReturn.toFixed(2)}%`;
+ tradingAlpha.textContent=`${alpha>=0?"+":""}${alpha.toFixed(2)}%`;
+ tradingPeriodReturn.className=series.portfolioReturn<0?"negative":"positive";spyPeriodReturn.className=series.spyReturn<0?"negative":"positive";tradingAlpha.className=alpha<0?"negative":"positive";
+ tradingPerformanceChart.innerHTML=series.labels.length?lineMulti([
+  {name:"Portfolio",vals:series.portfolio,color:"#2bd49a"},{name:"SPY",vals:series.spy,color:"#a460e8"}
+ ],series.labels.map(label=>label.slice(5))):`<div class="trading-empty"><b>Performance starts with your first position or deposit</b><span>Trading is optional and may remain at zero.</span></div>`;
+ qa("[data-trading-range]").forEach(button=>button.classList.toggle("active",button.dataset.tradingRange===(state.tradingRange||"YTD")));
+
+ tradingPositions.innerHTML=state.tradingPositions.length?state.tradingPositions.map(position=>{
+  const value=tradingPositionValue(position,state.usdIdr),cost=tradingPositionCost(position,state.usdIdr),pl=value-cost,pct=cost?pl/cost*100:0;
+  const quoteTime=position.priceAsOf?new Date(position.priceAsOf).toLocaleString("en-GB",{dateStyle:"medium",timeStyle:"short"}):"Manual fallback";
+  const status=position.priceStatus||"manual";
+  return `<article class="trading-position-card" data-trading-position="${position.id}"><div class="trading-position-head"><div><h4>${escapeHtml(position.ticker)}</h4><small>${position.market} · ${position.currency} · ${Number(position.quantity).toLocaleString("en-US",{maximumFractionDigits:6})} shares</small></div><span class="trading-position-state ${isPriceStale(position)?"stale":""}">${escapeHtml(status)}</span></div><div class="trading-position-value"><strong class="private">${fmt(value)}</strong><span class="${pl<0?"negative":pl>0?"positive":""}"><b class="private">${pl>=0?"+":""}${fmt(pl)}</b><small>${pct>=0?"+":""}${pct.toFixed(2)}%</small></span></div><div class="trading-position-meta"><span><small>AVG / SHARE</small><b>${plainNumber(position.avg)}</b></span><span><small>CURRENT</small><b>${plainNumber(position.current)}</b></span><span><small>TARGET</small><b>${position.targetPrice?plainNumber(position.targetPrice):"—"}</b></span><span><small>STOP LOSS</small><b>${position.stopLoss?plainNumber(position.stopLoss):"—"}</b></span></div><div class="trading-position-actions"><button class="buy" type="button" data-trading-buy="${position.id}">BUY MORE</button><button class="sell" type="button" data-trading-sell="${position.id}" ${Number(position.quantity)<=0?"disabled":""}>SELL</button><button type="button" data-trading-manual="${position.id}">PRICE</button>${Number(position.quantity)<=0?`<button type="button" data-trading-remove="${position.id}">REMOVE</button>`:""}</div><small class="price-time">${escapeHtml(quoteTime)}</small></article>`;
+ }).join(""):`<div class="trading-empty"><b>No active Trading position</b><span>Add one only when you want to track a separate trading portfolio.</span></div>`;
+
+ const ledger=[...state.tradingLedger].sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.__createdAt||"").localeCompare(String(a.__createdAt||"")));
+ tradingTradeCount.textContent=`${ledger.length} record${ledger.length===1?"":"s"}`;
+ tradingLedgerList.innerHTML=ledger.length?ledger.map(row=>{
+  const native=Math.abs(Number(row.quantity||0)*Number(row.price||0));
+  const amountIdr=row.type==="deposit"||row.type==="withdraw"?Math.abs(Number(row.externalFlowIdr||0)):native*(row.currency==="USD"?Number(row.fxRate||state.usdIdr):1);
+  const label={opening:"OPEN",deposit:"FUNDS",withdraw:"WITHDRAW",buy:"BUY",sell:"SELL"}[row.type]||row.type.toUpperCase();
+  return `<div class="trading-ledger-row ${row.type}"><i>${row.type==="sell"?"↗":row.type==="buy"||row.type==="opening"?"↘":row.type==="deposit"?"+":"−"}</i><div><b>${label}${row.ticker?` · ${escapeHtml(row.ticker)}`:""}</b><small>${row.date}${row.quantity?` · ${Number(row.quantity).toLocaleString("en-US",{maximumFractionDigits:6})} @ ${plainNumber(row.price)} ${row.currency}`:""}</small></div><strong class="private">${row.type==="buy"?"−":row.type==="sell"?"+":""}${fmt(amountIdr)}${row.realizedPlIdr?`<small class="${row.realizedPlIdr<0?"negative":"positive"}">P/L ${row.realizedPlIdr>=0?"+":""}${fmt(row.realizedPlIdr)}</small>`:""}</strong></div>`;
+ }).join(""):`<div class="trading-empty"><b>No Trading records yet</b><span>Deposits, withdrawals, buys and sells remain permanently recorded here.</span></div>`;
+
+ tradingPlanList.innerHTML=state.tradingPositions.length?state.tradingPositions.map(position=>`<div class="trading-plan-row"><strong>${escapeHtml(position.ticker)}</strong><label>TAKE PROFIT<input type="number" step=".01" min="0" data-trading-plan="targetPrice" data-position-id="${position.id}" value="${Number(position.targetPrice||0)||""}" placeholder="Optional"></label><label>STOP LOSS<input type="number" step=".01" min="0" data-trading-plan="stopLoss" data-position-id="${position.id}" value="${Number(position.stopLoss||0)||""}" placeholder="Optional"></label></div>`).join(""):`<div class="trading-empty"><b>No trade plan required</b><span>Targets appear after a position is added.</span></div>`;
+ qa("[data-trading-plan]").forEach(input=>input.onchange=()=>{const position=state.tradingPositions.find(row=>row.id===input.dataset.positionId);if(!position)return;position[input.dataset.tradingPlan]=Math.max(0,Number(input.value||0));save();});
+ qa("[data-trading-buy]").forEach(button=>button.onclick=()=>openTradingExecution(button.dataset.tradingBuy,"buy"));
+ qa("[data-trading-sell]").forEach(button=>button.onclick=()=>openTradingExecution(button.dataset.tradingSell,"sell"));
+ qa("[data-trading-manual]").forEach(button=>button.onclick=()=>openTradingManualPrice(button.dataset.tradingManual));
+ qa("[data-trading-remove]").forEach(button=>button.onclick=()=>{const position=state.tradingPositions.find(row=>row.id===button.dataset.tradingRemove);if(!position||Number(position.quantity)>0)return;state.tradingPositions=state.tradingPositions.filter(row=>row.id!==position.id);save();renderAll();toastMsg("Closed position removed · ledger retained");});
+}
+
+function openTradingCash(type,currency="USD"){
+ const wallet=tradingStats().wallet;
+ openSimple(type==="withdraw"?"Withdraw Trading Funds":"Add Trading Funds",[
+  {key:"currency",label:"Currency",options:["USD","IDR"],value:currency},{key:"amount",label:"Amount",type:"number",step:".01"},{key:"date",label:"Date",type:"date",value:todayISO()},{key:"note",label:"Note",required:false,value:type==="withdraw"?"Funds withdrawn":"Trading capital"}
+ ],values=>{
+  if(type==="withdraw"&&Number(values.amount)>Number(values.currency==="USD"?wallet.usd:wallet.idr)){alert(`Maximum available: ${values.currency==="USD"?wallet.usd:wallet.idr} ${values.currency}`);return false;}
+  state.tradingLedger.push({...cashEvent({type,currency:values.currency,amount:values.amount,date:values.date,fxRate:state.usdIdr,id:createId(),note:values.note}),__createdAt:new Date().toISOString()});recordTradingSnapshot();
+ });
+}
+
+function openTradingExecution(positionId,type){
+ const position=state.tradingPositions.find(row=>row.id===positionId);if(!position)return;
+ openSimple(type==="sell"?`Sell ${position.ticker}`:`Buy More ${position.ticker}`,[
+  {key:"quantity",label:`Shares${type==="sell"?` · max ${plainNumber(position.quantity)}`:""}`,type:"number",step:".000001",value:type==="sell"?position.quantity:""},
+  {key:"price",label:`Execution Price / Share (${position.currency})`,type:"number",step:".01",value:position.current},
+  {key:"fxRate",label:"USD/IDR Rate Used",type:"number",step:".01",value:state.usdIdr},
+  {key:"date",label:"Execution Date",type:"date",value:todayISO()}
+ ],values=>{
+  const wallet=tradingStats().wallet,nativeCost=Number(values.quantity)*Number(values.price);
+  if(type==="buy"&&nativeCost>Number(position.currency==="USD"?wallet.usd:wallet.idr)+1e-8){alert(`Insufficient ${position.currency} Trading wallet. Add funds first.`);return false;}
+  try{const entry=applyTrade({position,type,quantity:values.quantity,price:values.price,date:values.date,fxRate:values.fxRate,id:createId()});entry.__createdAt=new Date().toISOString();state.tradingLedger.push(entry);position.current=Number(values.price);position.manualCurrent=Number(values.price);position.priceSource="execution";position.priceStatus=type==="sell"?"sold":"manual";position.priceAsOf=new Date().toISOString();recordTradingSnapshot();}catch(error){alert(error.message);return false;}
+ });
+}
+
+function openTradingManualPrice(positionId){
+ const position=state.tradingPositions.find(row=>row.id===positionId);if(!position)return;
+ openSimple(`Update ${position.ticker} Price`,[{key:"price",label:`Current Price (${position.currency})`,type:"number",step:".01",value:position.current}],values=>{position.current=Math.max(0,Number(values.price));position.manualCurrent=position.current;position.priceSource="manual";position.priceStatus="manual";position.priceAsOf=new Date().toISOString();recordTradingSnapshot();});
+}
 function updateModeToggleLabels(){
  if(typeof baseModeToggle!=="undefined") baseModeToggle.textContent = state.baseMode === "auto" ? "Auto" : "Manual";
  if(typeof optimisticModeToggle!=="undefined") optimisticModeToggle.textContent = state.optimisticMode === "auto" ? "Auto" : "Manual";
@@ -704,7 +807,7 @@ function renderProspect(){
    </div>
    <p>Monthly Income − Monthly Expense · read-only</p>
   </div>`;
- yearGrid.innerHTML=pr.map(y=>{const ages=ageTriplet(y.year).join(", "),current=y.year===currentYear(),hasCredit=Number(y.expenses.credit)>0; return `<details class="year-card prospect-year-card"><summary><div class="year-head"><small>${y.year}</small><span class="age-triplet">${ages}</span></div><div class="year-summary-value"><h4 class="private ${moneyClass(y.nw)}">${fmt(y.nw)}</h4><span class="year-toggle">⌄</span></div><small class="year-equation">Opening Cash + Stocks + Income − Expenses</small></summary><div class="year-details"><small class="year-split private"><span>Opening Cash <b class="${moneyClass(y.opening)}">${fmt(y.opening)}</b></span><span>Stocks <b class="${moneyClass(y.portfolio)}">${fmt(y.portfolio)}</b></span><span>${current?"Remaining recurring income":"Recurring income"} <b class="positive">+${fmt(y.incomeBreakdown.recurring)}</b></span>${y.incomeBreakdown.outstanding?`<span>Current receivables <b class="positive">+${fmt(y.incomeBreakdown.outstanding)}</b></span>`:""}${current?`<span>This month remaining <b class="negative">−${fmt(y.expenses.currentMonth)}</b></span>`:""}<span>Recurring expense <b class="negative">−${fmt(y.expenses.recurring)}</b></span><span>Yearly expense <b class="negative">−${fmt(y.expenses.yearly)}</b></span><span>Events <b class="negative">−${fmt(y.expenses.events)}</b></span>${hasCredit?`<span>Credit & PayLater <b class="negative">−${fmt(y.expenses.credit)}</b></span>`:""}</small></div></details>`;}).join("");
+ yearGrid.innerHTML=pr.map(y=>{const ages=ageTriplet(y.year).join(", "),current=y.year===currentYear(),hasCredit=Number(y.expenses.credit)>0,investmentValue=netPortfolio(y.year,state.prospectMode),tradingValue=tradingAssets(); return `<details class="year-card prospect-year-card"><summary><div class="year-head"><small>${y.year}</small><span class="age-triplet">${ages}</span></div><div class="year-summary-value"><h4 class="private ${moneyClass(y.nw)}">${fmt(y.nw)}</h4><span class="year-toggle">⌄</span></div><small class="year-equation">Opening Cash + Investment + Trading + Income − Expenses</small></summary><div class="year-details"><small class="year-split private"><span>Opening Cash <b class="${moneyClass(y.opening)}">${fmt(y.opening)}</b></span><span>Investment Stocks <b class="${moneyClass(investmentValue)}">${fmt(investmentValue)}</b></span><span>Trading Stocks <b class="${moneyClass(tradingValue)}">${fmt(tradingValue)}</b></span><span>${current?"Remaining recurring income":"Recurring income"} <b class="positive">+${fmt(y.incomeBreakdown.recurring)}</b></span>${y.incomeBreakdown.outstanding?`<span>Current receivables <b class="positive">+${fmt(y.incomeBreakdown.outstanding)}</b></span>`:""}${current?`<span>This month remaining <b class="negative">−${fmt(y.expenses.currentMonth)}</b></span>`:""}<span>Recurring expense <b class="negative">−${fmt(y.expenses.recurring)}</b></span><span>Yearly expense <b class="negative">−${fmt(y.expenses.yearly)}</b></span><span>Events <b class="negative">−${fmt(y.expenses.events)}</b></span>${hasCredit?`<span>Credit & PayLater <b class="negative">−${fmt(y.expenses.credit)}</b></span>`:""}</small></div></details>`;}).join("");
 }
 
 function renderInsights(){
@@ -747,13 +850,17 @@ function renderInsights(){
  const collected=totalPaid()+totalOutstanding()?totalPaid()/(totalPaid()+totalOutstanding())*100:100;
  const holdingsInvested=state.stocks.reduce((sum,row)=>sum+invested(row),0);
  const pl=holdingsPortfolio()-holdingsInvested;
+ const activeTrading=tradingStats(),tradingPerf=performanceSeries(state.tradingSnapshots,state.tradingRange||"YTD",new Date());
+ const closedTrades=state.tradingLedger.filter(row=>row.type==="sell"),winningTrades=closedTrades.filter(row=>Number(row.realizedPlIdr)>0),tradingWinRate=closedTrades.length?winningTrades.length/closedTrades.length*100:0;
+ const tradingAlpha=tradingPerf.portfolioReturn-tradingPerf.spyReturn;
  const insightData=[
   {asset:"wallet",tone:runway>=6?"green":runway>=3?"yellow":"red",eyebrow:"Cash runway",title:`${runway.toFixed(1)} months of runway`,text:`Current liquid balance after entrusted funds is ${fmt(netAccountTotal())}; remaining monthly obligations are ${fmt(budgetRemaining())}.`},
   {asset:"clients",tone:collected>=80?"green":collected>=50?"yellow":"red",eyebrow:"Client collection",title:`${collected.toFixed(0)}% collected`,text:totalOutstanding()?`${fmt(totalOutstanding())} is still outstanding from recurring and ending clients.`:"All client payments are collected. Good job!"},
   {asset:"coffee",tone:coffeePct>100?"red":coffeePct>75?"yellow":"green",eyebrow:"Coffee check",title:coffeePct>100?"Coffee is over budget":coffeePct>75?"Coffee is getting expensive":"Coffee spending is controlled",text:`Coffee usage is ${coffeePct.toFixed(0)}% of its default monthly budget.`},
   {asset:"electricity",tone:electricDelta>5?"red":electricDelta<-5?"green":"blue",eyebrow:"Electricity trend",title:!latestElectric?"More readings needed":electricDelta<-5?"Electricity is decreasing — good job!":electricDelta>5?"Electricity usage is rising":"Electricity is stable",text:latestElectric?`Latest pace is ${latestElectric.daily.toFixed(1)} kWh/day (${electricDelta>=0?"+":""}${electricDelta.toFixed(1)}% versus the prior interval).`:"Add at least two readings to unlock a usage trend."},
   {asset:"calendar",tone:expenseDelta>5?"red":expenseDelta<-5?"green":"orange",eyebrow:"History trend",title:previousExpense?`Recorded expense ${expenseDelta>=0?"rose":"fell"} ${Math.abs(expenseDelta).toFixed(0)}%`:"Expense baseline is building",text:`History recorded ${fmt(thisExpense)} this month. It updates pacing only and is not deducted twice.`},
-  {asset:"stocks",tone:pl<0?"red":"green",eyebrow:"Portfolio P/L",title:`${pl<0?"Down":"Up"} ${fmt(Math.abs(pl))} · ${percent(pl,holdingsInvested,{absolute:true})}`,text:`Current holdings are ${fmt(holdingsPortfolio())} against ${fmt(holdingsInvested)} invested. Optional Netcash and Wallet are assets, not P/L.`}
+  {asset:"stocks",tone:pl<0?"red":"green",eyebrow:"Investment P/L",title:`${pl<0?"Down":"Up"} ${fmt(Math.abs(pl))} · ${percent(pl,holdingsInvested,{absolute:true})}`,text:`Investment holdings are ${fmt(holdingsPortfolio())} against ${fmt(holdingsInvested)} invested. Optional Netcash and Wallet are assets, not P/L.`},
+  {asset:"stocks",tone:activeTrading.totalPl<0?"red":activeTrading.totalPl>0?"green":"blue",eyebrow:"Trading performance",title:state.tradingLedger.length?`${activeTrading.totalPl<0?"Down":"Up"} ${fmt(Math.abs(activeTrading.totalPl))} · alpha ${tradingAlpha>=0?"+":""}${tradingAlpha.toFixed(2)}%`:"Trading is optional",text:state.tradingLedger.length?`Realized ${fmt(activeTrading.realized)}, unrealized ${fmt(activeTrading.unrealized)}. Deposits and withdrawals are excluded from gain/loss.`:"Add a Trading position only when you want a separate active portfolio."}
  ];
  insightCards.innerHTML=insightData.map(x=>`<article class="story-card ${x.tone} insight-${x.asset}"><img src="/assets/insights/${x.asset}.png" alt="" loading="lazy"><div><small>${x.eyebrow}</small><h3>${x.title}</h3><p>${x.text}</p></div></article>`).join("");
  const operatingMargin=operating.income?operating.net/operating.income*100:0;
@@ -769,7 +876,9 @@ function renderInsights(){
   {icon:"%",tone:operatingMargin>=0?"green":"red",label:"Operating Margin",value:`${operatingMargin>=0?"+":""}${operatingMargin.toFixed(1)}%`,text:"Annual operating net divided by annual recurring-client income."},
   {icon:"◔",tone:budgetUsedPct>100?"red":budgetUsedPct>75?"orange":"blue",label:"Budget Used",value:`${budgetUsedPct.toFixed(1)}%`,text:`${fmt(usedBudget)} recorded against ${fmt(monthlyBudget())} of monthly budget.`},
   {icon:"◇",tone:clientConcentration>50?"orange":"blue",label:"Client Concentration",value:`${clientConcentration.toFixed(1)}%`,text:largestClient?`${escapeHtml(largestClient.name)} is the largest share of recurring monthly income.`:"Add recurring clients to calculate concentration."},
-  {icon:"$",tone:usdExposure>60?"orange":"blue",label:"USD Exposure",value:`${usdExposure.toFixed(1)}%`,text:"Share of portfolio assets held in USD stocks and USD Wallet."}
+  {icon:"$",tone:usdExposure>60?"orange":"blue",label:"USD Exposure",value:`${usdExposure.toFixed(1)}%`,text:"Share of Investment assets held in USD stocks and USD Wallet."},
+  {icon:"α",tone:tradingAlpha<0?"red":tradingAlpha>0?"green":"blue",label:"Trading Alpha vs SPY",value:`${tradingAlpha>=0?"+":""}${tradingAlpha.toFixed(2)}%`,text:`Selected-period Trading return ${tradingPerf.portfolioReturn.toFixed(2)}% versus SPY ${tradingPerf.spyReturn.toFixed(2)}%.`},
+  {icon:"✓",tone:closedTrades.length&&!winningTrades.length?"red":tradingWinRate>=50?"green":"blue",label:"Trading Win Rate",value:closedTrades.length?`${tradingWinRate.toFixed(1)}%`:"—",text:closedTrades.length?`${winningTrades.length} profitable sell execution${winningTrades.length===1?"":"s"} from ${closedTrades.length} total.`:"No realized sell executions yet."}
  ];
  insightLong.innerHTML=decisionMetrics.map(x=>`<article class="signal-item metric-signal ${x.tone}"><div class="signal-ic"><span class="metric-symbol">${x.icon}</span></div><div><small>${x.label}</small><b class="private">${x.value}</b><p>${x.text}</p></div></article>`).join("");
 }
@@ -780,6 +889,7 @@ function renderAll(){
  renderExpenses();
  renderClients();
  renderStocks();
+ renderTrading();
  renderElectricity();
  renderProspect();
  renderInsights();
@@ -965,6 +1075,37 @@ async function refreshStockPrices({silent=false}={}){
  if(!silent)toastMsg(`${updated} price${updated===1?"":"s"} updated${failed?`, ${failed} fallback`:""}`);
 }
 
+async function refreshTradingPrices({silent=false,force=false}={}){
+ if(!navigator.onLine)return;
+ if(!state.tradingPositions.length&&!state.tradingLedger.length)return;
+ if(tradingRefreshPromise)return tradingRefreshPromise;
+ tradingRefreshPromise=(async()=>{
+  if(typeof refreshTradingBtn!=="undefined")refreshTradingBtn.disabled=true;
+  let updated=0,failed=0,lastCoverage="";
+  const quotes=new Map(),symbols=[...new Set(state.tradingPositions.map(position=>String(position.providerSymbol||position.ticker).trim().toUpperCase()).filter(Boolean))];
+  for(const symbol of symbols){
+   try{const quote=await fetchTradingQuote(symbol,{force});quotes.set(symbol,quote);lastCoverage=quote.coverage||quote.provider;}
+   catch(error){quotes.set(symbol,{error});}
+  }
+  for(const position of state.tradingPositions){
+   const symbol=String(position.providerSymbol||position.ticker).trim().toUpperCase(),quote=quotes.get(symbol);
+   if(quote&&!quote.error){position.current=Number(quote.price);position.priceSource=quote.provider;position.priceStatus=quote.status;position.priceAsOf=quote.asOf;position.lastPriceFetchAt=new Date().toISOString();updated++;}
+   else{position.priceStatus=`saved price · ${quote?.error?.code||"provider unavailable"}`;position.lastPriceFetchAt=new Date().toISOString();failed++;}
+  }
+  try{const spy=quotes.get("SPY")||await fetchTradingQuote("SPY",{force});state.spyQuote={price:Number(spy.price),asOf:spy.asOf,provider:spy.provider};lastCoverage=spy.coverage||lastCoverage;}
+  catch(error){state.spyQuote={...(state.spyQuote||{}),error:error.message};}
+  try{
+   const history=await fetchTradingBenchmark(),bars=[...(history.bars||[])].sort((a,b)=>a.date.localeCompare(b.date));
+   state.tradingSnapshots.forEach(snapshot=>{const exactOrPrevious=[...bars].reverse().find(bar=>bar.date<=snapshot.date);if(exactOrPrevious)snapshot.spyPrice=Number(exactOrPrevious.close);});
+  }catch{}
+  if(lastCoverage)state.tradingQuoteMeta={coverage:lastCoverage,asOf:new Date().toISOString()};
+  recordTradingSnapshot();
+  await save();renderAll();
+  if(!silent)toastMsg(`${updated} Trading price${updated===1?"":"s"} updated${failed?`, ${failed} saved fallback`:""} · SPY compared`);
+ })().finally(()=>{if(typeof refreshTradingBtn!=="undefined")refreshTradingBtn.disabled=false;tradingRefreshPromise=null;});
+ return tradingRefreshPromise;
+}
+
 async function refreshExchangeRate({silent=false,force=false}={}){
  if(!navigator.onLine)return false;
  if(fxRefreshPromise)return fxRefreshPromise;
@@ -1001,6 +1142,7 @@ async function refreshExchangeRate({silent=false,force=false}={}){
 async function refreshMarkets({silent=false}={}){
  await refreshExchangeRate({silent:true,force:true});
  await refreshStockPrices({silent:true});
+ if(state.page==="trading")await refreshTradingPrices({silent:true});
  if(!silent)toastMsg("Market prices and USD/IDR updated");
 }
 
@@ -1026,6 +1168,7 @@ qa("#cashFilter button").forEach(b=>b.onclick=()=>{qa("#cashFilter button").forE
 cashSort.onchange=()=>{state.sort=cashSort.value; renderCashflow();};
 txSearch.oninput=()=>renderCashflow();
 qa("#prospectTabs button").forEach(b=>b.onclick=()=>{qa("#prospectTabs button").forEach(x=>x.classList.remove("active")); b.classList.add("active"); state.prospectMode=b.dataset.prospect; renderProspect(); renderInsights();});
+qa("[data-trading-range]").forEach(b=>b.onclick=()=>{state.tradingRange=b.dataset.tradingRange;renderTrading();renderInsights();attachTips();});
 qa("[data-expense-view]").forEach(b=>b.onclick=()=>{state.expenseView=b.dataset.expenseView;renderExpenses();});
 baseModeToggle.onclick=()=>{state.baseMode = state.baseMode === "manual" ? "auto" : "manual"; saveSettings(); updateModeToggleLabels(); renderAll();};
 optimisticModeToggle.onclick=()=>{state.optimisticMode = state.optimisticMode === "manual" ? "auto" : "manual"; saveSettings(); updateModeToggleLabels(); renderAll();};
@@ -1112,6 +1255,20 @@ addTickerBtn.onclick=()=>openSimple("Add Ticker",[
  {key:"avg",label:"Average Price / Share",type:"number",step:".01"},
  {key:"current",label:"Manual Fallback Price / Share",type:"number",step:".01",value:0}
 ],o=>{o.id=createId();o.ticker=o.ticker.toUpperCase();o.displaySymbol=o.ticker;o.quantity=quantityForStorage(o.market,o.quantity);normalizeStockMapping(o);o.manualCurrent=o.current;o.priceSource="manual";o.priceStatus="manual";o.priceAsOf=null;o.base={};o.optimistic={};YEARS.slice(1).forEach(y=>{o.base[y]=o.current;o.optimistic[y]=o.current});state.stocks.push(o);});
+addTradingPositionBtn.onclick=()=>openSimple("Add Trading Position",[
+ {key:"ticker",label:"US Ticker"},{key:"market",label:"Market",options:["NASDAQ","NYSE","AMEX"],value:"NASDAQ"},
+ {key:"quantity",label:"Shares",type:"number",step:".000001"},{key:"avg",label:"Entry Price / Share (USD)",type:"number",step:".01"},
+ {key:"current",label:"Current / Manual Fallback (USD)",type:"number",step:".01"},{key:"targetPrice",label:"Take Profit (optional)",type:"number",step:".01",required:false,value:0},
+ {key:"stopLoss",label:"Stop Loss (optional)",type:"number",step:".01",required:false,value:0},{key:"date",label:"Opening Date",type:"date",value:todayISO()}
+],values=>{
+ const ticker=String(values.ticker||"").trim().toUpperCase();
+ if(state.tradingPositions.some(row=>row.ticker===ticker&&row.market===values.market)){alert(`${ticker} already exists in Trading.`);return false;}
+ if(!(Number(values.quantity)>0)||!(Number(values.avg)>=0)){alert("Enter a valid share quantity and entry price.");return false;}
+ const position={id:createId(),ticker,displaySymbol:ticker,providerSymbol:ticker,market:values.market,currency:"USD",quantity:Number(values.quantity),avg:Number(values.avg),current:Number(values.current||values.avg),manualCurrent:Number(values.current||values.avg),targetPrice:Number(values.targetPrice||0),stopLoss:Number(values.stopLoss||0),priceSource:"manual",priceStatus:"manual",priceAsOf:new Date().toISOString(),lastPriceFetchAt:null,__createdAt:new Date().toISOString()};
+ state.tradingPositions.push(position);state.tradingLedger.push({...applyOpeningPosition({position,date:values.date,fxRate:state.usdIdr,id:createId()}),__createdAt:new Date().toISOString()});recordTradingOpeningSnapshot(position,values.date);recordTradingSnapshot();
+});
+tradingDepositBtn.onclick=()=>openTradingCash("deposit","USD");
+qa("[data-trading-withdraw]").forEach(button=>button.onclick=()=>openTradingCash("withdraw",button.dataset.tradingWithdraw));
 addElectricityBtn.onclick=()=>openSimple("Add Meter Reading",[
  {key:"date",label:"Date",type:"date",value:todayISO()},
  {key:"time",label:"Time",type:"time",value:"19:00"},
@@ -1137,7 +1294,7 @@ qa("dialog").forEach(dialog=>{
 function applyCloudState(next,{preserveUi=false}={}){
  if(preserveUi)return;
  if(hasActiveEditor())return;
- const ui={page:state.page,privacy:state.privacy,filter:state.filter,sort:state.sort,expenseView:state.expenseView,txEdit:null,prospectMode:state.prospectMode};
+ const ui={page:state.page,privacy:state.privacy,filter:state.filter,sort:state.sort,expenseView:state.expenseView,txEdit:null,prospectMode:state.prospectMode,tradingRange:state.tradingRange||"YTD"};
  Object.assign(state,next,ui);
  document.documentElement.dataset.theme=state.theme;
  localStorage.setItem("cvfinance-theme-cache",state.theme);
@@ -1173,6 +1330,7 @@ async function showSignedIn(user){
   stockRefreshStarted=true;
   setTimeout(()=>refreshMarkets({silent:true}),500);
   fxRefreshTimer=setInterval(()=>refreshExchangeRate({silent:true}),5*60*1000);
+  tradingRefreshTimer=setInterval(()=>{if(state.page==="trading"&&!document.hidden)refreshTradingPrices({silent:true});},2*60*1000);
  }
 }
 
@@ -1217,8 +1375,9 @@ seedDataBtn.onclick=async()=>{
   await syncManager.handleRemoteChange();dataModal.close();toastMsg("MVP seed loaded");
  }catch(error){alert(error.message)}
 };
-logoutBtn.onclick=()=>{if(fxRefreshTimer)clearInterval(fxRefreshTimer);syncManager.signOut();};
+logoutBtn.onclick=()=>{if(fxRefreshTimer)clearInterval(fxRefreshTimer);if(tradingRefreshTimer)clearInterval(tradingRefreshTimer);syncManager.signOut();};
 refreshStocksBtn.onclick=()=>refreshMarkets();
+refreshTradingBtn.onclick=()=>refreshTradingPrices({force:true});
 refreshFxBtn.onclick=()=>refreshExchangeRate({force:true});
 editFxBtn.onclick=()=>openSimple("Set USD/IDR manually",[
  {key:"rate",label:"1 USD in IDR",type:"number",step:".01",value:Number(state.usdIdr||DEFAULT_USD_IDR)}
