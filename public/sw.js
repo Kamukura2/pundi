@@ -1,4 +1,4 @@
-const SHELL_CACHE = "cvfinance-shell-v8.3.0-crypto-multiquote";
+const SHELL_CACHE = "cvfinance-shell-v8.3.1-assets-label";
 const SHELL = ["/", "/index.html", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", event => {

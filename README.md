@@ -1,4 +1,6 @@
-# CVFinance v8.3.0
+# CVFinance v8.3.1
+
+v8.3.1 is a surgical UI naming patch: the existing top-level Stocks navigation label is now displayed as Assets. The Stocks implementation, Investment/Trading workspaces, Crypto, persistence, and accounting behavior are unchanged.
 
 v8.3.0 extends Crypto with flexible USD, IDR, and USDT requested quotes. User-facing pairs are resolved through validated Binance source symbols, with USD/IDR normalization using the existing CVFinance FX rate. Existing USDT positions remain unchanged.
 

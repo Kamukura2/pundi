@@ -13,7 +13,9 @@ for (const icon of manifest.icons) assert.ok(existsSync(resolve(root, "public", 
 const index = read("index.html");
 const css = read("styles.css");
 for (const tab of ["accumulation","cashflow","expenses","clients","stocks","trading","electricity","prospect","insights"]) assert.match(index, new RegExp(`id="${tab}"`));
-assert.equal((index.match(/data-page="stocks"/g)||[]).length,2,"Sidebar and data menu must expose one Stocks destination");
+assert.equal((index.match(/data-page="stocks"/g)||[]).length,2,"Sidebar and data menu must expose one Assets destination");
+assert.match(index,/data-page="stocks"[^>]*>[\s\S]*?Assets/,"The existing Stocks destination must be displayed as Assets");
+assert.doesNotMatch(index,/<span>Stocks<\/span>|>Stocks<\/button>/,"The top-level navigation label must no longer display Stocks");
 assert.doesNotMatch(index,/data-page="trading"/,"Trading must live inside Stocks instead of a separate route");
 assert.match(index,/data-stock-workspace="investment"/);assert.match(index,/data-stock-workspace="trading"/);
 assert.match(index,/id="dividendTickerList"/);assert.match(index,/id="investmentDepositBtn"/);
@@ -431,9 +433,9 @@ assert.match(appSource, /tx-history-archive/, "Previous History months must rema
 
 const electricityIndex = read("index.html");
 const electricityCss = read("styles.css");
-assert.equal(JSON.parse(read("package.json")).version,"8.3.0","Package version must be v8.3.0");
-assert.match(electricityIndex,/<title>CVFinance v8\.3\.0<\/title>/,"Document title must be v8.3.0");
-assert.match(read("public/sw.js"),/cvfinance-shell-v8\.3\.0/,"Service-worker cache must invalidate for v8.3.0");
+assert.equal(JSON.parse(read("package.json")).version,"8.3.1","Package version must be v8.3.1");
+assert.match(electricityIndex,/<title>CVFinance v8\.3\.1<\/title>/,"Document title must be v8.3.1");
+assert.match(read("public/sw.js"),/cvfinance-shell-v8\.3\.1/,"Service-worker cache must invalidate for v8.3.1");
 assert.match(electricityIndex,/id="topUpElectricityBtn"[^>]*>\s*TOP UP\s*<\/button>/,"Electricity must expose a distinct TOP UP action");
 assert.match(electricityIndex,/id="addElectricityBtn"[^>]*>\s*＋ Reading\s*<\/button>/,"The existing Reading action must remain available");
 assert.match(electricityIndex,/id="electricityTopUpModal"/);

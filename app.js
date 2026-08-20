@@ -137,7 +137,7 @@ const AGE_BASE=[33,30,0];
 const ageTriplet=(year)=>AGE_BASE.map(v=>v+(year-2026));
 const moneyClass=(n)=>Number(n)<0?"negative":"";
 const ID_TRANSLATIONS={
- "Accumulation":"Akumulasi","History":"Riwayat","Income":"Pendapatan","Expenses":"Pengeluaran","Clients":"Klien","Investment":"Investasi","Trading":"Trading","Stocks":"Saham","Stocks · Investment":"Saham · Investasi","Stocks · Trading":"Saham · Trading","Electricity":"Listrik","Prospect":"Proyeksi","Insights":"Insight","Dividend Income":"Pendapatan Dividen",
+ "Accumulation":"Akumulasi","History":"Riwayat","Income":"Pendapatan","Expenses":"Pengeluaran","Clients":"Klien","Assets":"Aset","Investment":"Investasi","Trading":"Trading","Stocks":"Saham","Stocks · Investment":"Saham · Investasi","Stocks · Trading":"Saham · Trading","Electricity":"Listrik","Prospect":"Proyeksi","Insights":"Insight","Dividend Income":"Pendapatan Dividen",
  "Investment liquidity":"Likuiditas investasi","Confirmed corporate actions":"Aksi korporasi terkonfirmasi","Remaining this year":"Sisa tahun ini","Receivable":"Piutang dividen","Next payment":"Pembayaran berikutnya","Eligible Shares":"Saham yang berhak","Gross Dividend":"Dividen bruto","Payment Date":"Tanggal pembayaran",
  "Available Balance":"Saldo Tersedia","Outstanding Client Income":"Piutang Klien","Balances":"Saldo","Cash, Bank & Wallets":"Tunai, Bank & Dompet","Payment Status":"Status Pembayaran",
  "Pending Expenses":"Kewajiban Mendatang","Where the Money Sits":"Distribusi Aset","Planned vs Actual":"Rencana vs Aktual","All":"Semua","Expense":"Pengeluaran","Income":"Pemasukan",
@@ -273,7 +273,7 @@ function setStockWorkspace(view,{refresh=true}={}){
  qa("[data-stock-workspace]").forEach(button=>{const active=button.dataset.stockWorkspace===next;button.classList.toggle("active",active);button.setAttribute("aria-selected",String(active));});
  qa("[data-stock-view]").forEach(panel=>panel.classList.toggle("active",panel.dataset.stockView===next));
  kicker.textContent=next==="trading"?"ACTIVE PORTFOLIO & PERFORMANCE":"LONG-TERM PORTFOLIO & TARGETS";
- title.textContent=next==="trading"?"Stocks · Trading":"Stocks · Investment";
+ title.textContent=next==="trading"?"Assets · Trading":"Assets · Investment";
  applyLanguage();
  syncCryptoMarketData();
  if(refresh&&next==="trading"&&stockRefreshStarted)queueMicrotask(()=>refreshTradingPrices({silent:true}));
@@ -285,7 +285,7 @@ function switchPage(p,{preserveScroll=false}={}){
  state.page=p;
  qa(".page").forEach(x=>x.classList.toggle("active",x.id===p));
  qa("[data-page]").forEach(x=>x.classList.toggle("active",x.dataset.page===p));
- const map={accumulation:["FINANCIAL COMMAND CENTER","Accumulation"],cashflow:["HISTORICAL RECORD","History"],expenses:["EDITABLE BUDGET & COSTS","Expenses"],clients:["INCOME WORKSPACE","Income"],stocks:["PORTFOLIO WORKSPACE","Stocks"],electricity:["UTILITY COST MONITOR","Electricity"],prospect:["READ-ONLY FUTURE PROJECTION","Prospect"],insights:["INFOGRAPHIC SUMMARY","Insights"]};
+ const map={accumulation:["FINANCIAL COMMAND CENTER","Accumulation"],cashflow:["HISTORICAL RECORD","History"],expenses:["EDITABLE BUDGET & COSTS","Expenses"],clients:["INCOME WORKSPACE","Income"],stocks:["PORTFOLIO WORKSPACE","Assets"],electricity:["UTILITY COST MONITOR","Electricity"],prospect:["READ-ONLY FUTURE PROJECTION","Prospect"],insights:["INFOGRAPHIC SUMMARY","Insights"]};
  kicker.textContent=map[p][0]; title.textContent=map[p][1];
  if(p==="stocks")setStockWorkspace(state.stockView||"investment",{refresh:!preserveScroll});
  applyLanguage();
