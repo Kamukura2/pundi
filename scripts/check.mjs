@@ -54,7 +54,7 @@ for (const key of ["FINNHUB_API_KEY","TWELVE_DATA_API_KEY","SUPABASE_URL","SUPAB
 const serviceWorker = read("public/sw.js");
 assert.match(serviceWorker, /pathname\.startsWith\("\/api\/"\)/);
 
-const jsFiles = ["app.js","api/config.js","api/_lib/rate-limit.js","api/_lib/dividends.js","api/stocks/dividends.js","api/stocks/fx.js","api/stocks/quote.js","api/stocks/validate.js","api/trading/quote.js","api/trading/benchmark.js","api/cron/refresh-stocks.js","src/data/default-data.js","src/data/finance-model.js","src/data/repository.js","src/lib/idb.js","src/lib/supabase.js","src/stocks/client.js","src/stocks/dividends.js","src/stocks/holding.js","src/trading/model.js","src/sync/sync-manager.js"];
+const jsFiles = ["app.js","api/config.js","api/_lib/rate-limit.js","api/_lib/dividends.js","api/stocks/dividends.js","api/stocks/fx.js","api/stocks/quote.js","api/stocks/validate.js","api/trading/quote.js","api/trading/benchmark.js","api/cron/refresh-stocks.js","src/data/default-data.js","src/data/finance-model.js","src/data/electricity-model.js","src/data/repository.js","src/lib/idb.js","src/lib/supabase.js","src/stocks/client.js","src/stocks/dividends.js","src/stocks/holding.js","src/trading/model.js","src/sync/sync-manager.js"];
 for (const file of jsFiles) execFileSync(process.execPath, ["--check", resolve(root, file)], { stdio:"pipe" });
 
 for (const file of jsFiles.map(read)) {
@@ -68,6 +68,29 @@ assert.equal(seed.clients.reduce((sum, row) => sum + row.monthly, 0), 10500000);
 assert.equal(seed.stocks.find(row => row.ticker === "WDC").quantity, 2.8033875);
 assert.equal(seed.rateKwh, 1740);
 assert.ok(seed.budgets.some(row => row.category === "Food") && seed.budgets.some(row => row.category === "Coffee"));
+
+const { electricityPeriods, latestElectricityBalance, parseTopUpAmount } = await import("../src/data/electricity-model.js");
+const readingA = {id:"reading-a",date:"2026-08-19",time:"19:00",remaining:398.07};
+const readingB = {id:"reading-b",date:"2026-08-20",time:"19:00",remaining:188.84};
+const unchangedAfterFutureTopUp = electricityPeriods([readingA,readingB],[{id:"topup-after",date:"2026-08-20",time:"22:45",amount:100}])[0];
+assert.equal(unchangedAfterFutureTopUp.status,"valid");
+assert.ok(Math.abs(unchangedAfterFutureTopUp.used-209.23)<1e-9,"A top-up after the latest reading must not rewrite completed usage");
+assert.ok(Math.abs(latestElectricityBalance([readingA,readingB],[{id:"topup-100",date:"2026-08-20",time:"22:45",amount:100}])-288.84)<1e-9,"Latest balance must add top-ups after the latest physical reading");
+const oneTopUpPeriod = electricityPeriods([{date:"2026-08-20",time:"19:00",remaining:188.84},{date:"2026-08-21",time:"19:00",remaining:250}],[{date:"2026-08-20",time:"22:45",amount:100}])[0];
+assert.ok(Math.abs(oneTopUpPeriod.used-38.84)<1e-9,"One top-up must reconcile into the next physical interval");
+const twoTopUpPeriod = electricityPeriods([{date:"2026-08-20",time:"19:00",remaining:188.84},{date:"2026-08-21",time:"19:00",remaining:200}],[{date:"2026-08-20",time:"22:45",amount:100},{date:"2026-08-20",time:"23:15",amount:50}])[0];
+assert.ok(Math.abs(twoTopUpPeriod.used-138.84)<1e-9,"Multiple top-ups must all reconcile once into the next physical interval");
+const noTopUpPeriod = electricityPeriods([readingA,readingB],[])[0];
+assert.ok(Math.abs(noTopUpPeriod.used-209.23)<1e-9,"No top-up must preserve the existing physical-reading formula");
+const anomalousPeriod = electricityPeriods([{date:"2026-08-20",time:"19:00",remaining:188.84},{date:"2026-08-21",time:"19:00",remaining:300}],[])[0];
+assert.equal(anomalousPeriod.status,"anomaly","Negative calculated consumption must be explicit");
+assert.ok(anomalousPeriod.rawUsed<0,"Anomalous intervals must retain their negative raw result");
+assert.equal(anomalousPeriod.used,null,"Anomalous intervals must not silently become zero usage");
+assert.equal(parseTopUpAmount(""),null,"Empty top-up amounts must be rejected");
+assert.equal(parseTopUpAmount("not-a-number"),null,"NaN top-up amounts must be rejected");
+assert.equal(parseTopUpAmount(-1),null,"Negative top-up amounts must be rejected");
+assert.equal(parseTopUpAmount(0),null,"Zero top-up amounts must be rejected");
+assert.equal(parseTopUpAmount("12.5"),12.5,"Decimal top-up amounts must be accepted");
 
 const { annualOperatingPerformance, buildMonthlyTimeline, buildProjection, getBudgetProgress, getClientPaidThisMonth, getCurrentNetWorth, getEntrustedDeduction, getFixedIncome, getTotalOutstanding, remainingYearExpenseBreakdown, remainingYearIncomeBreakdown, transactionsForMonth } = await import("../src/data/finance-model.js");
 const modelClients = [
@@ -147,6 +170,12 @@ assert.doesNotMatch(migration013,/drop\s+table|truncate\s+|delete\s+from/i);
 const migration014 = read("supabase/migrations/014_dividend_credit_reversal.sql");
 for (const marker of ["credited_amount_native","credited_currency","credit_reversed_at","investment_dividends_user_credited_idx"]) assert.match(migration014,new RegExp(marker));
 assert.doesNotMatch(migration014,/drop\s+table|truncate\s+|delete\s+from/i);
+const migration015 = read("supabase/migrations/015_electricity_topups.sql");
+for (const marker of ["electricity_topups","amount_kwh","topup_date","topup_time","enable row level security","force row level security","electricity_topups_select_own","electricity_topups_insert_own","electricity_topups_update_own","electricity_topups_delete_own","supabase_realtime"]) assert.match(migration015,new RegExp(marker,"i"));
+assert.doesNotMatch(migration015,/drop\s+table|truncate\s+|delete\s+from/i);
+const repositorySource = read("src/data/repository.js");
+assert.match(repositorySource,/"electricity_topups"/,"Top-ups must be a separate synchronized table");
+assert.match(repositorySource,/state\.electricityTopups/,"Top-ups must round-trip through synchronized state");
 
 const { advanceDividendLifecycle, creditDividendToWallet, dividendReceivables, mergeDividendEvents, projectedDividendForMonth, reconcileDividendState, reverseDividendCredit } = await import("../src/stocks/dividends.js");
 const dividendHolding={id:"h1",ticker:"BMRI",currency:"IDR",quantity:100};
@@ -345,6 +374,24 @@ assert.match(appSource, /currentMonthTransactions/, "History summaries must be s
 assert.match(appSource, /groupExpenses\("category"\).*groupExpenses\("channel"\)/s, "Current expenses must be grouped independently by category and channel");
 assert.match(appSource, /tx-current-month/, "The active History month must be visually separate from archives");
 assert.match(appSource, /tx-history-archive/, "Previous History months must remain available in Archive");
+
+const electricityIndex = read("index.html");
+const electricityCss = read("styles.css");
+assert.equal(JSON.parse(read("package.json")).version,"8.1.2","Package version must be v8.1.2");
+assert.match(electricityIndex,/<title>CVFinance v8\.1\.2<\/title>/,"Document title must be v8.1.2");
+assert.match(read("public/sw.js"),/cvfinance-shell-v8\.1\.2/,"Service-worker cache must invalidate for v8.1.2");
+assert.match(electricityIndex,/id="topUpElectricityBtn"[^>]*>\s*TOP UP\s*<\/button>/,"Electricity must expose a distinct TOP UP action");
+assert.match(electricityIndex,/id="addElectricityBtn"[^>]*>\s*＋ Reading\s*<\/button>/,"The existing Reading action must remain available");
+assert.match(electricityIndex,/id="electricityTopUpModal"/);
+assert.match(electricityIndex,/id="electricityTopUpAmount"/);
+assert.match(electricityIndex,/id="electricityTopUpCancel"/);
+assert.match(electricityIndex,/id="electricityTopUpSubmit"[^>]*>\s*Add Top Up\s*<\/button>/);
+assert.doesNotMatch(electricityIndex,/electricityTopUpCost|Top Up Cost/i,"TOP UP must not request an IDR cost");
+assert.match(electricityIndex,/Electricity History/,"Combined electricity activity must not be mislabeled as physical readings only");
+assert.match(appSource,/latestElectricityBalance\(/,"Latest Meter Balance must use effective physical-reading-plus-top-ups balance");
+assert.match(appSource,/state\.electricityTopups/,"Electricity rendering and saving must include persisted top-up events");
+assert.match(appSource,/electricityTopUpSubmitting/,"TOP UP must guard against accidental double-submit");
+assert.match(electricityCss,/electricity-history-topup/,"TOP UP history rows must have a distinct positive treatment");
 
 const app = read("app.js");
 assert.match(app, /portfolioPL\.textContent=`\$\{fmt\(pl\)\} · \$\{percent\(pl,inv\)\}`/);

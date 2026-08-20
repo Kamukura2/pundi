@@ -1,4 +1,6 @@
-# CVFinance v8.1.1
+# CVFinance v8.1.2
+
+v8.1.2 adds separate persisted Electricity TOP UP events. A top-up increases the current effective meter balance without changing completed consumption intervals; future physical readings reconcile the top-up exactly once.
 
 v8.1.1 replaces the crowded mobile/tablet bottom navigation with a compact hamburger drawer that reuses the complete desktop sidebar. A single floating transaction button remains at the lower-right, the drawer closes after navigation, backdrop taps, or Escape, and phone headers receive clearer vertical spacing. Desktop layout and financial behavior are unchanged.
 

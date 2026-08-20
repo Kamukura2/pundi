@@ -1,5 +1,6 @@
 import { createEmptyState, createId, createMvpSeed, readLegacyLocalStorage, YEARS } from "./src/data/default-data.js";
 import { annualExpenseBreakdown, annualOperatingPerformance, buildMonthlyTimeline, buildProjection, getBudgetProgress, getClientOutstanding, getClientPaidThisMonth, getCurrentNetWorth, getEndingClients, getEntrustedDeduction, getFixedIncome, getReceivableClients, getRecurringClients, getTotalOutstanding, getTotalPaid, getYearlyProjectionTotal, monthKey, monthlyBudgetRemaining, recordedExpenseForBudget, remainingYearExpenseBreakdown, remainingYearIncomeBreakdown } from "./src/data/finance-model.js";
+import { electricityHistoryEvents, electricityPeriods as calculateElectricityPeriods, latestElectricityBalance, parseTopUpAmount } from "./src/data/electricity-model.js";
 import { SyncManager } from "./src/sync/sync-manager.js";
 import { fetchHoldingDividends, fetchHoldingQuote, fetchTradingBenchmark, fetchTradingQuote, fetchUsdIdrRate, isPriceStale, validateHoldingSymbol } from "./src/stocks/client.js";
 import { normalizeStockMapping, quantityForDisplay, quantityForStorage, quantityUnit } from "./src/stocks/holding.js";
@@ -60,6 +61,13 @@ const save=(options)=>syncManager?.persist(state,options);
 const saveSettings=()=>save();
 const q=(s)=>document.querySelector(s);
 const qa=(s)=>[...document.querySelectorAll(s)];
+const electricityTopUpModal=q("#electricityTopUpModal");
+const electricityTopUpForm=q("#electricityTopUpForm");
+const electricityTopUpAmount=q("#electricityTopUpAmount");
+const electricityTopUpError=q("#electricityTopUpError");
+const electricityTopUpSubmit=q("#electricityTopUpSubmit");
+const electricityTopUpCancel=q("#electricityTopUpCancel");
+let electricityTopUpSubmitting=false;
 const hasActiveEditor=()=>{
  const active=document.activeElement;
  return Boolean(active&&active.matches("input,select,textarea,[contenteditable=true]")&&!active.closest("#authGate"));
@@ -130,7 +138,7 @@ const ID_TRANSLATIONS={
  "Paid Items":"Item Lunas","Paid This Month":"Dibayar Bulan Ini","Outstanding":"Belum Dibayar","Fixed Monthly":"Tetap Bulanan","Recurring Clients":"Klien Berulang","Ending Clients":"Klien Berakhir","Estimated Income This Year":"Estimasi Pemasukan Tahun Ini","Outstanding Now":"Piutang Saat Ini",
  "Fixed Yearly":"Tetap Tahunan","Expense Perusahaan":"Expense Perusahaan","Capital record only":"Pencatatan modal saja",
  "Total Portfolio Value":"Total Nilai Portofolio","Invested":"Modal","Unrealized":"Belum Direalisasi","Starting Funds":"Modal Awal","Allocation":"Alokasi","Holdings":"Kepemilikan","Target prices":"Target harga","Budget":"Anggaran","Optional liquid assets":"Aset likuid opsional","Netcash & USD Wallet":"Netcash & Dompet USD","Included in total assets":"Masuk ke total aset",
- "Latest Meter Balance":"Sisa Token Terbaru","Average Daily Usage":"Rata-rata Harian","Estimated Monthly Cost":"Estimasi Biaya Bulanan","Meter Readings":"Catatan Meter",
+ "Latest Meter Balance":"Sisa Token Terbaru","Average Daily Usage":"Rata-rata Harian","Estimated Monthly Cost":"Estimasi Biaya Bulanan","Meter Readings":"Catatan Meter","Electricity History":"Riwayat Listrik","Top Up Amount":"Jumlah Top Up","Add Top Up":"Tambah Top Up","Cancel":"Batal","Reading":"Catatan","TOP UP":"TOP UP",
  "Read-only projection":"Proyeksi hanya-baca","Annual View":"Tampilan Tahunan","Operating Performance":"Kinerja Operasional","Annual Income":"Pemasukan Tahunan","Annual Expense":"Pengeluaran Tahunan","Annual Net":"Net Tahunan","Future Cash + Assets":"Kas + Aset Masa Depan","Cash Runway":"Daya Tahan Kas","Largest Expense":"Pengeluaran Terbesar","Largest Holding":"Saham Terbesar",
  "Base vs Optimistic":"Dasar vs Optimistis","Money Story This Month":"Cerita Keuangan Bulan Ini","Decision Metrics":"Metrik Keputusan","Add Transaction":"Tambah Transaksi","Save":"Simpan","Editor":"Editor",
  "Financial Action Plan":"Rencana Aksi Keuangan","Next Moves":"Langkah Berikutnya","Operating Balance":"Keseimbangan Operasional","Client Follow-up":"Tindak Lanjut Klien","Cash Buffer":"Cadangan Kas",
@@ -906,19 +914,10 @@ function updateModeToggleLabels(){
 }
 
 function electricityPeriods(){
- const x=[...state.electricity].sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
- const out=[];
- for(let i=1;i<x.length;i++){
-  const prev=x[i-1], cur=x[i];
-  const days=(new Date(cur.date+"T"+cur.time)-new Date(prev.date+"T"+prev.time))/864e5;
-  const used=Math.max(0,Number(prev.remaining)-Number(cur.remaining));
-  const daily=days?used/days:0;
-  out.push({from:prev,to:cur,days,used,daily,cost:used*state.rateKwh});
- }
- return out;
+ return calculateElectricityPeriods(state.electricity,state.electricityTopups||[]).map(period=>({...period,cost:Number.isFinite(period.used)?period.used*state.rateKwh:null}));
 }
 function electricityDailySeries(){
- const periods=electricityPeriods();
+ const periods=electricityPeriods().filter(period=>period.status==="valid"&&Number.isFinite(period.daily));
  const vals=[]; const labels=[];
  periods.forEach(p=>{
   let d=new Date(p.from.date+"T00:00:00");
@@ -932,20 +931,34 @@ function electricityDailySeries(){
  });
  return {vals,labels};
 }
+function renderElectricityHistory(){
+ const periods=electricityPeriods();
+ const anomalousReadingIds=new Set(periods.filter(period=>period.status==="anomaly").map(period=>period.to.id));
+ const events=electricityHistoryEvents(state.electricity,state.electricityTopups||[]);
+ electricityList.innerHTML=events.length?events.map(event=>{
+  const topUp=event.eventType==="topup";
+  const anomaly=!topUp&&anomalousReadingIds.has(event.id);
+  const value=topUp?`+${Number(event.amount||0).toFixed(2)} kWh`:`${plainNumber(Number(event.remaining||0))} kWh`;
+  const label=topUp?"TOP UP":anomaly?"Reading · REVIEW":"Reading";
+  return `<div class="list-row electricity-history-row ${topUp?"electricity-history-topup":anomaly?"electricity-history-anomaly":"electricity-history-reading"}"><div class="list-ic">${topUp?"＋":anomaly?"⚠":"⚡"}</div><div class="list-meta"><b>${label}</b><small>${escapeHtml(event.date)} · ${escapeHtml(event.time)}</small></div><div class="list-value private">${value}</div></div>`;
+ }).join(""): `<div class="list-row"><div class="list-ic">ℹ</div><div class="list-meta"><b>No electricity activity yet</b><small>Add a physical reading or top up to start the history.</small></div></div>`;
+}
 function renderElectricity(){
- const x=[...state.electricity].sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
- const periods=electricityPeriods(), latest=periods.at(-1), last=x.at(-1);
+ const periods=electricityPeriods(), latest=periods.at(-1);
+ const anomaly=latest?.status==="anomaly";
  const series=electricityDailySeries();
- latestKwh.textContent=`${last?.remaining||0} kWh`;
- dailyKwh.textContent=`${(latest?.daily||0).toFixed(1)} kWh/day`;
- monthlyElectricCost.textContent=fmt((latest?.daily||0)*30*state.rateKwh);
+ latestKwh.textContent=`${plainNumber(latestElectricityBalance(state.electricity,state.electricityTopups||[]))} kWh`;
+ dailyKwh.textContent=anomaly?"Review reading":`${(latest?.daily||0).toFixed(1)} kWh/day`;
+ monthlyElectricCost.textContent=anomaly?"Review reading":fmt((latest?.daily||0)*30*state.rateKwh);
  electricUsageChart.innerHTML=bars(series.vals.length?series.vals:[0],series.labels.length?series.labels:["—"]);
- electricInterval.innerHTML=latest?listRows([
+ electricInterval.innerHTML=anomaly?listRows([
+  {icon:"⚠",name:"Reading anomaly",sub:`Raw calculated usage is ${latest.rawUsed.toFixed(2)} kWh. Correct the reading or add the missing top-up.`,value:"Review"}
+ ]):latest?listRows([
   {icon:"⚡",name:`${latest.used.toFixed(1)} kWh used`,sub:`${latest.from.date} ${latest.from.time} → ${latest.to.date} ${latest.to.time}`,value:fmt(latest.cost)},
   {icon:"📆",name:`${latest.days.toFixed(1)} days interval`,sub:`Average ${latest.daily.toFixed(1)} kWh/day`,value:fmt(latest.daily*state.rateKwh)+" / day"},
   {icon:"📌",name:"Estimated monthly",sub:"Based on latest daily usage",value:fmt(latest.daily*30*state.rateKwh)}
  ]):`<div class="list-row"><div class="list-ic">ℹ</div><div class="list-meta"><b>Add at least 2 readings</b></div></div>`;
- electricityList.innerHTML=listRows(x.map(r=>({icon:"⚡",name:`${r.remaining} kWh`,sub:`${r.date} · ${r.time}`,value:""})));
+ renderElectricityHistory();
 }
 
 function renderProspect(){
@@ -1032,7 +1045,9 @@ function renderInsights(){
  const now=new Date(),prev=new Date(now.getFullYear(),now.getMonth()-1,1);
  const expenseIn=(date)=>state.transactions.filter(row=>row.type==="expense"&&String(row.date).startsWith(`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}`)).reduce((sum,row)=>sum+Number(row.amount),0);
  const thisExpense=expenseIn(now),previousExpense=expenseIn(prev),expenseDelta=previousExpense?((thisExpense-previousExpense)/previousExpense*100):0;
- const periods=electricityPeriods(),latestElectric=periods.at(-1),previousElectric=periods.at(-2),electricDelta=previousElectric?.daily?((latestElectric.daily-previousElectric.daily)/previousElectric.daily*100):0;
+ const periods=electricityPeriods(),latestElectric=periods.at(-1),previousElectric=periods.at(-2);
+ const latestElectricValid=latestElectric?.status==="valid",previousElectricValid=previousElectric?.status==="valid";
+ const electricDelta=latestElectricValid&&previousElectricValid&&previousElectric.daily?((latestElectric.daily-previousElectric.daily)/previousElectric.daily*100):0;
  const coffeePct=foodBudget()?coffeeSpentForInsight()/Math.max(1,state.budgets.find(b=>String(b.category).toLowerCase()==="coffee")?.monthly||foodBudget())*100:0;
  const collected=totalPaid()+totalOutstanding()?totalPaid()/(totalPaid()+totalOutstanding())*100:100;
  const holdingsInvested=state.stocks.reduce((sum,row)=>sum+invested(row),0);
@@ -1044,7 +1059,7 @@ function renderInsights(){
   {asset:"wallet",tone:runway>=6?"green":runway>=3?"yellow":"red",eyebrow:"Cash runway",title:`${runway.toFixed(1)} months of runway`,text:`Current liquid balance after entrusted funds is ${fmt(netAccountTotal())}; remaining monthly obligations are ${fmt(budgetRemaining())}.`},
   {asset:"clients",tone:collected>=80?"green":collected>=50?"yellow":"red",eyebrow:"Client collection",title:`${collected.toFixed(0)}% collected`,text:totalOutstanding()?`${fmt(totalOutstanding())} is still outstanding from recurring and ending clients.`:"All client payments are collected. Good job!"},
   {asset:"coffee",tone:coffeePct>100?"red":coffeePct>75?"yellow":"green",eyebrow:"Coffee check",title:coffeePct>100?"Coffee is over budget":coffeePct>75?"Coffee is getting expensive":"Coffee spending is controlled",text:`Coffee usage is ${coffeePct.toFixed(0)}% of its default monthly budget.`},
-  {asset:"electricity",tone:electricDelta>5?"red":electricDelta<-5?"green":"blue",eyebrow:"Electricity trend",title:!latestElectric?"More readings needed":electricDelta<-5?"Electricity is decreasing — good job!":electricDelta>5?"Electricity usage is rising":"Electricity is stable",text:latestElectric?`Latest pace is ${latestElectric.daily.toFixed(1)} kWh/day (${electricDelta>=0?"+":""}${electricDelta.toFixed(1)}% versus the prior interval).`:"Add at least two readings to unlock a usage trend."},
+  {asset:"electricity",tone:latestElectric?.status==="anomaly"?"red":electricDelta>5?"red":electricDelta<-5?"green":"blue",eyebrow:"Electricity trend",title:!latestElectric?"More readings needed":latestElectric.status==="anomaly"?"Review latest reading":electricDelta<-5?"Electricity is decreasing — good job!":electricDelta>5?"Electricity usage is rising":"Electricity is stable",text:latestElectric?.status==="anomaly"?`Latest physical reading is above the effective prior balance by ${Math.abs(latestElectric.rawUsed).toFixed(2)} kWh. Add the missing top-up or correct the reading.`:latestElectric?`Latest pace is ${latestElectric.daily.toFixed(1)} kWh/day (${electricDelta>=0?"+":""}${electricDelta.toFixed(1)}% versus the prior interval).`:"Add at least two readings to unlock a usage trend."},
   {asset:"calendar",tone:expenseDelta>5?"red":expenseDelta<-5?"green":"orange",eyebrow:"History trend",title:previousExpense?`Recorded expense ${expenseDelta>=0?"rose":"fell"} ${Math.abs(expenseDelta).toFixed(0)}%`:"Expense baseline is building",text:`History recorded ${fmt(thisExpense)} this month. It updates pacing only and is not deducted twice.`},
   {asset:"stocks",tone:pl<0?"red":"green",eyebrow:"Investment P/L",title:`${pl<0?"Down":"Up"} ${fmt(Math.abs(pl))} · ${percent(pl,holdingsInvested,{absolute:true})}`,text:`Investment holdings are ${fmt(holdingsPortfolio())} against ${fmt(holdingsInvested)} invested. Optional Netcash and Wallet are assets, not P/L.`},
   {asset:"stocks",tone:activeTrading.realized<0?"red":activeTrading.realized>0?"green":"blue",eyebrow:"Trading performance",title:closedTrades.length?`${activeTrading.realized<0?"Realized loss":"Realized gain"} ${fmt(Math.abs(activeTrading.realized))} · alpha ${tradingAlpha>=0?"+":""}${tradingAlpha.toFixed(2)}%`:"Trading is optional",text:state.tradingLedger.length?`Accumulated realized P/L is ${fmt(activeTrading.realized)}; open-position unrealized P/L is ${fmt(activeTrading.unrealized)}. Investment data is excluded.`:"Add a Trading position only when you want a separate active portfolio."}
@@ -1520,7 +1535,53 @@ addElectricityBtn.onclick=()=>openSimple("Add Meter Reading",[
  {key:"date",label:"Date",type:"date",value:todayISO()},
  {key:"time",label:"Time",type:"time",value:"19:00"},
  {key:"remaining",label:"Remaining kWh",type:"number",step:".01"}
-],o=>state.electricity.push({id:createId(),...o}));
+],o=>{
+ const remaining=Number(o.remaining);
+ if(!Number.isFinite(remaining)||remaining<0){alert("Enter a valid non-negative meter reading.");return false;}
+ const candidate={id:createId(),...o,remaining};
+ const nextPeriod=calculateElectricityPeriods([...state.electricity,candidate],state.electricityTopups||[]).at(-1);
+ if(nextPeriod?.status==="anomaly"){
+  alert(`Reading rejected: ${remaining.toFixed(2)} kWh is above the effective available balance of ${nextPeriod.effectiveStart.toFixed(2)} kWh. Add the missing top-up or correct the reading.`);
+  return false;
+ }
+ state.electricity.push(candidate);
+});
+
+function electricityNowParts(now=new Date()){
+ const pad=value=>String(value).padStart(2,"0");
+ return {date:`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`,time:`${pad(now.getHours())}:${pad(now.getMinutes())}`};
+}
+function clearElectricityTopUpError(){electricityTopUpError.textContent="";}
+q("#topUpElectricityBtn").onclick=()=>{
+ clearElectricityTopUpError();
+ electricityTopUpAmount.value="";
+ electricityTopUpSubmit.disabled=false;
+ electricityTopUpCancel.disabled=false;
+ electricityTopUpModal.showModal();
+ queueMicrotask(()=>electricityTopUpAmount.focus());
+};
+electricityTopUpCancel.onclick=()=>{clearElectricityTopUpError();electricityTopUpAmount.value="";electricityTopUpModal.close();};
+electricityTopUpForm.onsubmit=event=>{
+ event.preventDefault();
+ if(electricityTopUpSubmitting)return;
+ const amount=parseTopUpAmount(electricityTopUpAmount.value);
+ if(amount===null){electricityTopUpError.textContent="Enter a kWh amount greater than 0.";electricityTopUpAmount.focus();return;}
+ electricityTopUpSubmitting=true;
+ electricityTopUpSubmit.disabled=true;
+ electricityTopUpCancel.disabled=true;
+ const now=new Date(),parts=electricityNowParts(now);
+ state.electricityTopups ||= [];
+ state.electricityTopups.push({id:createId(),date:parts.date,time:parts.time,amount,__createdAt:now.toISOString()});
+ electricityTopUpModal.close();
+ const pendingSave=save();
+ renderAll();
+ toastMsg(`Top up added · +${amount.toFixed(2)} kWh`);
+ Promise.resolve(pendingSave).catch(()=>{}).finally(()=>{
+  electricityTopUpSubmitting=false;
+  electricityTopUpSubmit.disabled=false;
+  electricityTopUpCancel.disabled=false;
+ });
+};
 
 qa(".close-dialog").forEach(b=>b.onclick=()=>b.closest("dialog").close());
 qa("dialog").forEach(dialog=>{

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-  <title>CVFinance v8.1.1</title>
+  <title>CVFinance v8.1.2</title>
   <meta name="theme-color" content="#d6249f">
   <meta name="description" content="Private synchronized personal finance dashboard">
   <meta name="mobile-web-app-capable" content="yes">
@@ -506,7 +506,10 @@
     <section id="electricity" class="page">
       <div class="toolbar">
         <span class="pill">⚡ Rp1,740 / kWh</span>
-        <button class="primary-btn" id="addElectricityBtn">＋ Reading</button>
+        <div class="electricity-actions">
+          <button class="top-up-btn" id="topUpElectricityBtn" type="button">TOP UP</button>
+          <button class="primary-btn" id="addElectricityBtn" type="button">＋ Reading</button>
+        </div>
       </div>
 
       <div class="grid-3 compact">
@@ -528,7 +531,7 @@
       </div>
 
       <article class="panel">
-        <div class="panel-head"><div><p>Log</p><h3>Meter Readings</h3></div></div>
+        <div class="panel-head"><div><p>Log</p><h3>Electricity History</h3></div></div>
         <div id="electricityList" class="list"></div>
       </article>
     </section>
@@ -702,6 +705,23 @@
     </div>
     <div id="simpleFields" class="form-grid"></div>
     <button class="primary-btn">Save</button>
+  </form>
+</dialog>
+
+<dialog id="electricityTopUpModal">
+  <form id="electricityTopUpForm" class="modal" novalidate>
+    <div class="panel-head">
+      <div><p>Electricity Balance</p><h3>TOP UP</h3></div>
+      <button type="button" class="ghost-btn close-dialog" aria-label="Close">×</button>
+    </div>
+    <label for="electricityTopUpAmount">Top Up Amount
+      <span class="input-suffix"><input id="electricityTopUpAmount" type="number" min="0" step="any" inputmode="decimal" autocomplete="off"><b>kWh</b></span>
+    </label>
+    <small id="electricityTopUpError" class="form-error" role="alert"></small>
+    <div class="modal-actions">
+      <button id="electricityTopUpCancel" class="ghost-btn" type="button">Cancel</button>
+      <button id="electricityTopUpSubmit" class="primary-btn" type="submit">Add Top Up</button>
+    </div>
   </form>
 </dialog>
 

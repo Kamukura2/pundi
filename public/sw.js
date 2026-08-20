@@ -1,4 +1,4 @@
-const SHELL_CACHE = "cvfinance-shell-v8.1.1-simple-mobile-drawer";
+const SHELL_CACHE = "cvfinance-shell-v8.1.2-electricity-top-up";
 const SHELL = ["/", "/index.html", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", event => {

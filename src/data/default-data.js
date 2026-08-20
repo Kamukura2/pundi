@@ -39,7 +39,8 @@ export function createEmptyState() {
     tradingLedger: [],
     tradingSnapshots: [],
     tradingRange: "YTD",
-    electricity: []
+    electricity: [],
+    electricityTopups: []
   };
 }
 
@@ -120,7 +121,8 @@ export function createMvpSeed() {
     electricity: [
       {id:createId(),date:"2026-08-06",time:"19:00",remaining:500},
       {id:createId(),date:"2026-08-20",time:"19:00",remaining:25}
-    ]
+    ],
+    electricityTopups: []
   };
 }
 

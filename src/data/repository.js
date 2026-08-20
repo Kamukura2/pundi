@@ -5,11 +5,11 @@ export const DATA_TABLES = [
   "profiles", "accounts", "transactions", "monthly_budgets", "yearly_expenses",
   "planned_events", "credit_facilities", "credit_items", "clients", "stock_holdings",
   "stock_price_targets", "investment_dividends", "trading_positions", "trading_ledger", "trading_snapshots",
-  "electricity_readings", "entrusted_funds", "app_settings"
+  "electricity_readings", "electricity_topups", "entrusted_funds", "app_settings"
 ];
 
 const SAVE_TABLES = DATA_TABLES.filter(table => table !== "profiles");
-const parentFirst = ["accounts","transactions","monthly_budgets","yearly_expenses","planned_events","credit_facilities","credit_items","clients","stock_holdings","stock_price_targets","investment_dividends","trading_positions","trading_ledger","trading_snapshots","electricity_readings","entrusted_funds","app_settings"];
+const parentFirst = ["accounts","transactions","monthly_budgets","yearly_expenses","planned_events","credit_facilities","credit_items","clients","stock_holdings","stock_price_targets","investment_dividends","trading_positions","trading_ledger","trading_snapshots","electricity_readings","electricity_topups","entrusted_funds","app_settings"];
 const deleteFirst = [...parentFirst].reverse();
 const meta = row => ({ __createdAt: row.created_at, __updatedAt: row.updated_at });
 const clean = value => JSON.parse(JSON.stringify(value));
@@ -78,6 +78,7 @@ function rowsToState(rows) {
     cashValueIdr:Number(row.cash_value_idr),spyPrice:Number(row.spy_price),...meta(row)
   })).sort((a,b)=>a.date.localeCompare(b.date));
   state.electricity = rows.electricity_readings.map(row => ({id:row.id,date:row.reading_date,time:String(row.reading_time).slice(0,5),remaining:Number(row.remaining_kwh),...meta(row)}));
+  state.electricityTopups = (rows.electricity_topups || []).map(row => ({id:row.id,date:row.topup_date,time:String(row.topup_time).slice(0,5),amount:Number(row.amount_kwh),...meta(row)})).sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
   const settings = rows.app_settings[0];
   if (settings) {
     state.settingsId = settings.id;
@@ -165,6 +166,7 @@ function stateToRows(state, userId, { dividendCreditAudit = true } = {}) {
       holdings_value_idr:Number(row.holdingsValueIdr||0),cash_value_idr:Number(row.cashValueIdr||0),spy_price:Number(row.spyPrice||0),...stamp(row)
     })),
     electricity_readings: state.electricity.map(row => owned({id:row.id,reading_date:row.date,reading_time:row.time,remaining_kwh:Number(row.remaining),...stamp(row)})),
+    electricity_topups: (state.electricityTopups || []).map(row => owned({id:row.id,topup_date:row.date,topup_time:row.time,amount_kwh:Number(row.amount),...stamp(row)})),
     app_settings: [owned({
       id:state.settingsId,theme:state.theme,language:state.language||"en",base_mode:state.baseMode,optimistic_mode:state.optimisticMode,
       base_growth:Number(state.baseGrowth),optimistic_growth:Number(state.optimisticGrowth),usd_idr:Number(state.usdIdr),
@@ -348,6 +350,7 @@ export function validateBackup(value) {
   if (value?.format !== "cvfinance-backup" || value?.version !== 1 || !value?.data) throw new Error("Invalid CVFinance backup file.");
   const required = ["accounts","transactions","budgets","yearly","events","creditFacilities","credit","clients","stocks","electricity"];
   required.forEach(key => { if (!Array.isArray(value.data[key])) throw new Error(`Backup is missing ${key}.`); });
+  if (!Array.isArray(value.data.electricityTopups)) value.data.electricityTopups = [];
   if (!Array.isArray(value.data.entrustedFunds)) value.data.entrustedFunds = [];
   if (!Array.isArray(value.data.tradingPositions)) value.data.tradingPositions = [];
   if (!Array.isArray(value.data.tradingLedger)) value.data.tradingLedger = [];
