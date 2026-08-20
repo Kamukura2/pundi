@@ -425,6 +425,7 @@ assert.match(appSource,/assetType/,"Stocks and Trading state must distinguish cr
 assert.doesNotMatch(read(".env.example"),/BINANCE_(API_KEY|SECRET)/,"Binance public market data must not require credentials");
 const cryptoApi = read("api/crypto/quote.js");
 assert.match(cryptoApi,/data-api\.binance\.vision/,"Crypto REST must be proxied through the official Binance endpoint server-side");
+assert.match(cryptoApi,/permissionSets/,"Binance SPOT validation must accept the current exchangeInfo permission shape");
 assert.match(cryptoApi,/Crypto symbol not found/);
 assert.match(cryptoApi,/Live Crypto price is temporarily unavailable/);
 const binanceSource = read("src/crypto/binance.js");

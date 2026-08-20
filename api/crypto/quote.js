@@ -23,9 +23,13 @@ export default async function handler(request, response) {
     let exchangeInfo;
     try {
       exchangeInfo = await fetchJson(`${UPSTREAM}/exchangeInfo?symbol=${encodeURIComponent(providerSymbol)}`);
-    } catch { throw clientError("Unable to reach Crypto market data. Please try again.", "crypto_provider_unreachable", 503); }
+    } catch (error) {
+      if ([400,404,422].includes(Number(error.status))) throw clientError("Crypto symbol not found.", "crypto_symbol_not_found");
+      throw clientError("Unable to reach Crypto market data. Please try again.", "crypto_provider_unreachable", 503);
+    }
     const symbol = exchangeInfo?.symbols?.find(row => row.symbol === providerSymbol);
-    const spotAllowed = symbol?.isSpotTradingAllowed !== false && (!Array.isArray(symbol?.permissions) || symbol.permissions.includes("SPOT"));
+    const spotAllowed = symbol?.isSpotTradingAllowed !== false
+      && (!Array.isArray(symbol?.permissions) || symbol.permissions.length === 0 || symbol.permissions.includes("SPOT") || symbol.permissionSets?.some(set => Array.isArray(set) && set.includes("SPOT")));
     if (!symbol || symbol.status !== "TRADING" || symbol.baseAsset !== base || symbol.quoteAsset !== "USDT" || !spotAllowed) {
       throw clientError("Crypto symbol not found.", "crypto_symbol_not_found");
     }
