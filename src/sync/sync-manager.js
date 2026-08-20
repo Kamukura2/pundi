@@ -38,7 +38,11 @@ export class SyncManager {
       state = cached.state;
       this.status("offline", "Offline cache", { lastSynced:cached.savedAt, pending:await this.repository.pendingCount() });
     }
-    this.onState(state);
+    try {
+      this.onState(state);
+    } catch (error) {
+      this.status("error", "Dashboard initialization failed", { detail:error.message });
+    }
     this.unsubscribe?.();
     this.unsubscribe = this.repository.subscribe(() => this.handleRemoteChange());
     window.addEventListener("online", () => this.flush());

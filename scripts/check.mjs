@@ -54,7 +54,7 @@ for (const key of ["FINNHUB_API_KEY","TWELVE_DATA_API_KEY","SUPABASE_URL","SUPAB
 const serviceWorker = read("public/sw.js");
 assert.match(serviceWorker, /pathname\.startsWith\("\/api\/"\)/);
 
-const jsFiles = ["app.js","api/config.js","api/_lib/rate-limit.js","api/_lib/dividends.js","api/stocks/dividends.js","api/stocks/fx.js","api/stocks/quote.js","api/stocks/validate.js","api/trading/quote.js","api/trading/benchmark.js","api/cron/refresh-stocks.js","api/crypto/quote.js","src/data/default-data.js","src/data/finance-model.js","src/data/electricity-model.js","src/crypto/binance.js","src/data/repository.js","src/lib/idb.js","src/lib/supabase.js","src/stocks/client.js","src/stocks/dividends.js","src/stocks/holding.js","src/trading/model.js","src/sync/sync-manager.js"];
+const jsFiles = ["app.js","api/config.js","api/_lib/rate-limit.js","api/_lib/dividends.js","api/stocks/dividends.js","api/stocks/fx.js","api/stocks/quote.js","api/stocks/validate.js","api/trading/quote.js","api/trading/benchmark.js","api/cron/refresh-stocks.js","api/crypto/quote.js","src/data/default-data.js","src/data/finance-model.js","src/data/electricity-model.js","src/data/currency-format.js","src/crypto/binance.js","src/data/repository.js","src/lib/idb.js","src/lib/supabase.js","src/stocks/client.js","src/stocks/dividends.js","src/stocks/holding.js","src/trading/model.js","src/sync/sync-manager.js"];
 for (const file of jsFiles) execFileSync(process.execPath, ["--check", resolve(root, file)], { stdio:"pipe" });
 
 for (const file of jsFiles.map(read)) {
@@ -91,6 +91,13 @@ assert.equal(parseTopUpAmount("not-a-number"),null,"NaN top-up amounts must be r
 assert.equal(parseTopUpAmount(-1),null,"Negative top-up amounts must be rejected");
 assert.equal(parseTopUpAmount(0),null,"Zero top-up amounts must be rejected");
 assert.equal(parseTopUpAmount("12.5"),12.5,"Decimal top-up amounts must be accepted");
+
+const { formatCryptoQuote, formatFiatCurrency } = await import("../src/data/currency-format.js");
+assert.doesNotThrow(()=>formatFiatCurrency(72081.90,"USDT"),"USDT must never be passed to Intl as a fiat currency code");
+assert.match(formatFiatCurrency(72081.90,"USDT"),/USDT$/,"USDT must display as a numeric quote with an explicit suffix");
+assert.match(formatCryptoQuote(0.00005,"USDT"),/USDT$/,"Small crypto quantities/quotes must remain format-safe");
+assert.match(formatFiatCurrency(72081.90,"USD"),/\$/,"USD fiat formatting must remain unchanged");
+assert.match(formatFiatCurrency(72081.90,"IDR"),/IDR|Rp/,"IDR fiat formatting must remain unchanged");
 
 const { binanceSpotSymbol, cryptoBaseSymbol, isCryptoAsset, normalizeCryptoSymbol } = await import("../src/crypto/binance.js");
 assert.equal(normalizeCryptoSymbol("btc"),"BTC","Crypto symbols must normalize to uppercase base symbols");
@@ -404,9 +411,9 @@ assert.match(appSource, /tx-history-archive/, "Previous History months must rema
 
 const electricityIndex = read("index.html");
 const electricityCss = read("styles.css");
-assert.equal(JSON.parse(read("package.json")).version,"8.2.1","Package version must be v8.2.1");
-assert.match(electricityIndex,/<title>CVFinance v8\.2\.1<\/title>/,"Document title must be v8.2.1");
-assert.match(read("public/sw.js"),/cvfinance-shell-v8\.2\.1/,"Service-worker cache must invalidate for v8.2.1");
+assert.equal(JSON.parse(read("package.json")).version,"8.2.2","Package version must be v8.2.2");
+assert.match(electricityIndex,/<title>CVFinance v8\.2\.2<\/title>/,"Document title must be v8.2.2");
+assert.match(read("public/sw.js"),/cvfinance-shell-v8\.2\.2/,"Service-worker cache must invalidate for v8.2.2");
 assert.match(electricityIndex,/id="topUpElectricityBtn"[^>]*>\s*TOP UP\s*<\/button>/,"Electricity must expose a distinct TOP UP action");
 assert.match(electricityIndex,/id="addElectricityBtn"[^>]*>\s*＋ Reading\s*<\/button>/,"The existing Reading action must remain available");
 assert.match(electricityIndex,/id="electricityTopUpModal"/);
@@ -433,7 +440,10 @@ assert.match(binanceSource,/CVFINANCE_CRYPTO_API/,"Browser Crypto REST must use 
 assert.match(electricityIndex,/id="cryptoMarketStatus"/);
 assert.equal((appSource.match(/options:\["IDX","NASDAQ","NYSE","CRYPTO"\]/g)||[]).length,2,"Investment and Trading new-entry market selectors must match exactly");
 assert.doesNotMatch(appSource,/options:\[[^\]]*AMEX[^\]]*\]/,"AMEX must not be selectable in new-entry forms");
-assert.match(read("index.html"),/id="usdIdrRate"[\s\S]*id="cryptoMarketStatus"/,"Crypto status must sit beside the existing FX status");
+assert.match(electricityIndex,/id="usdIdrRate"[\s\S]*id="cryptoMarketStatus"/,"Crypto status must sit beside the existing FX status");
+const syncInitSource = read("src/sync/sync-manager.js");
+assert.match(syncInitSource,/Dashboard initialization failed/,"Post-auth render errors must be reported separately from authentication errors");
+assert.match(syncInitSource,/this\.onState\(state\)/,"Authenticated state must still be handed to the app after session success");
 
 const app = read("app.js");
 assert.match(app, /portfolioPL\.textContent=`\$\{fmt\(pl\)\} · \$\{percent\(pl,inv\)\}`/);

@@ -1,4 +1,6 @@
-# CVFinance v8.2.1
+# CVFinance v8.2.2
+
+v8.2.2 fixes the authenticated Crypto runtime crash caused by passing USDT to Intl.NumberFormat as a fiat currency code. USDT now uses numeric formatting with an explicit suffix, while USD/IDR formatting and all Investment/Trading accounting remain unchanged.
 
 v8.2.1 fixes production Crypto quote resolution through a same-origin Vercel REST proxy, aligns Investment/Trading market selectors, simplifies Crypto symbol entry, and places Crypto status beside the existing FX status. Investment and Trading accounting are unchanged.
 

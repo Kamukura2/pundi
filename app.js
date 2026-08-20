@@ -1,6 +1,7 @@
 import { createEmptyState, createId, createMvpSeed, readLegacyLocalStorage, YEARS } from "./src/data/default-data.js";
 import { annualExpenseBreakdown, annualOperatingPerformance, buildMonthlyTimeline, buildProjection, getBudgetProgress, getClientOutstanding, getClientPaidThisMonth, getCurrentNetWorth, getEndingClients, getEntrustedDeduction, getFixedIncome, getReceivableClients, getRecurringClients, getTotalOutstanding, getTotalPaid, getYearlyProjectionTotal, monthKey, monthlyBudgetRemaining, recordedExpenseForBudget, remainingYearExpenseBreakdown, remainingYearIncomeBreakdown } from "./src/data/finance-model.js";
 import { electricityHistoryEvents, electricityPeriods as calculateElectricityPeriods, latestElectricityBalance, parseTopUpAmount } from "./src/data/electricity-model.js";
+import { formatCryptoQuote, formatFiatCurrency } from "./src/data/currency-format.js";
 import { CryptoMarketStream, binanceSpotSymbol, fetchBinanceTicker, isCryptoAsset, normalizeCryptoSymbol, normalizeQuoteValueToIdr, resolveCryptoSymbol } from "./src/crypto/binance.js";
 import { SyncManager } from "./src/sync/sync-manager.js";
 import { fetchHoldingDividends, fetchHoldingQuote, fetchTradingBenchmark, fetchTradingQuote, fetchUsdIdrRate, isPriceStale, validateHoldingSymbol } from "./src/stocks/client.js";
@@ -665,8 +666,8 @@ function renderTargetTable(mode,headEl,bodyEl){
 }
 
 function formatDividendNative(value,currency){
- if(state.privacy)return currency==="USD"?"$••••":"Rp••••";
- return new Intl.NumberFormat(currency==="USD"?"en-US":"id-ID",{style:"currency",currency,maximumFractionDigits:currency==="USD"?4:2}).format(Number(value||0));
+ if(state.privacy)return currency==="USD"?"$••••":currency==="USDT"?"•••• USDT":"Rp••••";
+ return formatFiatCurrency(value,currency,{locale:currency==="USD"?"en-US":"id-ID",maximumFractionDigits:currency==="USDT"?8:currency==="USD"?4:2});
 }
 
 function dividendSourceLabel(event){
@@ -816,7 +817,7 @@ function renderTrading(){
   const value=tradingPositionValue(position,state.usdIdr),cost=tradingPositionCost(position,state.usdIdr),pl=value-cost,pct=cost?pl/cost*100:0;
   const quoteTime=position.priceAsOf?new Date(position.priceAsOf).toLocaleString("en-GB",{dateStyle:"medium",timeStyle:"short"}):"Waiting for API quote";
   const status=position.priceStatus||"saved";
-  const crypto=isCryptoAsset(position),currentUsd=new Intl.NumberFormat("en-US",{style:"currency",currency:position.currency||"USD",minimumFractionDigits:2,maximumFractionDigits:4}).format(Number(position.current||0)),currentLabel=crypto?`${plainCryptoNumber(position.current)} USDT`:currentUsd;
+  const crypto=isCryptoAsset(position),currentUsd=crypto?"":formatFiatCurrency(position.current,"USD",{locale:"en-US",maximumFractionDigits:4}),currentLabel=crypto?formatCryptoQuote(position.current,"USDT",{locale:"en-US",minimumFractionDigits:2,maximumFractionDigits:8}):currentUsd;
   return `<article class="trading-position-card" data-trading-position="${position.id}"><div class="trading-position-head"><div><h4>${escapeHtml(position.ticker)}</h4><small>${position.market} · ${position.currency} · ${Number(position.quantity).toLocaleString("en-US",{maximumFractionDigits:8})} ${crypto?"units":"shares"}</small></div><span class="trading-position-state ${isPriceStale(position)?"stale":""}" ${crypto?`data-crypto-position-status="${position.id}"`:""}>${escapeHtml(status)}</span></div><div class="trading-current-price"><small>CURRENT PRICE</small><strong class="private" ${crypto?`data-crypto-position-current="${position.id}"`:""}>${currentLabel}</strong></div><div class="trading-position-value"><span><small>POSITION VALUE</small><b class="private" ${crypto?`data-crypto-position-value="${position.id}"`:""}>${money(value)}</b></span><span class="${pl<0?"negative":pl>0?"positive":""}"><b class="private" ${crypto?`data-crypto-position-pl="${position.id}"`:""}>${pl>=0?"+":""}${money(pl)}</b><small ${crypto?`data-crypto-position-pct="${position.id}"`:""}>${pct>=0?"+":""}${pct.toFixed(2)}%</small></span></div><div class="trading-position-meta"><span><small>AVG / SHARE</small><b>${crypto?plainCryptoNumber(position.avg):plainNumber(position.avg)} ${crypto?"USDT":""}</b></span><span><small>TARGET PRICE</small><b>${position.targetPrice?plainNumber(position.targetPrice):"—"} ${crypto&&position.targetPrice?"USDT":""}</b></span><span><small>INVESTED</small><b class="private">${money(cost)}</b></span></div><div class="trading-position-actions"><button class="buy" type="button" data-trading-buy="${position.id}">BUY MORE</button><button class="sell" type="button" data-trading-sell="${position.id}" ${Number(position.quantity)<=0?"disabled":""}>SELL</button><button class="delete" type="button" data-trading-delete="${position.id}">DELETE</button></div><small class="price-time">${escapeHtml(quoteTime)}</small></article>`;
  }).join(""):`<div class="trading-empty"><b>No active Trading position</b><span>Add one only when you want to track a separate trading portfolio.</span></div>`;
 
