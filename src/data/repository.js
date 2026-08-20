@@ -42,7 +42,7 @@ function rowsToState(rows) {
   state.stocks = rows.stock_holdings.map(row => {
     const target = targetsByHolding.get(row.id) || {base:{},optimistic:{},ids:{base:{},optimistic:{}}};
     return {
-      id:row.id,ticker:row.display_symbol,displaySymbol:row.display_symbol,market:row.market,
+      id:row.id,ticker:row.display_symbol,displaySymbol:row.display_symbol,market:row.market,assetType:row.asset_type||"equity",
       provider:row.provider,providerSymbol:row.provider_symbol,currency:row.currency,
       quantity:Number(row.quantity),avg:Number(row.avg_purchase_price),current:Number(row.current_price),
       manualCurrent:Number(row.manual_current_price ?? row.current_price),priceSource:row.price_source,
@@ -59,14 +59,14 @@ function rowsToState(rows) {
     creditedAmountNative:Number(row.credited_amount_native||0),creditedCurrency:row.credited_currency||"",creditReversedAt:row.credit_reversed_at||null,...meta(row)
   }));
   state.tradingPositions = (rows.trading_positions || []).map(row => ({
-    id:row.id,ticker:row.display_symbol,displaySymbol:row.display_symbol,market:row.market,
+    id:row.id,ticker:row.display_symbol,displaySymbol:row.display_symbol,market:row.market,assetType:row.asset_type||"equity",
     providerSymbol:row.provider_symbol,currency:row.currency,quantity:Number(row.quantity),
     avg:Number(row.avg_purchase_price),current:Number(row.current_price),manualCurrent:Number(row.manual_current_price),
     targetPrice:Number(row.target_price),stopLoss:Number(row.stop_loss_price),priceSource:row.price_source,
     priceStatus:row.price_status,priceAsOf:row.price_as_of,lastPriceFetchAt:row.last_price_fetch_at,...meta(row)
   }));
   state.tradingLedger = (rows.trading_ledger || []).map(row => ({
-    id:row.id,type:row.entry_type,positionId:row.position_id,ticker:row.ticker,quantity:Number(row.quantity),
+    id:row.id,type:row.entry_type,positionId:row.position_id,ticker:row.ticker,assetType:row.asset_type||"equity",quantity:Number(row.quantity),
     price:Number(row.execution_price),currency:row.currency,fxRate:Number(row.fx_rate),
     cashDeltaIdr:Number(row.cash_delta_idr),cashDeltaUsd:Number(row.cash_delta_usd),
     externalFlowIdr:Number(row.external_flow_idr),realizedPlIdr:Number(row.realized_pl_idr),
@@ -75,7 +75,11 @@ function rowsToState(rows) {
   state.tradingSnapshots = (rows.trading_snapshots || []).map(row => ({
     id:row.id,date:row.snapshot_date,equityIdr:Number(row.equity_idr),
     netContributionsIdr:Number(row.net_contributions_idr),holdingsValueIdr:Number(row.holdings_value_idr),
-    cashValueIdr:Number(row.cash_value_idr),spyPrice:Number(row.spy_price),...meta(row)
+    cashValueIdr:Number(row.cash_value_idr),spyPrice:Number(row.spy_price),
+    benchmarkEquityIdr:Number(row.benchmark_equity_idr ?? row.equity_idr),
+    benchmarkExternalFlowsIdr:Number(row.benchmark_external_flows_idr ?? row.net_contributions_idr),
+    benchmarkHoldingsValueIdr:Number(row.benchmark_holdings_value_idr ?? row.holdings_value_idr),
+    benchmarkCashValueIdr:Number(row.benchmark_cash_value_idr ?? row.cash_value_idr),...meta(row)
   })).sort((a,b)=>a.date.localeCompare(b.date));
   state.electricity = rows.electricity_readings.map(row => ({id:row.id,date:row.reading_date,time:String(row.reading_time).slice(0,5),remaining:Number(row.remaining_kwh),...meta(row)}));
   state.electricityTopups = (rows.electricity_topups || []).map(row => ({id:row.id,date:row.topup_date,time:String(row.topup_time).slice(0,5),amount:Number(row.amount_kwh),...meta(row)})).sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
@@ -133,7 +137,7 @@ function stateToRows(state, userId, { dividendCreditAudit = true } = {}) {
     entrusted_funds: state.entrustedFunds.map((row,index) => owned({id:row.id,name:row.name,amount:Number(row.amount),deduction_source:row.source,is_settled:Boolean(row.settled),sort_order:Number(row.sortOrder??index),...stamp(row)})),
     clients: state.clients.map((row,index) => owned({id:row.id,name:row.name,monthly_retainer:Number(row.monthly),paid_this_month:Number(row.paid),previous_outstanding:Number(row.carry),status:row.status==="freeze"?"pending":row.status,client_type:row.clientType || "recurring",ending_paid:Boolean(row.endingPaid),sort_order:Number(row.sortOrder??index),tracking_month:row.trackingMonth||null,...stamp(row)})),
     stock_holdings: state.stocks.map(row => owned({
-      id:row.id,display_symbol:row.displaySymbol || row.ticker,market:row.market,provider:row.provider,
+      id:row.id,display_symbol:row.displaySymbol || row.ticker,market:row.market,asset_type:row.assetType||"equity",provider:row.provider,
       provider_symbol:row.providerSymbol || row.ticker,currency:row.currency,quantity:Number(row.quantity),
       avg_purchase_price:Number(row.avg),current_price:Number(row.current),manual_current_price:Number(row.manualCurrent ?? row.current),
       price_source:row.priceSource || "manual",price_status:row.priceStatus || "manual",
@@ -149,21 +153,23 @@ function stateToRows(state, userId, { dividendCreditAudit = true } = {}) {
       ...(dividendCreditAudit?{credited_amount_native:Number(row.creditedAmountNative||0),credited_currency:row.creditedCurrency||null,credit_reversed_at:row.creditReversedAt||null}:{}),...stamp(row)
     })),
     trading_positions: (state.tradingPositions || []).map(row => owned({
-      id:row.id,display_symbol:row.displaySymbol || row.ticker,market:row.market,provider_symbol:row.providerSymbol || row.ticker,
+      id:row.id,display_symbol:row.displaySymbol || row.ticker,market:row.market,asset_type:row.assetType||"equity",provider_symbol:row.providerSymbol || row.ticker,
       currency:row.currency,quantity:Number(row.quantity),avg_purchase_price:Number(row.avg),current_price:Number(row.current),
       manual_current_price:Number(row.manualCurrent ?? row.current),target_price:Number(row.targetPrice||0),stop_loss_price:Number(row.stopLoss||0),
       price_source:row.priceSource || "manual",price_status:row.priceStatus || "manual",price_as_of:row.priceAsOf || null,
       last_price_fetch_at:row.lastPriceFetchAt || null,...stamp(row)
     })),
     trading_ledger: (state.tradingLedger || []).map(row => owned({
-      id:row.id,position_id:row.positionId || null,entry_type:row.type,ticker:row.ticker || "",quantity:Number(row.quantity||0),
+      id:row.id,position_id:row.positionId || null,entry_type:row.type,ticker:row.ticker || "",asset_type:row.assetType||"equity",quantity:Number(row.quantity||0),
       execution_price:Number(row.price||0),currency:row.currency || "IDR",fx_rate:Number(row.fxRate||0),
       cash_delta_idr:Number(row.cashDeltaIdr||0),cash_delta_usd:Number(row.cashDeltaUsd||0),external_flow_idr:Number(row.externalFlowIdr||0),
       realized_pl_idr:Number(row.realizedPlIdr||0),trade_date:row.date,note:row.note || "",...stamp(row)
     })),
     trading_snapshots: (state.tradingSnapshots || []).map(row => owned({
       id:row.id,snapshot_date:row.date,equity_idr:Number(row.equityIdr||0),net_contributions_idr:Number(row.netContributionsIdr||0),
-      holdings_value_idr:Number(row.holdingsValueIdr||0),cash_value_idr:Number(row.cashValueIdr||0),spy_price:Number(row.spyPrice||0),...stamp(row)
+      holdings_value_idr:Number(row.holdingsValueIdr||0),cash_value_idr:Number(row.cashValueIdr||0),spy_price:Number(row.spyPrice||0),
+      benchmark_equity_idr:Number(row.benchmarkEquityIdr ?? row.equityIdr ?? 0),benchmark_external_flows_idr:Number(row.benchmarkExternalFlowsIdr ?? row.netContributionsIdr ?? 0),
+      benchmark_holdings_value_idr:Number(row.benchmarkHoldingsValueIdr ?? row.holdingsValueIdr ?? 0),benchmark_cash_value_idr:Number(row.benchmarkCashValueIdr ?? row.cashValueIdr ?? 0),...stamp(row)
     })),
     electricity_readings: state.electricity.map(row => owned({id:row.id,reading_date:row.date,reading_time:row.time,remaining_kwh:Number(row.remaining),...stamp(row)})),
     electricity_topups: (state.electricityTopups || []).map(row => owned({id:row.id,topup_date:row.date,topup_time:row.time,amount_kwh:Number(row.amount),...stamp(row)})),

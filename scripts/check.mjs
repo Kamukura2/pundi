@@ -54,7 +54,7 @@ for (const key of ["FINNHUB_API_KEY","TWELVE_DATA_API_KEY","SUPABASE_URL","SUPAB
 const serviceWorker = read("public/sw.js");
 assert.match(serviceWorker, /pathname\.startsWith\("\/api\/"\)/);
 
-const jsFiles = ["app.js","api/config.js","api/_lib/rate-limit.js","api/_lib/dividends.js","api/stocks/dividends.js","api/stocks/fx.js","api/stocks/quote.js","api/stocks/validate.js","api/trading/quote.js","api/trading/benchmark.js","api/cron/refresh-stocks.js","src/data/default-data.js","src/data/finance-model.js","src/data/electricity-model.js","src/data/repository.js","src/lib/idb.js","src/lib/supabase.js","src/stocks/client.js","src/stocks/dividends.js","src/stocks/holding.js","src/trading/model.js","src/sync/sync-manager.js"];
+const jsFiles = ["app.js","api/config.js","api/_lib/rate-limit.js","api/_lib/dividends.js","api/stocks/dividends.js","api/stocks/fx.js","api/stocks/quote.js","api/stocks/validate.js","api/trading/quote.js","api/trading/benchmark.js","api/cron/refresh-stocks.js","src/data/default-data.js","src/data/finance-model.js","src/data/electricity-model.js","src/crypto/binance.js","src/data/repository.js","src/lib/idb.js","src/lib/supabase.js","src/stocks/client.js","src/stocks/dividends.js","src/stocks/holding.js","src/trading/model.js","src/sync/sync-manager.js"];
 for (const file of jsFiles) execFileSync(process.execPath, ["--check", resolve(root, file)], { stdio:"pipe" });
 
 for (const file of jsFiles.map(read)) {
@@ -91,6 +91,14 @@ assert.equal(parseTopUpAmount("not-a-number"),null,"NaN top-up amounts must be r
 assert.equal(parseTopUpAmount(-1),null,"Negative top-up amounts must be rejected");
 assert.equal(parseTopUpAmount(0),null,"Zero top-up amounts must be rejected");
 assert.equal(parseTopUpAmount("12.5"),12.5,"Decimal top-up amounts must be accepted");
+
+const { binanceSpotSymbol, cryptoBaseSymbol, isCryptoAsset, normalizeCryptoSymbol } = await import("../src/crypto/binance.js");
+assert.equal(normalizeCryptoSymbol("btc"),"BTC","Crypto symbols must normalize to uppercase base symbols");
+assert.equal(binanceSpotSymbol("btc"),"BTCUSDT","Crypto symbols must map to the default USDT spot pair");
+assert.equal(cryptoBaseSymbol("BTCUSDT"),"BTC","Provider pairs must resolve back to their base symbol");
+assert.equal(isCryptoAsset({assetType:"crypto",market:"CRYPTO",currency:"USDT"}),true);
+assert.equal(isCryptoAsset({market:"NASDAQ",currency:"USD"}),false);
+assert.throws(()=>normalizeCryptoSymbol("BTC/USDT"),/Invalid crypto symbol/);
 
 const { annualOperatingPerformance, buildMonthlyTimeline, buildProjection, getBudgetProgress, getClientPaidThisMonth, getCurrentNetWorth, getEntrustedDeduction, getFixedIncome, getTotalOutstanding, remainingYearExpenseBreakdown, remainingYearIncomeBreakdown, transactionsForMonth } = await import("../src/data/finance-model.js");
 const modelClients = [
@@ -173,9 +181,13 @@ assert.doesNotMatch(migration014,/drop\s+table|truncate\s+|delete\s+from/i);
 const migration015 = read("supabase/migrations/015_electricity_topups.sql");
 for (const marker of ["electricity_topups","amount_kwh","topup_date","topup_time","enable row level security","force row level security","electricity_topups_select_own","electricity_topups_insert_own","electricity_topups_update_own","electricity_topups_delete_own","supabase_realtime"]) assert.match(migration015,new RegExp(marker,"i"));
 assert.doesNotMatch(migration015,/drop\s+table|truncate\s+|delete\s+from/i);
+const migration016 = read("supabase/migrations/016_crypto_asset_class.sql");
+for (const marker of ["asset_type","crypto","binance","USDT","stock_holdings","trading_positions","trading_ledger"]) assert.match(migration016,new RegExp(marker,"i"));
+assert.doesNotMatch(migration016,/drop\s+table|truncate\s+|delete\s+from/i);
 const repositorySource = read("src/data/repository.js");
 assert.match(repositorySource,/"electricity_topups"/,"Top-ups must be a separate synchronized table");
 assert.match(repositorySource,/state\.electricityTopups/,"Top-ups must round-trip through synchronized state");
+assert.match(repositorySource,/asset_type/,"Crypto asset type must round-trip through persisted holdings and trades");
 
 const { advanceDividendLifecycle, creditDividendToWallet, dividendReceivables, mergeDividendEvents, projectedDividendForMonth, reconcileDividendState, reverseDividendCredit } = await import("../src/stocks/dividends.js");
 const dividendHolding={id:"h1",ticker:"BMRI",currency:"IDR",quantity:100};
@@ -199,7 +211,7 @@ assert.equal(duplicateDividendState.dividends.length,1);assert.ok(Math.abs(dupli
 assert.equal(reverseDividendCredit(duplicateDividendState,duplicateDividendState.dividends[0],new Date("2026-08-14T00:00:00Z")),true);
 assert.ok(Math.abs(duplicateDividendState.stockExtras.netcashIdr)<.02,"Cancelling a dividend credit must reverse its exact wallet amount");
 
-const { applyOpeningPosition, applyTrade, archiveClosedTradingPositions, cashEvent, performancePreview, performanceSeries, reconcileTradingPositions, removeTradingLedgerEntry, removeTradingPositionData, setTradingWalletBalance, tradingMetrics, tradingTargetSimulation, tradingWallet, upsertDailySnapshot } = await import("../src/trading/model.js");
+const { amountToIdr, applyOpeningPosition, applyTrade, archiveClosedTradingPositions, cashEvent, equityBenchmarkMetrics, performancePreview, performanceSeries, reconcileTradingPositions, removeTradingLedgerEntry, removeTradingPositionData, setTradingWalletBalance, tradingMetrics, tradingTargetSimulation, tradingWallet, upsertDailySnapshot } = await import("../src/trading/model.js");
 const tradePosition={id:"p1",ticker:"MU",market:"NASDAQ",currency:"USD",quantity:0,avg:0,current:0};
 const tradingLedger=[cashEvent({type:"deposit",currency:"USD",amount:1000,date:"2026-01-02",fxRate:16000,id:"cash1"})];
 const editableWallet=[];
@@ -230,6 +242,21 @@ assert.ok(Math.abs(sameDayComparison.portfolioReturn+3)<1e-9,"Same-day Trading p
 assert.ok(Math.abs(sameDayComparison.spyReturn-2)<1e-9,"SPY must compare its current API quote with the opening-day baseline");
 const target=tradingTargetSimulation({quantity:2,avg:100,currency:"USD"},125,16000);
 assert.equal(target.projectedValueIdr,4000000);assert.equal(target.projectedPlIdr,800000);assert.equal(target.projectedReturn,25);
+assert.equal(amountToIdr(600,"USDT",17000),10200000,"USDT must use the documented USD/IDR normalization approximation");
+const cryptoInvestment={quantity:0.01,avg:60000,current:65000,currency:"USDT",assetType:"crypto"};
+assert.equal(cryptoInvestment.quantity*cryptoInvestment.avg,600,"Crypto Investment cost must preserve fractional quantity and USDT price");
+assert.equal(cryptoInvestment.quantity*cryptoInvestment.current,650,"Crypto Investment value must preserve fractional quantity and USDT price");
+const cryptoPosition={id:"crypto-p1",ticker:"BTC",assetType:"crypto",currency:"USDT",quantity:0.05,avg:60000,current:65000};
+const cryptoLedger=[applyOpeningPosition({position:cryptoPosition,date:"2026-08-20",fxRate:17000,id:"crypto-open"})];
+cryptoLedger.push(applyTrade({position:cryptoPosition,type:"sell",quantity:0.02,price:65000,date:"2026-08-21",fxRate:17000,id:"crypto-sell"}));
+assert.ok(Math.abs(cryptoPosition.quantity-0.03)<1e-12,"Crypto partial sell must preserve fractional remaining quantity");
+assert.equal(cryptoLedger[1].assetType,"crypto");
+assert.equal(cryptoLedger[1].realizedPlIdr,1700000,"Crypto realized P/L must use the existing cost-basis method");
+const cryptoMetrics=tradingMetrics({positions:[cryptoPosition],ledger:cryptoLedger,fxRate:17000});
+assert.equal(cryptoMetrics.unrealized,2550000,"Crypto unrealized P/L must use current USDT value and normalized IDR");
+const mixedBenchmark=equityBenchmarkMetrics({positions:[{assetType:"equity",currency:"USD",quantity:1,avg:100,current:110},{assetType:"crypto",market:"CRYPTO",currency:"USDT",quantity:1,avg:60000,current:65000}],ledger:[{assetType:"equity",type:"opening",externalFlowIdr:1700000,cashDeltaIdr:0,cashDeltaUsd:0},{assetType:"crypto",type:"opening",externalFlowIdr:102000000,cashDeltaIdr:0,cashDeltaUsd:0}],fxRate:17000});
+assert.equal(mixedBenchmark.holdingsValue,1870000,"Mixed benchmark must retain the equity holding component");
+assert.equal(mixedBenchmark.externalFlows,1700000,"Mixed benchmark must exclude Crypto external flows");
 const removed=removeTradingPositionData({positions:[{id:"p1"},{id:"p2"}],ledger:[{id:"l1",positionId:"p1",date:"2026-02-01"},{id:"l2",positionId:"p2",date:"2026-01-01"}],snapshots:[{date:"2026-01-01"},{date:"2026-02-01"}]},"p1");
 assert.deepEqual(removed.positions,[{id:"p2"}]);assert.deepEqual(removed.ledger,[{id:"l2",positionId:"p2",date:"2026-01-01"}]);assert.deepEqual(removed.snapshots,[{date:"2026-01-01"}]);
 const ledgerDeletion=removeTradingLedgerEntry({positions:[],ledger:[{id:"deposit-a",type:"deposit",date:"2026-01-02",cashDeltaUsd:100,externalFlowIdr:1600000},{id:"deposit-b",type:"deposit",date:"2026-02-02",cashDeltaUsd:50,externalFlowIdr:800000}],snapshots:[{date:"2026-01-02"},{date:"2026-02-02"}]},"deposit-b");
@@ -360,7 +387,7 @@ assert.doesNotMatch(appSource, /<input[^>]*type=\"number\"[^>]*data-target=/, "T
 assert.match(appSource, /class=\"target-price-input\" type=\"text\" inputmode=\"decimal\"/, "Target-price inputs must preserve editable text drafts");
 assert.match(appSource, /backdropPress/, "Dialog dismissal must distinguish backdrop clicks from drag-selection gestures");
 assert.match(appSource, /fetchUsdIdrRate/, "USD\/IDR live refresh must be wired into the app");
-assert.match(appSource, /Number\(s\.quantity\)\*stockPrice[\s\S]*s\.currency===\"USD\"\?v\*state\.usdIdr:v/, "US holdings must convert shares times USD price using USD\/IDR");
+assert.match(appSource,/normalizeQuoteValueToIdr\(v,s\.currency,state\.usdIdr\)/,"USD and USDT holdings must use the centralized quote-to-IDR normalization helper");
 
 assert.match(appSource, /COMPANY_EXPENSE_TAG="Expense Perusahaan"/, "Expense Perusahaan must remain a fixed History-only tag");
 assert.match(appSource, /transactions:\[\]/, "Projection calls must explicitly exclude History transactions");
@@ -377,9 +404,9 @@ assert.match(appSource, /tx-history-archive/, "Previous History months must rema
 
 const electricityIndex = read("index.html");
 const electricityCss = read("styles.css");
-assert.equal(JSON.parse(read("package.json")).version,"8.1.2","Package version must be v8.1.2");
-assert.match(electricityIndex,/<title>CVFinance v8\.1\.2<\/title>/,"Document title must be v8.1.2");
-assert.match(read("public/sw.js"),/cvfinance-shell-v8\.1\.2/,"Service-worker cache must invalidate for v8.1.2");
+assert.equal(JSON.parse(read("package.json")).version,"8.2.0","Package version must be v8.2.0");
+assert.match(electricityIndex,/<title>CVFinance v8\.2\.0<\/title>/,"Document title must be v8.2.0");
+assert.match(read("public/sw.js"),/cvfinance-shell-v8\.2\.0/,"Service-worker cache must invalidate for v8.2.0");
 assert.match(electricityIndex,/id="topUpElectricityBtn"[^>]*>\s*TOP UP\s*<\/button>/,"Electricity must expose a distinct TOP UP action");
 assert.match(electricityIndex,/id="addElectricityBtn"[^>]*>\s*＋ Reading\s*<\/button>/,"The existing Reading action must remain available");
 assert.match(electricityIndex,/id="electricityTopUpModal"/);
@@ -392,6 +419,10 @@ assert.match(appSource,/latestElectricityBalance\(/,"Latest Meter Balance must u
 assert.match(appSource,/state\.electricityTopups/,"Electricity rendering and saving must include persisted top-up events");
 assert.match(appSource,/electricityTopUpSubmitting/,"TOP UP must guard against accidental double-submit");
 assert.match(electricityCss,/electricity-history-topup/,"TOP UP history rows must have a distinct positive treatment");
+assert.match(electricityIndex,/CRYPTO/,"Stocks must expose the Crypto market selector");
+assert.match(appSource,/CryptoMarketStream/,"Crypto prices must use one managed combined market stream");
+assert.match(appSource,/assetType/,"Stocks and Trading state must distinguish crypto from equity");
+assert.doesNotMatch(read(".env.example"),/BINANCE_(API_KEY|SECRET)/,"Binance public market data must not require credentials");
 
 const app = read("app.js");
 assert.match(app, /portfolioPL\.textContent=`\$\{fmt\(pl\)\} · \$\{percent\(pl,inv\)\}`/);
@@ -407,7 +438,8 @@ assert.match(read("index.html"), /STARTING FUNDS/, "Trading capital label must u
 assert.doesNotMatch(read("index.html"), /NET CONTRIBUTIONS/, "The old Net Contributions label must be removed from Trading");
 assert.match(app, /switchPage\(state\.page,\{preserveScroll:true\}\)/, "Realtime sync must not force mobile Trading back to the top");
 assert.match(app, /if\(!window\.matchMedia\("\(max-width:1024px\)"\)\.matches\)requestAnimationFrame/, "Mobile background sync must never fight touch scrolling with scrollTo");
-assert.match(app, /performancePreview\(state\.tradingSnapshots,metrics,state\.spyQuote\?\.price/, "Trading benchmark must render a current preview without waiting for a sell");
+assert.match(app, /benchmarkSnapshots/, "Trading benchmark must use the equity-only benchmark snapshot component");
+assert.match(app, /hasEquityBenchmark/, "Trading benchmark must remain available for equity in mixed Equity + Crypto portfolios");
 assert.match(app, /tradingPositions\.addEventListener\("click",handleTradingPositionAction\)/, "Trading actions must use a persistent delegated desktop click handler");
 assert.match(app, /archiveClosedTradingPositions\(\{positions:state\.tradingPositions,ledger:state\.tradingLedger\}\)/, "A full sell must archive the active card immediately");
 assert.match(app, /already has an active Trading position/, "Ticker duplication must block only another active position");

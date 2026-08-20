@@ -1,12 +1,13 @@
 import { createEmptyState, createId, createMvpSeed, readLegacyLocalStorage, YEARS } from "./src/data/default-data.js";
 import { annualExpenseBreakdown, annualOperatingPerformance, buildMonthlyTimeline, buildProjection, getBudgetProgress, getClientOutstanding, getClientPaidThisMonth, getCurrentNetWorth, getEndingClients, getEntrustedDeduction, getFixedIncome, getReceivableClients, getRecurringClients, getTotalOutstanding, getTotalPaid, getYearlyProjectionTotal, monthKey, monthlyBudgetRemaining, recordedExpenseForBudget, remainingYearExpenseBreakdown, remainingYearIncomeBreakdown } from "./src/data/finance-model.js";
 import { electricityHistoryEvents, electricityPeriods as calculateElectricityPeriods, latestElectricityBalance, parseTopUpAmount } from "./src/data/electricity-model.js";
+import { CryptoMarketStream, binanceSpotSymbol, fetchBinanceTicker, isCryptoAsset, normalizeCryptoSymbol, normalizeQuoteValueToIdr, resolveCryptoSymbol } from "./src/crypto/binance.js";
 import { SyncManager } from "./src/sync/sync-manager.js";
 import { fetchHoldingDividends, fetchHoldingQuote, fetchTradingBenchmark, fetchTradingQuote, fetchUsdIdrRate, isPriceStale, validateHoldingSymbol } from "./src/stocks/client.js";
 import { normalizeStockMapping, quantityForDisplay, quantityForStorage, quantityUnit } from "./src/stocks/holding.js";
 import { advanceDividendLifecycle, creditDividendToWallet, dividendEventYear, dividendGross, dividendNativeGross, dividendReceivables, mergeDividendEvents, projectedDividendForMonth, reconcileDividendState, reverseDividendCredit, summarizeDividends } from "./src/stocks/dividends.js";
 import { getSupabase } from "./src/lib/supabase.js";
-import { applyOpeningPosition, applyTrade, archiveClosedTradingPositions, cashEvent, performancePreview, performanceSeries, reconcileTradingPositions, removeTradingLedgerEntry, removeTradingPositionData, setTradingWalletBalance, tradingMetrics, tradingPositionCost, tradingPositionValue, tradingTargetSimulation, upsertDailySnapshot } from "./src/trading/model.js";
+import { applyOpeningPosition, applyTrade, archiveClosedTradingPositions, cashEvent, equityBenchmarkMetrics, performancePreview, performanceSeries, reconcileTradingPositions, removeTradingLedgerEntry, removeTradingPositionData, setTradingWalletBalance, tradingMetrics, tradingPositionCost, tradingPositionValue, tradingTargetSimulation, upsertDailySnapshot } from "./src/trading/model.js";
 
 const COLORS=["#7F66FF","#39C3FF","#FF8F63","#36D695","#F4C24F","#FF6EA8","#62C8FF","#8D7AFF"];
 const COMPANY_EXPENSE_TAG="Expense Perusahaan";
@@ -30,6 +31,8 @@ let tradingRefreshTimer=null;
 let fxRefreshPromise=null;
 let tradingRefreshPromise=null;
 let dividendRefreshPromise=null;
+let cryptoMarketStream=null;
+let cryptoSummaryFrame=null;
 let transactionTagFilter=null;
 const currentYear=()=>new Date().getFullYear();
 const escapeHtml=value=>String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));
@@ -76,6 +79,10 @@ const plainNumber=value=>{
  const number=Number(value||0);
  return Number.isInteger(number)?String(number):String(Number(number.toFixed(6)));
 };
+const plainCryptoNumber=value=>{
+ const number=Number(value||0);
+ return Number.isFinite(number)?String(Number(number.toFixed(8))):"";
+};
 const accountTotal=()=>state.accounts.reduce((a,b)=>a+Number(b.balance),0);
 const entrustedTotal=(source)=>getEntrustedDeduction(state.entrustedFunds,source);
 const netAccountTotal=()=>accountTotal()-entrustedTotal("cash");
@@ -103,16 +110,17 @@ const stockPrice=(s,y,mode)=>{
  if(y===currentYear()) return Number(s.current);
  const useMode=mode==="base"?state.baseMode:state.optimisticMode;
  const g=mode==="base"?Number(state.baseGrowth):Number(state.optimisticGrowth);
+ if(isCryptoAsset(s)&&useMode==="auto") return Number(s.current);
  if(useMode==="auto") return Number(s.current)*Math.pow(1+g/100,y-currentYear());
  return Number(s[mode][y]??s.current);
 };
 const stockValue=(s,y=currentYear(),mode="base")=>{
  let v=Number(s.quantity)*stockPrice(s,y,mode);
- return s.currency==="USD"?v*state.usdIdr:v;
+ return normalizeQuoteValueToIdr(v,s.currency,state.usdIdr);
 };
 const invested=(s)=>{
  let v=Number(s.quantity)*Number(s.avg);
- return s.currency==="USD"?v*state.usdIdr:v;
+ return normalizeQuoteValueToIdr(v,s.currency,state.usdIdr);
 };
 const stockExtrasValue=()=>Math.max(0,Number(state.stockExtras?.netcashIdr||0))+Math.max(0,Number(state.stockExtras?.walletUsd||0))*Number(state.usdIdr||0);
 const investmentDividendReceivables=()=>dividendReceivables(state.dividends||[],state.usdIdr);
@@ -265,6 +273,7 @@ function setStockWorkspace(view,{refresh=true}={}){
  kicker.textContent=next==="trading"?"ACTIVE PORTFOLIO & PERFORMANCE":"LONG-TERM PORTFOLIO & TARGETS";
  title.textContent=next==="trading"?"Stocks · Trading":"Stocks · Investment";
  applyLanguage();
+ syncCryptoMarketData();
  if(refresh&&next==="trading"&&stockRefreshStarted)queueMicrotask(()=>refreshTradingPrices({silent:true}));
  if(refresh&&next==="investment"&&stockRefreshStarted)queueMicrotask(()=>refreshInvestmentDividends({silent:true}));
  if(window.matchMedia("(max-width:1024px)").matches)window.scrollTo({top:0,left:0,behavior:"auto"});
@@ -278,6 +287,7 @@ function switchPage(p,{preserveScroll=false}={}){
  kicker.textContent=map[p][0]; title.textContent=map[p][1];
  if(p==="stocks")setStockWorkspace(state.stockView||"investment",{refresh:!preserveScroll});
  applyLanguage();
+ syncCryptoMarketData();
  if(window.matchMedia("(max-width:1024px)").matches&&!preserveScroll)window.scrollTo({top:0,left:0,behavior:"auto"});
 }
 
@@ -608,11 +618,17 @@ function renderStocks(){
   usdIdrRate.title=meta?.asOf?`${providerLabel} · updated ${new Date(meta.asOf).toLocaleString("en-GB",{dateStyle:"medium",timeStyle:"short"})}`:"Last saved exchange rate";
  }
  holdingsBody.innerHTML=state.stocks.map((s,i)=>{
-  const stale=isPriceStale(s), status=s.priceStatus||"manual", stamp=s.priceAsOf?new Date(s.priceAsOf).toLocaleString("en-GB",{dateStyle:"medium",timeStyle:"short"}):"Never";
+  const stale=isPriceStale(s), crypto=isCryptoAsset(s), status=s.priceStatus||"manual", stamp=s.priceAsOf?new Date(s.priceAsOf).toLocaleString("en-GB",{dateStyle:"medium",timeStyle:"short"}):"Never";
   const statusLabel=status==="manual"?"MANUAL FALLBACK":status;
-  const qty=quantityForDisplay(s), unit=quantityUnit(s.market);
+  const qty=quantityForDisplay(s), unit=quantityUnit(s.market), quantityStep=crypto?".00000001":".000001", priceStep=crypto?".00000001":".01";
+  const marketSelect=(crypto?["CRYPTO"]:["IDX","NASDAQ","NYSE"]).map(market=>`<option ${s.market===market?"selected":""}>${market}</option>`).join("");
+  const cryptoCurrentAttr=crypto?`data-crypto-holding-current="${s.id}"`:"";
+  const cryptoValueAttr=crypto?`data-crypto-holding-value="${s.id}"`:"";
+  const cryptoPlAttr=crypto?`data-crypto-holding-pl="${s.id}"`:"";
+  const cryptoPctAttr=crypto?`data-crypto-holding-pct="${s.id}"`:"";
+  const cryptoStatusAttr=crypto?`data-crypto-holding-status="${s.id}"`:"";
   const pl=stockValue(s)-invested(s);
-  return `<tr><td data-label="Ticker"><input data-stock="${i}" data-field="ticker" value="${s.ticker}"></td><td data-label="Market"><select data-stock="${i}" data-field="market"><option ${s.market==="IDX"?"selected":""}>IDX</option><option ${s.market==="NASDAQ"?"selected":""}>NASDAQ</option><option ${s.market==="NYSE"?"selected":""}>NYSE</option></select></td><td data-label="Provider Symbol"><input data-stock="${i}" data-field="providerSymbol" value="${s.providerSymbol||s.ticker}"></td><td data-label="Currency"><input value="${s.currency}" title="Selected automatically from market" disabled></td><td data-label="Quantity"><div class="quantity-field"><input data-stock="${i}" data-field="quantity" type="number" min="0" step=".000001" value="${qty}"><small>${unit}</small></div></td><td data-label="Average / Share"><input data-stock="${i}" data-field="avg" type="number" step=".01" value="${s.avg}"></td><td data-label="Current / Fallback"><input data-stock="${i}" data-field="current" type="number" step=".01" value="${s.current}" title="Latest price. Edit only to set a manual fallback."></td><td data-label="Price State"><span class="price-state ${stale?'stale':''}">${stale?'STALE · ':''}${statusLabel}</span><small class="price-time">${stamp}</small></td><td data-label="Value" class="private">${fmt(stockValue(s))}</td><td data-label="Profit / Loss" class="private holding-pl ${pl<0?"negative":pl>0?"positive":""}"><b>${fmt(pl)}</b><small>${percent(pl,invested(s))}</small></td><td class="stock-remove"><button class="icon-mini" data-del-stock="${i}" title="Remove" aria-label="Remove ${s.ticker}">🗑</button></td></tr>`;
+  return `<tr><td data-label="Ticker"><input data-stock="${i}" data-field="ticker" value="${s.ticker}"></td><td data-label="Market"><select data-stock="${i}" data-field="market">${marketSelect}</select></td><td data-label="Provider Symbol"><input data-stock="${i}" data-field="providerSymbol" value="${s.providerSymbol||s.ticker}" ${crypto?"disabled":""}></td><td data-label="Currency"><input value="${s.currency}" title="Selected automatically from market" disabled></td><td data-label="Quantity"><div class="quantity-field"><input data-stock="${i}" data-field="quantity" type="number" min="0" step="${quantityStep}" value="${crypto?plainCryptoNumber(qty):qty}"><small>${unit}</small></div></td><td data-label="Average / Share"><input data-stock="${i}" data-field="avg" type="number" step="${priceStep}" value="${crypto?plainCryptoNumber(s.avg):s.avg}"></td><td data-label="Current / Fallback"><input data-stock="${i}" data-field="current" type="number" step="${priceStep}" value="${crypto?plainCryptoNumber(s.current):s.current}" title="${crypto?"Live Binance price in USDT":"Latest price. Edit only to set a manual fallback."}" ${crypto?`disabled ${cryptoCurrentAttr}`:""}></td><td data-label="Price State"><span class="price-state ${stale?'stale':''}" ${cryptoStatusAttr}>${stale?'STALE · ':''}${statusLabel}</span><small class="price-time">${stamp}</small></td><td data-label="Value" class="private" ${cryptoValueAttr}>${fmt(stockValue(s))}</td><td data-label="Profit / Loss" class="private holding-pl ${pl<0?"negative":pl>0?"positive":""}" ${cryptoPlAttr}><b>${fmt(pl)}</b><small ${cryptoPctAttr}>${percent(pl,invested(s))}</small></td><td class="stock-remove"><button class="icon-mini" data-del-stock="${i}" title="Remove" aria-label="Remove ${s.ticker}">🗑</button></td></tr>`;
  }).join("");
  qa("[data-stock]").forEach(el=>el.onchange=()=>{
   const i=Number(el.dataset.stock),f=el.dataset.field,s=state.stocks[i];
@@ -669,10 +685,14 @@ function dividendEligibilityView(event,holding=state.stocks.find(row=>row.id===e
 
 function renderDividends(){
  const year=currentYear();
- if(reconcileDividendState(state,{year}))queueMicrotask(()=>save({background:true}));
- const events=state.dividends||[],summary=summarizeDividends(events,year,state.usdIdr,new Date());
+ const investmentStocks=state.stocks.filter(row=>!isCryptoAsset(row));
+ const investmentIds=new Set(investmentStocks.map(row=>row.id));
+ const events=(state.dividends||[]).filter(event=>investmentIds.has(event.holdingId));
+ const dividendViewState={...state,dividends:events};
+ if(reconcileDividendState(dividendViewState,{year}))queueMicrotask(()=>save({background:true}));
+ const summary=summarizeDividends(events,year,state.usdIdr,new Date());
  const paidRows=events.filter(event=>event.creditedAt).sort((a,b)=>String(b.creditedAt).localeCompare(String(a.creditedAt)));
- if(!state.stocks.length){dividendSummary.innerHTML="";dividendTickerList.innerHTML=`<div class="dividend-empty"><b>No Investment holdings</b><span>Dividend rows appear dynamically after you add an Investment ticker.</span></div>`;dividendCreditHistory.innerHTML="";addDividendBtn.disabled=true;dividendSyncMeta.textContent="No Investment tickers";return;}
+ if(!investmentStocks.length){dividendSummary.innerHTML="";dividendTickerList.innerHTML=`<div class="dividend-empty"><b>No equity Investment holdings</b><span>Crypto assets do not participate in the Dividend feature.</span></div>`;dividendCreditHistory.innerHTML="";addDividendBtn.disabled=true;dividendSyncMeta.textContent="No equity tickers";return;}
  const nextDate=summary.next?.paymentDate||summary.next?.recordDate||summary.next?.exDate||"—";
  dividendSummary.innerHTML=[
   ["Remaining this year",fmt(summary.remaining),summary.remaining?"Confirmed + receivable":"No remaining confirmed dividend"],
@@ -681,7 +701,7 @@ function renderDividends(){
   ["Next payment",nextDate,summary.next?`${summary.next.ticker} · ${formatDividendNative(summary.next.amountPerShare,summary.next.currency)} / share`:"No scheduled payment"]
  ].map(([label,value,note])=>`<article class="dividend-summary-card"><small>${label}</small><strong class="private">${value}</strong><span>${note}</span></article>`).join("");
  addDividendBtn.disabled=false;
- dividendTickerList.innerHTML=state.stocks.map(holding=>{
+ dividendTickerList.innerHTML=investmentStocks.map(holding=>{
   const rows=events.filter(event=>event.holdingId===holding.id).sort((a,b)=>String(b.paymentDate||b.recordDate||b.exDate).localeCompare(String(a.paymentDate||a.recordDate||a.exDate)));
   const currentRows=rows.filter(event=>dividendEventYear(event)===year&&event.status!=="cancelled"),perShare=currentRows.reduce((sum,event)=>sum+Number(event.amountPerShare||0),0),holdingTotal=currentRows.reduce((sum,event)=>sum+dividendGross(event,state.usdIdr),0);
   const today=todayISO(),remaining=currentRows.filter(event=>!event.creditedAt&&(event.status==="receivable"||String(event.paymentDate||event.recordDate||event.exDate)>=today)).reduce((sum,event)=>sum+dividendGross(event,state.usdIdr),0);
@@ -705,8 +725,8 @@ function renderDividends(){
 }
 
 function openDividendEditor(eventId){
- const existing=(state.dividends||[]).find(row=>row.id===eventId),holding=state.stocks.find(row=>row.id===(existing?.holdingId||state.stocks[0]?.id));if(!holding)return;
- const holdingOptions=state.stocks.map(row=>`${row.ticker} · ${row.id}`);
+ const existing=(state.dividends||[]).find(row=>row.id===eventId),investmentStocks=state.stocks.filter(row=>!isCryptoAsset(row)),holding=state.stocks.find(row=>row.id===(existing?.holdingId||investmentStocks[0]?.id));if(!holding)return;
+ const holdingOptions=investmentStocks.map(row=>`${row.ticker} · ${row.id}`);
  openSimple(existing?`Edit ${existing.ticker} Dividend`:"Add Investment Dividend",[
   {key:"holding",label:"Investment Ticker",options:holdingOptions,value:`${holding.ticker} · ${holding.id}`},
   {key:"type",label:"Dividend Type",options:["regular","interim","final","special"],value:existing?.type||"regular"},
@@ -730,18 +750,23 @@ function openDividendEditor(eventId){
  });
 }
 
+function tradingEquityBenchmarkMetrics(){
+ return equityBenchmarkMetrics({positions:state.tradingPositions,ledger:state.tradingLedger,fxRate:state.usdIdr});
+}
 function recordTradingSnapshot(spyPrice=Number(state.spyQuote?.price||state.tradingSnapshots.at(-1)?.spyPrice||0)){
  if(!state.tradingLedger.length&&!state.tradingPositions.length)return null;
  const existing=state.tradingSnapshots.find(item=>item.date===todayISO());
- const row=upsertDailySnapshot(state.tradingSnapshots,tradingStats(),Number(existing?.spyPrice||spyPrice),new Date());
+ const row=upsertDailySnapshot(state.tradingSnapshots,{...tradingStats(),...Object.fromEntries(Object.entries(tradingEquityBenchmarkMetrics()).map(([key,value])=>[`benchmark${key[0].toUpperCase()}${key.slice(1)}Idr`,value]))},Number(existing?.spyPrice||spyPrice),new Date());
  row.id ||= createId();
  return row;
 }
 function recordTradingOpeningSnapshot(position,date){
  const snapshotDate=String(date||todayISO()).slice(0,10),cost=tradingPositionCost(position,state.usdIdr);
  let row=state.tradingSnapshots.find(item=>item.date===snapshotDate);
- if(!row){row={id:createId(),date:snapshotDate,equityIdr:0,netContributionsIdr:0,holdingsValueIdr:0,cashValueIdr:0,spyPrice:0};state.tradingSnapshots.push(row);}
+ if(!row){row={id:createId(),date:snapshotDate,equityIdr:0,netContributionsIdr:0,holdingsValueIdr:0,cashValueIdr:0,spyPrice:0,benchmarkEquityIdr:0,benchmarkExternalFlowsIdr:0,benchmarkHoldingsValueIdr:0,benchmarkCashValueIdr:0};state.tradingSnapshots.push(row);}
+ row.benchmarkEquityIdr=Number(row.benchmarkEquityIdr??row.equityIdr??0);row.benchmarkExternalFlowsIdr=Number(row.benchmarkExternalFlowsIdr??row.netContributionsIdr??0);row.benchmarkHoldingsValueIdr=Number(row.benchmarkHoldingsValueIdr??row.holdingsValueIdr??0);row.benchmarkCashValueIdr=Number(row.benchmarkCashValueIdr??row.cashValueIdr??0);
  row.equityIdr=Number(row.equityIdr||0)+cost;row.netContributionsIdr=Number(row.netContributionsIdr||0)+cost;row.holdingsValueIdr=Number(row.holdingsValueIdr||0)+cost;
+ if(!isCryptoAsset(position)){row.benchmarkEquityIdr+=cost;row.benchmarkExternalFlowsIdr+=cost;row.benchmarkHoldingsValueIdr+=cost;}
  state.tradingSnapshots.sort((a,b)=>a.date.localeCompare(b.date));return row;
 }
 
@@ -751,6 +776,8 @@ function renderTrading(){
  if(closedPositionState.closedPositionIds.length){state.tradingPositions=closedPositionState.positions;state.tradingLedger=closedPositionState.ledger;}
  if(repairedPositionState||closedPositionState.closedPositionIds.length){recordTradingSnapshot();queueMicrotask(()=>save({background:true}));}
  const activeTradingPositions=state.tradingPositions.filter(position=>Number(position.quantity)>1e-9);
+ const hasCryptoTrading=state.tradingPositions.some(isCryptoAsset)||state.tradingLedger.some(row=>row.assetType==="crypto");
+ const hasEquityBenchmark=state.tradingPositions.some(row=>!isCryptoAsset(row))||state.tradingLedger.some(row=>!isCryptoAsset(row));
  const metrics=tradingStats();
  const compactMobile=window.matchMedia("(max-width:680px)").matches;
  const money=value=>fmt(value,compactMobile);
@@ -769,16 +796,18 @@ function renderTrading(){
  tradingQuoteSource.textContent=compactMobile?fullCoverage.replace(/\s+PRIMARY/gi,"").replace(/\s+BACKUP/gi,""):fullCoverage;
  tradingQuoteSource.title=fullCoverage;
 
- const snapshots=performancePreview(state.tradingSnapshots,metrics,state.spyQuote?.price,new Date());
- const series=performanceSeries(snapshots,state.tradingRange||"YTD",new Date());
+ const benchmarkMetrics=tradingEquityBenchmarkMetrics();
+ const benchmarkSnapshots=state.tradingSnapshots.map(row=>({...row,equityIdr:Number(row.benchmarkEquityIdr??row.equityIdr),netContributionsIdr:Number(row.benchmarkExternalFlowsIdr??row.netContributionsIdr),holdingsValueIdr:Number(row.benchmarkHoldingsValueIdr??row.holdingsValueIdr),cashValueIdr:Number(row.benchmarkCashValueIdr??row.cashValueIdr)}));
+ const snapshots=performancePreview(benchmarkSnapshots,benchmarkMetrics,state.spyQuote?.price,new Date());
+ const series=hasEquityBenchmark?performanceSeries(snapshots,state.tradingRange||"YTD",new Date()):{labels:[],portfolio:[],spy:[],portfolioReturn:0,spyReturn:0};
  const alpha=series.portfolioReturn-series.spyReturn;
  tradingPeriodReturn.textContent=`${series.portfolioReturn>=0?"+":""}${series.portfolioReturn.toFixed(2)}%`;
  spyPeriodReturn.textContent=`${series.spyReturn>=0?"+":""}${series.spyReturn.toFixed(2)}%`;
  tradingAlpha.textContent=`${alpha>=0?"+":""}${alpha.toFixed(2)}%`;
- spyCurrentPrice.textContent=Number(state.spyQuote?.price)>0?new Intl.NumberFormat("en-US",{style:"currency",currency:"USD",minimumFractionDigits:2,maximumFractionDigits:4}).format(state.spyQuote.price):"Waiting for API";
- spyCurrentMeta.textContent=state.spyQuote?.asOf?`${String(state.spyQuote.provider||"API").toUpperCase()} · ${new Date(state.spyQuote.asOf).toLocaleString("en-GB",{dateStyle:"medium",timeStyle:"short"})}`:"Current SPY quote";
+ spyCurrentPrice.textContent=!hasEquityBenchmark?"N/A":Number(state.spyQuote?.price)>0?new Intl.NumberFormat("en-US",{style:"currency",currency:"USD",minimumFractionDigits:2,maximumFractionDigits:4}).format(state.spyQuote.price):"Waiting for API";
+ spyCurrentMeta.textContent=!hasEquityBenchmark?"Crypto benchmark unavailable in v8.2.0":hasCryptoTrading?"Equity benchmark only · Crypto excluded":state.spyQuote?.asOf?`${String(state.spyQuote.provider||"API").toUpperCase()} · ${new Date(state.spyQuote.asOf).toLocaleString("en-GB",{dateStyle:"medium",timeStyle:"short"})}`:"Current SPY quote";
  tradingPeriodReturn.className=series.portfolioReturn<0?"negative":"positive";spyPeriodReturn.className=series.spyReturn<0?"negative":"positive";tradingAlpha.className=alpha<0?"negative":"positive";
- tradingPerformanceChart.innerHTML=series.labels.length?lineMulti([
+ tradingPerformanceChart.innerHTML=!hasEquityBenchmark?`<div class="trading-empty"><b>Crypto benchmark: N/A</b><span>No equity component is available for SPY comparison.</span></div>`:series.labels.length?lineMulti([
   {name:"Portfolio",vals:series.portfolio,color:"#2bd49a"},{name:"SPY",vals:series.spy,color:"#a460e8"}
  ],series.labels.map(label=>label.includes("T")?"NOW":label.slice(5))):`<div class="trading-empty"><b>Performance starts with your first position or deposit</b><span>Trading is optional and may remain at zero.</span></div>`;
  qa("[data-trading-range]").forEach(button=>button.classList.toggle("active",button.dataset.tradingRange===(state.tradingRange||"YTD")));
@@ -787,15 +816,15 @@ function renderTrading(){
   const value=tradingPositionValue(position,state.usdIdr),cost=tradingPositionCost(position,state.usdIdr),pl=value-cost,pct=cost?pl/cost*100:0;
   const quoteTime=position.priceAsOf?new Date(position.priceAsOf).toLocaleString("en-GB",{dateStyle:"medium",timeStyle:"short"}):"Waiting for API quote";
   const status=position.priceStatus||"saved";
-  const currentUsd=new Intl.NumberFormat("en-US",{style:"currency",currency:position.currency||"USD",minimumFractionDigits:2,maximumFractionDigits:4}).format(Number(position.current||0));
-  return `<article class="trading-position-card" data-trading-position="${position.id}"><div class="trading-position-head"><div><h4>${escapeHtml(position.ticker)}</h4><small>${position.market} · ${position.currency} · ${Number(position.quantity).toLocaleString("en-US",{maximumFractionDigits:6})} shares</small></div><span class="trading-position-state ${isPriceStale(position)?"stale":""}">${escapeHtml(status)}</span></div><div class="trading-current-price"><small>CURRENT PRICE</small><strong class="private">${currentUsd}</strong></div><div class="trading-position-value"><span><small>POSITION VALUE</small><b class="private">${money(value)}</b></span><span class="${pl<0?"negative":pl>0?"positive":""}"><b class="private">${pl>=0?"+":""}${money(pl)}</b><small>${pct>=0?"+":""}${pct.toFixed(2)}%</small></span></div><div class="trading-position-meta"><span><small>AVG / SHARE</small><b>${plainNumber(position.avg)}</b></span><span><small>TARGET PRICE</small><b>${position.targetPrice?plainNumber(position.targetPrice):"—"}</b></span><span><small>INVESTED</small><b class="private">${money(cost)}</b></span></div><div class="trading-position-actions"><button class="buy" type="button" data-trading-buy="${position.id}">BUY MORE</button><button class="sell" type="button" data-trading-sell="${position.id}" ${Number(position.quantity)<=0?"disabled":""}>SELL</button><button class="delete" type="button" data-trading-delete="${position.id}">DELETE</button></div><small class="price-time">${escapeHtml(quoteTime)}</small></article>`;
+  const crypto=isCryptoAsset(position),currentUsd=new Intl.NumberFormat("en-US",{style:"currency",currency:position.currency||"USD",minimumFractionDigits:2,maximumFractionDigits:4}).format(Number(position.current||0)),currentLabel=crypto?`${plainCryptoNumber(position.current)} USDT`:currentUsd;
+  return `<article class="trading-position-card" data-trading-position="${position.id}"><div class="trading-position-head"><div><h4>${escapeHtml(position.ticker)}</h4><small>${position.market} · ${position.currency} · ${Number(position.quantity).toLocaleString("en-US",{maximumFractionDigits:8})} ${crypto?"units":"shares"}</small></div><span class="trading-position-state ${isPriceStale(position)?"stale":""}" ${crypto?`data-crypto-position-status="${position.id}"`:""}>${escapeHtml(status)}</span></div><div class="trading-current-price"><small>CURRENT PRICE</small><strong class="private" ${crypto?`data-crypto-position-current="${position.id}"`:""}>${currentLabel}</strong></div><div class="trading-position-value"><span><small>POSITION VALUE</small><b class="private" ${crypto?`data-crypto-position-value="${position.id}"`:""}>${money(value)}</b></span><span class="${pl<0?"negative":pl>0?"positive":""}"><b class="private" ${crypto?`data-crypto-position-pl="${position.id}"`:""}>${pl>=0?"+":""}${money(pl)}</b><small ${crypto?`data-crypto-position-pct="${position.id}"`:""}>${pct>=0?"+":""}${pct.toFixed(2)}%</small></span></div><div class="trading-position-meta"><span><small>AVG / SHARE</small><b>${crypto?plainCryptoNumber(position.avg):plainNumber(position.avg)} ${crypto?"USDT":""}</b></span><span><small>TARGET PRICE</small><b>${position.targetPrice?plainNumber(position.targetPrice):"—"} ${crypto&&position.targetPrice?"USDT":""}</b></span><span><small>INVESTED</small><b class="private">${money(cost)}</b></span></div><div class="trading-position-actions"><button class="buy" type="button" data-trading-buy="${position.id}">BUY MORE</button><button class="sell" type="button" data-trading-sell="${position.id}" ${Number(position.quantity)<=0?"disabled":""}>SELL</button><button class="delete" type="button" data-trading-delete="${position.id}">DELETE</button></div><small class="price-time">${escapeHtml(quoteTime)}</small></article>`;
  }).join(""):`<div class="trading-empty"><b>No active Trading position</b><span>Add one only when you want to track a separate trading portfolio.</span></div>`;
 
  const ledger=[...state.tradingLedger].sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.__createdAt||"").localeCompare(String(a.__createdAt||"")));
  tradingTradeCount.textContent=`${ledger.length} record${ledger.length===1?"":"s"}`;
  tradingLedgerList.innerHTML=ledger.length?ledger.map(row=>{
   const native=Math.abs(Number(row.quantity||0)*Number(row.price||0));
-  const amountIdr=row.type==="deposit"||row.type==="withdraw"?Math.abs(Number(row.externalFlowIdr||0)):native*(row.currency==="USD"?Number(row.fxRate||state.usdIdr):1);
+  const amountIdr=row.type==="deposit"||row.type==="withdraw"?Math.abs(Number(row.externalFlowIdr||0)):native*(["USD","USDT"].includes(String(row.currency||"").toUpperCase())?Number(row.fxRate||state.usdIdr):1);
   const label={opening:"OPEN",deposit:"FUNDS",withdraw:"WITHDRAW",buy:"BUY",sell:"SELL"}[row.type]||row.type.toUpperCase();
   return `<div class="trading-ledger-row ${row.type}"><i>${row.type==="sell"?"↗":row.type==="buy"||row.type==="opening"?"↘":row.type==="deposit"?"+":"−"}</i><div><b>${label}${row.ticker?` · ${escapeHtml(row.ticker)}`:""}</b><small>${row.date}${row.quantity?` · ${Number(row.quantity).toLocaleString("en-US",{maximumFractionDigits:6})} @ ${plainNumber(row.price)} ${row.currency}`:""}</small></div><strong class="private">${row.type==="buy"?"−":row.type==="sell"?"+":""}${money(amountIdr)}${row.realizedPlIdr?`<small class="${row.realizedPlIdr<0?"negative":"positive"}">P/L ${row.realizedPlIdr>=0?"+":""}${money(row.realizedPlIdr)}</small>`:""}</strong><button type="button" class="trading-ledger-delete" data-trading-ledger-delete="${row.id}" title="Delete this Trading record" aria-label="Delete ${label} record">🗑</button></div>`;
  }).join(""):`<div class="trading-empty"><b>No Trading records yet</b><span>Deposits, withdrawals, buys and sells remain permanently recorded here.</span></div>`;
@@ -1113,14 +1142,14 @@ function openSimple(title,fields,callback){
    : `<input id="sf_${f.key}" type="${f.type||'text'}" ${f.step?`step="${f.step}"`:''} ${f.inputmode?`inputmode="${f.inputmode}"`:''} ${f.value!==undefined?`value="${f.value}"`:''} ${f.required===false?'':'required'}>`;
   return `<label>${f.label}${input}</label>`;
  }).join("");
- simpleForm.onsubmit=(e)=>{
+ simpleForm.onsubmit=async(e)=>{
   e.preventDefault();
   const obj={};
   fields.forEach(f=>{
    const el=q("#sf_"+f.key);
    obj[f.key]=f.type==="number"?Number(el.value):el.value;
   });
-  const result=callback(obj);
+  const result=await callback(obj);
   if(result===false)return;
   simpleModal.close();
   save(); renderAll(); toastMsg(typeof result==="string"?result:result?.message||"Saved");
@@ -1264,12 +1293,98 @@ function autoDueDate(source){
  return `${target.getFullYear()}-${pad(target.getMonth()+1)}-${pad(target.getDate())}`;
 }
 
+function cryptoRows(){
+ return [...state.stocks,...state.tradingPositions].filter(isCryptoAsset);
+}
+function cryptoProviderSymbols(){
+ return [...new Set(cryptoRows().map(row=>String(row.providerSymbol||"").trim().toUpperCase()).filter(Boolean))];
+}
+function setCryptoMarketStatus({state:status="offline",reason=""}={}){
+ const element=q("#cryptoMarketStatus");
+ if(!element)return;
+ const label=status.toUpperCase();
+ element.textContent=`CRYPTO ${label}`;
+ element.className=`crypto-market-status crypto-status-${status}`;
+ element.title=reason||`Binance market data ${label.toLowerCase()}`;
+}
+function updateCryptoPriceNodes(providerSymbol){
+ const pair=String(providerSymbol||"").toUpperCase();
+ const stock=state.stocks.find(row=>String(row.providerSymbol||"").toUpperCase()===pair);
+ if(stock){
+  const value=stockValue(stock),cost=invested(stock),pl=value-cost;
+  qa(`[data-crypto-holding-current="${stock.id}"]`).forEach(element=>{if(document.activeElement!==element)element.value=plainCryptoNumber(stock.current);});
+  qa(`[data-crypto-holding-value="${stock.id}"]`).forEach(element=>element.textContent=fmt(value));
+  qa(`[data-crypto-holding-pl="${stock.id}"]`).forEach(element=>{element.textContent=fmt(pl);element.className=`private holding-pl ${pl<0?"negative":pl>0?"positive":""}`;});
+  qa(`[data-crypto-holding-pct="${stock.id}"]`).forEach(element=>element.textContent=percent(pl,cost));
+  qa(`[data-crypto-holding-status="${stock.id}"]`).forEach(element=>element.textContent=String(stock.priceStatus||"STALE").toUpperCase());
+ }
+ const position=state.tradingPositions.find(row=>String(row.providerSymbol||"").toUpperCase()===pair);
+ if(position){
+  const value=tradingPositionValue(position,state.usdIdr),cost=tradingPositionCost(position,state.usdIdr),pl=value-cost,pct=cost?pl/cost*100:0;
+  qa(`[data-crypto-position-current="${position.id}"]`).forEach(element=>element.textContent=`${plainCryptoNumber(position.current)} USDT`);
+  qa(`[data-crypto-position-value="${position.id}"]`).forEach(element=>element.textContent=fmt(value));
+  qa(`[data-crypto-position-pl="${position.id}"]`).forEach(element=>element.textContent=`${pl>=0?"+":""}${fmt(pl)}`);
+  qa(`[data-crypto-position-pct="${position.id}"]`).forEach(element=>element.textContent=`${pct>=0?"+":""}${pct.toFixed(2)}%`);
+  qa(`[data-crypto-position-status="${position.id}"]`).forEach(element=>element.textContent=String(position.priceStatus||"STALE").toUpperCase());
+ }
+}
+function renderCryptoSummary(){
+ if(state.page==="stocks"&&state.stockView==="investment"){
+  const grossHoldings=holdingsPortfolio(),inv=state.stocks.reduce((sum,row)=>sum+invested(row),0),pl=grossHoldings-inv;
+  portfolioValue.textContent=fmt(netPortfolio());
+  portfolioInvested.textContent=fmt(inv);
+  portfolioPL.textContent=`${fmt(pl)} · ${percent(pl,inv)}`;
+  portfolioPL.className=`private ${pl<0?"negative":pl>0?"positive":""}`;
+ }
+ if(state.page==="stocks"&&state.stockView==="trading"){
+  const metrics=tradingStats();
+  tradingEquity.textContent=fmt(metrics.equity,true);
+  tradingUnrealizedPl.textContent=`${metrics.unrealized>=0?"+":""}${fmt(metrics.unrealized,true)}`;
+  tradingTotalPl.textContent=`${metrics.realized>=0?"+":""}${fmt(metrics.realized,true)} · ${metrics.realizedReturn>=0?"+":""}${metrics.realizedReturn.toFixed(2)}%`;
+ }
+ if(state.page==="accumulation")renderAccumulation();
+ if(state.page==="prospect")renderProspect();
+ if(state.page==="insights")renderInsights();
+}
+function scheduleCryptoSummary(){
+ if(cryptoSummaryFrame)return;
+ const run=()=>{cryptoSummaryFrame=null;renderCryptoSummary();};
+ cryptoSummaryFrame=typeof requestAnimationFrame==="function"?requestAnimationFrame(run):setTimeout(run,250);
+}
+function handleCryptoTicker(providerSymbol,quote){
+ if(!Number.isFinite(Number(quote?.price))||Number(quote.price)<=0)return;
+ const apply=row=>{
+  row.current=Number(quote.price);
+  row.priceSource="binance";
+  row.priceStatus=quote.status||"stale";
+  row.priceAsOf=quote.asOf||new Date().toISOString();
+  row.lastPriceFetchAt=new Date().toISOString();
+  row.changePercent=Number(quote.changePercent);
+ };
+ state.stocks.filter(row=>String(row.providerSymbol||"").toUpperCase()===String(providerSymbol).toUpperCase()).forEach(apply);
+ state.tradingPositions.filter(row=>String(row.providerSymbol||"").toUpperCase()===String(providerSymbol).toUpperCase()).forEach(apply);
+ updateCryptoPriceNodes(providerSymbol);
+ scheduleCryptoSummary();
+}
+function syncCryptoMarketData(){
+ const symbols=state.page==="stocks"?cryptoProviderSymbols():[];
+ if(!cryptoMarketStream)cryptoMarketStream=new CryptoMarketStream({onTicker:handleCryptoTicker,onStatus:setCryptoMarketStatus});
+ cryptoMarketStream.setSymbols(symbols);
+}
+async function refreshCryptoMarketData(){
+ const symbols=cryptoProviderSymbols();
+ for(const symbol of symbols){
+  try{handleCryptoTicker(symbol,await fetchBinanceTicker(symbol));}
+  catch(error){setCryptoMarketStatus({state:"stale",reason:error.message});}
+ }
+}
+
 async function refreshStockPrices({silent=false}={}){
- if(!navigator.onLine||!state.stocks.length)return;
+ if(!navigator.onLine)return;
  if(typeof refreshStocksBtn!=="undefined")refreshStocksBtn.disabled=true;
  if(normalizeStockMappings())await save();
  let updated=0,failed=0;
- for(const stock of state.stocks){
+ for(const stock of state.stocks.filter(row=>!isCryptoAsset(row))){
   try{
    const quote=await fetchHoldingQuote(stock.id);
    stock.current=Number(quote.price);stock.priceSource=quote.provider;stock.priceStatus=quote.status;
@@ -1285,23 +1400,24 @@ async function refreshStockPrices({silent=false}={}){
 }
 
 async function refreshInvestmentDividends({silent=false,force=false}={}){
- if(!navigator.onLine||!state.stocks.length){if(!state.stocks.length)renderDividends();return false;}
+ const investmentStocks=state.stocks.filter(row=>!isCryptoAsset(row));
+ if(!navigator.onLine||!investmentStocks.length){if(!investmentStocks.length)renderDividends();return false;}
  if(dividendRefreshPromise)return dividendRefreshPromise;
- const holdingSignature=state.stocks.map(stock=>stock.id).sort().join(",");
+ const holdingSignature=investmentStocks.map(stock=>stock.id).sort().join(",");
  const refreshKey=`cvfinance-dividends-refresh:${todayISO()}:${holdingSignature}`;
  if(!force&&localStorage.getItem(refreshKey)==="done")return false;
  dividendRefreshPromise=(async()=>{
   if(typeof refreshDividendsBtn!=="undefined")refreshDividendsBtn.disabled=true;
   if(typeof dividendSyncMeta!=="undefined")dividendSyncMeta.textContent="Checking confirmed dividends…";
   const incoming=[];let succeeded=0,failed=0;const coverage=new Set();
-  for(const stock of state.stocks){
+  for(const stock of investmentStocks){
    try{
     const result=await fetchHoldingDividends(stock.id);
     (result.events||[]).forEach(event=>incoming.push({...event,holdingId:stock.id}));
     if(result.coverage)coverage.add(result.coverage);succeeded++;
    }catch{failed++;}
   }
-  const merged=mergeDividendEvents(state.dividends||(state.dividends=[]),incoming,state.stocks,createId,new Date());
+  const merged=mergeDividendEvents(state.dividends||(state.dividends=[]),incoming,investmentStocks,createId,new Date());
   const reconciled=reconcileDividendState(state,{year:currentYear()});
   const advanced=advanceDividendLifecycle(state,new Date());
   if(succeeded)localStorage.setItem(refreshKey,"done");
@@ -1322,26 +1438,36 @@ async function refreshTradingPrices({silent=false,force=false}={}){
   if(typeof refreshTradingBtn!=="undefined")refreshTradingBtn.disabled=true;
   let updated=0,failed=0,lastCoverage="";
   const activePositions=state.tradingPositions.filter(position=>Number(position.quantity)>1e-9);
-  const quotes=new Map(),symbols=[...new Set(activePositions.map(position=>String(position.providerSymbol||position.ticker).trim().toUpperCase()).filter(Boolean))];
+  const equityPositions=activePositions.filter(position=>!isCryptoAsset(position));
+  const cryptoPositions=activePositions.filter(isCryptoAsset);
+  const quotes=new Map(),symbols=[...new Set(equityPositions.map(position=>String(position.providerSymbol||position.ticker).trim().toUpperCase()).filter(Boolean))];
   for(const symbol of symbols){
    try{const quote=await fetchTradingQuote(symbol,{force});quotes.set(symbol,quote);lastCoverage=quote.coverage||quote.provider;}
    catch(error){quotes.set(symbol,{error});}
   }
-  for(const position of activePositions){
+  for(const position of equityPositions){
    const symbol=String(position.providerSymbol||position.ticker).trim().toUpperCase(),quote=quotes.get(symbol);
    if(quote&&!quote.error){position.current=Number(quote.price);position.priceSource=quote.provider;position.priceStatus=quote.status;position.priceAsOf=quote.asOf;position.lastPriceFetchAt=new Date().toISOString();updated++;}
    else{position.priceStatus=`saved price · ${quote?.error?.code||"provider unavailable"}`;position.lastPriceFetchAt=new Date().toISOString();failed++;}
   }
-  try{const spy=quotes.get("SPY")||await fetchTradingQuote("SPY",{force});state.spyQuote={price:Number(spy.price),asOf:spy.asOf,provider:spy.provider};lastCoverage=spy.coverage||lastCoverage;}
-  catch(error){state.spyQuote={...(state.spyQuote||{}),error:error.message};}
-  try{
-   const history=await fetchTradingBenchmark(),bars=[...(history.bars||[])].sort((a,b)=>a.date.localeCompare(b.date));
-   state.tradingSnapshots.forEach(snapshot=>{const exactOrPrevious=[...bars].reverse().find(bar=>bar.date<=snapshot.date);if(exactOrPrevious)snapshot.spyPrice=Number(exactOrPrevious.close);});
-  }catch{}
+  const hasCryptoTrading=cryptoPositions.length>0||state.tradingLedger.some(row=>row.assetType==="crypto");
+  const hasEquityBenchmark=equityPositions.length>0||state.tradingLedger.some(row=>!isCryptoAsset(row));
+  if(hasEquityBenchmark){
+   try{const spy=quotes.get("SPY")||await fetchTradingQuote("SPY",{force});state.spyQuote={price:Number(spy.price),asOf:spy.asOf,provider:spy.provider};lastCoverage=spy.coverage||lastCoverage;}
+   catch(error){state.spyQuote={...(state.spyQuote||{}),error:error.message};}
+   try{
+    const history=await fetchTradingBenchmark(),bars=[...(history.bars||[])].sort((a,b)=>a.date.localeCompare(b.date));
+    state.tradingSnapshots.forEach(snapshot=>{const exactOrPrevious=[...bars].reverse().find(bar=>bar.date<=snapshot.date);if(exactOrPrevious)snapshot.spyPrice=Number(exactOrPrevious.close);});
+   }catch{}
+  }else{
+   state.spyQuote=null;
+   lastCoverage="Crypto benchmark N/A";
+  }
+  await refreshCryptoMarketData();
   if(lastCoverage)state.tradingQuoteMeta={coverage:lastCoverage,asOf:new Date().toISOString()};
   recordTradingSnapshot();
   await save({background:silent});if(!hasActiveEditor())renderAllPreservingScroll();
-  if(!silent)toastMsg(`${updated} Trading price${updated===1?"":"s"} updated${failed?`, ${failed} saved fallback`:""} · SPY compared`);
+  if(!silent)toastMsg(`${updated} Trading price${updated===1?"":"s"} updated${failed?`, ${failed} saved fallback`:""} · ${!hasEquityBenchmark?"Crypto benchmark N/A":hasCryptoTrading?"Equity benchmark · Crypto excluded":"SPY compared"}`);
  })().finally(()=>{if(typeof refreshTradingBtn!=="undefined")refreshTradingBtn.disabled=false;tradingRefreshPromise=null;});
  return tradingRefreshPromise;
 }
@@ -1384,6 +1510,8 @@ async function refreshMarkets({silent=false}={}){
  await refreshStockPrices({silent:true});
  await refreshInvestmentDividends({silent:true});
  if(state.page==="stocks"&&state.stockView==="trading")await refreshTradingPrices({silent:true});
+ else await refreshCryptoMarketData();
+ syncCryptoMarketData();
  if(!silent)toastMsg("Market prices and USD/IDR updated");
 }
 
@@ -1392,7 +1520,7 @@ async function validateStockSymbols(){
  if(typeof validateSymbolsBtn!=="undefined")validateSymbolsBtn.disabled=true;
  const results=[];
  for(const stock of state.stocks){
-  try{await validateHoldingSymbol(stock.id);results.push(`${stock.ticker}: OK`)}
+  try{if(isCryptoAsset(stock))await resolveCryptoSymbol(normalizeCryptoSymbol(stock.ticker),"USDT");else await validateHoldingSymbol(stock.id);results.push(`${stock.ticker}: OK`)}
   catch(error){results.push(`${stock.ticker}: ${error.message}`)}
  }
  if(typeof validateSymbolsBtn!=="undefined")validateSymbolsBtn.disabled=false;
@@ -1502,26 +1630,48 @@ addClientBtn.onclick=()=>openSimple("Add Client",[
  {key:"status",label:"Status",options:["paid","pending"],value:"pending"}
 ],o=>state.clients.push({id:createId(),...o,sortOrder:state.clients.filter(row=>(row.clientType||"recurring")===o.clientType).length,endingPaid:o.clientType==="ending"&&o.status==="paid",status:o.status==="paid"?"paid":"pending",trackingMonth:monthKey(new Date())}));
 addTickerBtn.onclick=()=>openSimple("Add Ticker",[
- {key:"ticker",label:"Ticker"},
- {key:"market",label:"Market",options:["IDX","NASDAQ","NYSE"],value:"NASDAQ"},
- {key:"providerSymbol",label:"Provider Symbol (leave blank to use ticker)",required:false},
- {key:"quantity",label:"Quantity (IDX = lots · US = shares)",type:"number",step:".000001"},
- {key:"avg",label:"Average Price / Share",type:"number",step:".01"},
- {key:"current",label:"Manual Fallback Price / Share",type:"number",step:".01",value:0}
-],o=>{o.id=createId();o.ticker=o.ticker.toUpperCase();o.displaySymbol=o.ticker;o.quantity=quantityForStorage(o.market,o.quantity);normalizeStockMapping(o);o.manualCurrent=o.current;o.priceSource="manual";o.priceStatus="manual";o.priceAsOf=null;o.base={};o.optimistic={};YEARS.slice(1).forEach(y=>{o.base[y]=o.current;o.optimistic[y]=o.current});state.stocks.push(o);queueMicrotask(()=>refreshInvestmentDividends({silent:true,force:true}));});
-addTradingPositionBtn.onclick=()=>openSimple("Add Trading Position",[
- {key:"ticker",label:"US Ticker"},{key:"market",label:"Market",options:["NASDAQ","NYSE","AMEX"],value:"NASDAQ"},
- {key:"quantity",label:"Shares",type:"number",step:".000001"},{key:"avg",label:"Entry Price / Share (USD)",type:"number",step:".01"},
- {key:"date",label:"Opening Date",type:"date",value:todayISO()}
-],values=>{
+ {key:"ticker",label:"Ticker / Crypto Symbol"},
+ {key:"market",label:"Market",options:["IDX","NASDAQ","NYSE","CRYPTO"],value:"NASDAQ"},
+ {key:"providerSymbol",label:"Provider Symbol (equity only)",required:false},
+ {key:"quantity",label:"Quantity (Crypto supports fractions)",type:"number",step:".00000001"},
+ {key:"avg",label:"Average Price / Unit",type:"number",step:".00000001"},
+ {key:"current",label:"Manual Fallback Price / Unit",type:"number",step:".00000001",value:0}
+],async values=>{
  const ticker=String(values.ticker||"").trim().toUpperCase();
+ if(!ticker){alert("Enter a ticker or crypto symbol.");return false;}
+ if(values.market==="CRYPTO"){
+  if(!(Number(values.quantity)>0)||!(Number(values.avg)>=0)){alert("Enter a valid fractional quantity and average price.");return false;}
+  try{
+   const base=normalizeCryptoSymbol(ticker),resolved=await resolveCryptoSymbol(base,"USDT"),quote=await fetchBinanceTicker(resolved.providerSymbol);
+   if(state.stocks.some(row=>isCryptoAsset(row)&&row.ticker===base)){alert(`${base} already exists in Investment.`);return false;}
+   const current=Number(quote.price),row={id:createId(),ticker:base,displaySymbol:base,assetType:"crypto",market:"CRYPTO",provider:"binance",providerSymbol:resolved.providerSymbol,currency:"USDT",quantity:Number(values.quantity),avg:Number(values.avg),current,manualCurrent:current,priceSource:"binance",priceStatus:quote.status,priceAsOf:quote.asOf,lastPriceFetchAt:new Date().toISOString(),base:{},optimistic:{}};
+   YEARS.slice(1).forEach(year=>{row.base[year]=current;row.optimistic[year]=current;});
+   state.stocks.push(row);syncCryptoMarketData();return "Crypto Investment asset added";
+  }catch(error){alert(error.message);return false;}
+ }
+ const row={...values,id:createId(),ticker,displaySymbol:ticker,assetType:"equity"};
+ row.quantity=quantityForStorage(row.market,row.quantity);normalizeStockMapping(row);row.manualCurrent=row.current;row.priceSource="manual";row.priceStatus="manual";row.priceAsOf=null;row.base={};row.optimistic={};YEARS.slice(1).forEach(y=>{row.base[y]=row.current;row.optimistic[y]=row.current});state.stocks.push(row);queueMicrotask(()=>refreshInvestmentDividends({silent:true,force:true}));
+});
+addTradingPositionBtn.onclick=()=>openSimple("Add Trading Position",[
+ {key:"ticker",label:"Ticker / Crypto Symbol"},{key:"market",label:"Market",options:["NASDAQ","NYSE","AMEX","CRYPTO"],value:"NASDAQ"},
+ {key:"quantity",label:"Quantity (Crypto supports fractions)",type:"number",step:".00000001"},{key:"avg",label:"Entry Price / Unit",type:"number",step:".00000001"},
+ {key:"date",label:"Opening Date",type:"date",value:todayISO()}
+],async values=>{
+ const ticker=String(values.ticker||"").trim().toUpperCase(),crypto=values.market==="CRYPTO";
+ if(!(Number(values.quantity)>0)||!(Number(values.avg)>=0)){alert("Enter a valid quantity and entry price.");return false;}
  if(state.tradingPositions.some(row=>row.ticker===ticker&&row.market===values.market&&Number(row.quantity)>1e-9)){alert(`${ticker} already has an active Trading position.`);return false;}
- if(!(Number(values.quantity)>0)||!(Number(values.avg)>=0)){alert("Enter a valid share quantity and entry price.");return false;}
+ let providerSymbol=ticker,currency="USD",assetType="equity",current=Number(values.avg),priceSource="saved entry",priceStatus="waiting for API";
+ if(crypto){
+  try{
+   const resolved=await resolveCryptoSymbol(normalizeCryptoSymbol(ticker),"USDT"),quote=await fetchBinanceTicker(resolved.providerSymbol);
+   providerSymbol=resolved.providerSymbol;currency="USDT";assetType="crypto";current=Number(quote.price);priceSource="binance";priceStatus=quote.status;
+  }catch(error){alert(error.message);return false;}
+ }
  const reusable=state.tradingPositions.find(row=>row.ticker===ticker&&row.market===values.market&&Number(row.quantity)<=1e-9);
  if(reusable)state.tradingLedger=state.tradingLedger.map(row=>row.positionId===reusable.id?{...row,positionId:null}:row);
- const position={id:reusable?.id||createId(),ticker,displaySymbol:ticker,providerSymbol:ticker,market:values.market,currency:"USD",quantity:Number(values.quantity),avg:Number(values.avg),current:Number(values.avg),manualCurrent:Number(values.avg),targetPrice:0,stopLoss:0,priceSource:"saved entry",priceStatus:"waiting for API",priceAsOf:null,lastPriceFetchAt:null,__createdAt:reusable?.__createdAt||new Date().toISOString()};
+ const position={id:reusable?.id||createId(),ticker,displaySymbol:ticker,assetType,providerSymbol,market:values.market,currency,quantity:Number(values.quantity),avg:Number(values.avg),current,manualCurrent:current,targetPrice:0,stopLoss:0,priceSource,priceStatus,priceAsOf:crypto?new Date().toISOString():null,lastPriceFetchAt:null,__createdAt:reusable?.__createdAt||new Date().toISOString()};
  if(reusable)Object.assign(reusable,position);else state.tradingPositions.push(position);
- state.tradingLedger.push({...applyOpeningPosition({position,date:values.date,fxRate:state.usdIdr,id:createId()}),__createdAt:new Date().toISOString()});recordTradingOpeningSnapshot(position,values.date);queueMicrotask(()=>refreshTradingPrices({silent:true,force:true}));
+ state.tradingLedger.push({...applyOpeningPosition({position,date:values.date,fxRate:state.usdIdr,id:createId()}),__createdAt:new Date().toISOString()});recordTradingOpeningSnapshot(position,values.date);syncCryptoMarketData();queueMicrotask(()=>refreshTradingPrices({silent:true,force:true}));
 });
 tradingDepositBtn.onclick=()=>openTradingCash("deposit","USD");
 qa("[data-trading-withdraw]").forEach(button=>button.onclick=()=>openTradingCash("withdraw",button.dataset.tradingWithdraw));
@@ -1613,7 +1763,7 @@ function applyCloudState(next,{preserveUi=false}={}){
  themeBtn.textContent=state.theme==="dark"?"☀":"☾";
  baseGrowth.value=state.baseGrowth;optimisticGrowth.value=state.optimisticGrowth;
  const dividendStateChanged=advanceDividendLifecycle(state,new Date());
- updateModeToggleLabels();renderAllPreservingScroll();switchPage(state.page,{preserveScroll:true});
+ updateModeToggleLabels();renderAllPreservingScroll();switchPage(state.page,{preserveScroll:true});syncCryptoMarketData();
  if(repairedPositionState||closedPositionState.closedPositionIds.length||dividendStateChanged){recordTradingSnapshot();queueMicrotask(()=>save({background:true}));}
 }
 
@@ -1644,8 +1794,9 @@ async function showSignedIn(user){
   setTimeout(()=>refreshMarkets({silent:true}),500);
   fxRefreshTimer=setInterval(()=>refreshExchangeRate({silent:true}),5*60*1000);
   tradingRefreshTimer=setInterval(()=>{if(state.page==="stocks"&&state.stockView==="trading"&&!document.hidden)refreshTradingPrices({silent:true});},2*60*1000);
- }
-}
+  }
+  syncCryptoMarketData();
+  }
 
 async function boot(){
  document.documentElement.dataset.theme=state.theme;themeBtn.textContent=state.theme==="dark"?"☀":"☾";
@@ -1688,7 +1839,7 @@ seedDataBtn.onclick=async()=>{
   await syncManager.handleRemoteChange();dataModal.close();toastMsg("MVP seed loaded");
  }catch(error){alert(error.message)}
 };
-logoutBtn.onclick=()=>{if(fxRefreshTimer)clearInterval(fxRefreshTimer);if(tradingRefreshTimer)clearInterval(tradingRefreshTimer);syncManager.signOut();};
+logoutBtn.onclick=()=>{if(fxRefreshTimer)clearInterval(fxRefreshTimer);if(tradingRefreshTimer)clearInterval(tradingRefreshTimer);cryptoMarketStream?.stop();syncManager.signOut();};
 refreshStocksBtn.onclick=()=>refreshMarkets();
 refreshTradingBtn.onclick=()=>refreshTradingPrices({force:true});
 q("#resetTradingBtn").onclick=()=>{

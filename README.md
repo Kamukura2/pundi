@@ -1,4 +1,6 @@
-# CVFinance v8.1.2
+# CVFinance v8.2.0
+
+v8.2.0 adds Crypto as a market-data-only asset class inside Stocks → Investment and Stocks → Trading. Binance public spot data is used without API credentials; crypto prices are displayed in USDT and normalized to IDR using the existing USD/IDR approximation for portfolio totals.
 
 v8.1.2 adds separate persisted Electricity TOP UP events. A top-up increases the current effective meter balance without changing completed consumption intervals; future physical readings reconcile the top-up exactly once.
 

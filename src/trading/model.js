@@ -1,8 +1,10 @@
+import { isCryptoAsset, isDollarLikeCurrency, normalizeQuoteValueToIdr } from "../crypto/binance.js";
+
 const n = value => Number(value || 0);
 const isoDay = value => String(value || new Date().toISOString()).slice(0, 10);
 
 export function amountToIdr(amount, currency, fxRate) {
-  return n(amount) * (currency === "USD" ? n(fxRate) : 1);
+  return normalizeQuoteValueToIdr(amount,currency,fxRate);
 }
 
 export function tradingWallet(ledger = []) {
@@ -85,13 +87,23 @@ export function tradingMetrics({ positions = [], ledger = [], fxRate = 0 } = {})
   return { wallet, holdingsValue, openCost, cashValue, equity, realized, realizedCost, realizedReturn, unrealized, totalPl, externalFlows };
 }
 
+export function equityBenchmarkMetrics({ positions = [], ledger = [], fxRate = 0 } = {}) {
+  const equityPositions = positions.filter(row => !isCryptoAsset(row));
+  const equityLedger = ledger.filter(row => !isCryptoAsset(row));
+  const wallet = tradingWallet(equityLedger);
+  const holdingsValue = equityPositions.reduce((sum, row) => sum + tradingPositionValue(row, fxRate), 0);
+  const cashValue = wallet.idr + wallet.usd * n(fxRate);
+  const externalFlows = equityLedger.reduce((sum, row) => sum + n(row.externalFlowIdr), 0);
+  return { equity:cashValue + holdingsValue, externalFlows, holdingsValue, cashValue };
+}
+
 export function applyOpeningPosition({ position, date, fxRate, id }) {
   const costIdr = tradingPositionCost(position, fxRate);
   return {
     id, type:"opening", positionId:position.id, ticker:position.ticker,
     quantity:n(position.quantity), price:n(position.avg), currency:position.currency,
-    fxRate:n(fxRate), cashDeltaIdr:0, cashDeltaUsd:0, externalFlowIdr:costIdr,
-    realizedPlIdr:0, date:isoDay(date), note:"Opening position"
+    fxRate:n(fxRate), cashDeltaIdr:0, cashDeltaUsd:0,
+    externalFlowIdr:costIdr, realizedPlIdr:0, assetType:position.assetType || "equity", date:isoDay(date), note:"Opening position"
   };
 }
 
@@ -100,7 +112,11 @@ export function applyTrade({ position, type, quantity, price, date, fxRate, id }
   if (!(qty > 0) || !(execution >= 0)) throw new Error("Enter a valid quantity and execution price.");
   if (type === "sell" && qty > beforeQty + 1e-9) throw new Error("Sell quantity exceeds the open position.");
   const nativeAmount = qty * execution;
-  const cashDeltaIdr = position.currency === "IDR" ? (type === "sell" ? nativeAmount : -nativeAmount) : 0;
+  const cashDeltaIdr = position.currency === "IDR"
+    ? (type === "sell" ? nativeAmount : -nativeAmount)
+    : position.currency === "USDT"
+      ? (type === "sell" ? amountToIdr(nativeAmount, "USDT", fxRate) : -amountToIdr(nativeAmount, "USDT", fxRate))
+      : 0;
   const cashDeltaUsd = position.currency === "USD" ? (type === "sell" ? nativeAmount : -nativeAmount) : 0;
   const realizedPlIdr = type === "sell" ? amountToIdr((execution - beforeAvg) * qty, position.currency, fxRate) : 0;
   if (type === "buy") {
@@ -111,7 +127,7 @@ export function applyTrade({ position, type, quantity, price, date, fxRate, id }
     position.quantity = Math.max(0, beforeQty - qty);
   }
   return {
-    id, type, positionId:position.id, ticker:position.ticker, quantity:qty, price:execution,
+    id, type, positionId:position.id, ticker:position.ticker, assetType:position.assetType || "equity", quantity:qty, price:execution,
     currency:position.currency, fxRate:n(fxRate), cashDeltaIdr, cashDeltaUsd,
     externalFlowIdr:0, realizedPlIdr, date:isoDay(date), note:type === "sell" ? "Position sold" : "Position increased"
   };
@@ -145,7 +161,11 @@ export function upsertDailySnapshot(snapshots = [], metrics, spyPrice, date = ne
   const row = snapshots.find(item => item.date === snapshotDate);
   const values = {
     date:snapshotDate, equityIdr:n(metrics.equity), netContributionsIdr:n(metrics.externalFlows),
-    holdingsValueIdr:n(metrics.holdingsValue), cashValueIdr:n(metrics.cashValue), spyPrice:n(spyPrice)
+    holdingsValueIdr:n(metrics.holdingsValue), cashValueIdr:n(metrics.cashValue), spyPrice:n(spyPrice),
+    benchmarkEquityIdr:n(metrics.benchmarkEquityIdr ?? metrics.equity),
+    benchmarkExternalFlowsIdr:n(metrics.benchmarkExternalFlowsIdr ?? metrics.externalFlows),
+    benchmarkHoldingsValueIdr:n(metrics.benchmarkHoldingsValueIdr ?? metrics.holdingsValue),
+    benchmarkCashValueIdr:n(metrics.benchmarkCashValueIdr ?? metrics.cashValue)
   };
   if (row) return Object.assign(row, values);
   snapshots.push(values);
@@ -205,7 +225,7 @@ export function performancePreview(snapshots = [], metrics = {}, spyPrice = 0, n
 export function tradingTargetSimulation(position, targetPrice, fxRate) {
   const target = Math.max(0, n(targetPrice));
   const quantity = n(position?.quantity), average = n(position?.avg);
-  const multiplier = position?.currency === "USD" ? n(fxRate) : 1;
+  const multiplier = isDollarLikeCurrency(position?.currency) ? n(fxRate) : 1;
   const projectedValueIdr = quantity * target * multiplier;
   const projectedPlIdr = quantity * (target - average) * multiplier;
   const projectedReturn = average > 0 ? (target / average - 1) * 100 : 0;

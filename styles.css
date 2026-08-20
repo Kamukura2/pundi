@@ -1122,6 +1122,7 @@ select,input,.search{width:100%;min-width:0;height:46px;padding:0 12px;border-ra
 .stock-workspace-tabs button.active{color:#fff;background:linear-gradient(135deg,#785eff,#27b9e8);box-shadow:0 10px 24px rgba(74,111,255,.23)}
 .stock-workspace-view{display:none;min-width:0}
 .stock-workspace-view.active{display:block}
+.crypto-market-status{display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:0 10px;border-radius:999px;border:1px solid var(--line);font-size:9px;font-weight:900;letter-spacing:.06em;white-space:nowrap}.crypto-status-live{color:var(--green);background:rgba(52,200,139,.12)}.crypto-status-stale,.crypto-status-connecting{color:var(--orange);background:rgba(255,155,94,.12)}.crypto-status-offline{color:var(--muted);background:var(--surface2)}
 .investment-wallet-panel{margin-top:26px}
 .investment-wallet-grid .investment-wallet-card{min-height:96px}
 .dividend-panel{margin-top:28px}
