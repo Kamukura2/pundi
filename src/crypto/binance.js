@@ -1,36 +1,59 @@
 export const BINANCE_REST_BASE = "https://data-api.binance.vision/api/v3";
 export const BINANCE_WS_BASE = "wss://data-stream.binance.vision/stream?streams=";
 export const CVFINANCE_CRYPTO_API = "/api/crypto/quote";
-export const DEFAULT_CRYPTO_QUOTE = "USDT";
+export const DEFAULT_CRYPTO_QUOTE = "USD";
+export const CRYPTO_QUOTE_CURRENCIES = ["USD", "IDR", "USDT"];
 
-// Portfolio normalization only: USDT is approximated with the existing USD/IDR rate.
-// This is not a claim that USDT is exactly equal to USD.
-export const isDollarLikeCurrency = currency => ["USD","USDT"].includes(String(currency || "").toUpperCase());
+// Portfolio normalization only: stablecoin quotes are approximated with USD.
+// This is not a claim that any stablecoin is exactly equal to USD.
+export const isStableQuote = currency => ["USDT", "USDC", "FDUSD"].includes(String(currency || "").toUpperCase());
+export const isDollarLikeCurrency = currency => ["USD", ...CRYPTO_QUOTE_CURRENCIES.filter(value => isStableQuote(value))].includes(String(currency || "").toUpperCase());
 export const normalizeQuoteValueToIdr = (amount, currency, usdIdr) => Number(amount || 0) * (isDollarLikeCurrency(currency) ? Number(usdIdr || 0) : 1);
 
 const baseSymbolPattern = /^[A-Z0-9]{2,20}$/;
-const quoteSymbolPattern = /^[A-Z0-9]{2,10}$/;
+const quoteSymbolPattern = /^(USD|IDR|USDT)$/;
 const exchangeInfoCache = new Map();
+
+export function normalizeQuoteCurrency(value, fallback = DEFAULT_CRYPTO_QUOTE) {
+  const quote = String(value || fallback).trim().toUpperCase();
+  if (!CRYPTO_QUOTE_CURRENCIES.includes(quote)) throw new Error("Unsupported Crypto quote currency.");
+  return quote;
+}
 
 export function normalizeCryptoSymbol(value) {
   const symbol = String(value || "").trim().toUpperCase();
   if (!baseSymbolPattern.test(symbol) || /[^A-Z0-9]/.test(symbol)) throw new Error("Invalid crypto symbol.");
-  if (symbol.endsWith(DEFAULT_CRYPTO_QUOTE) && symbol.length > DEFAULT_CRYPTO_QUOTE.length) return symbol.slice(0, -DEFAULT_CRYPTO_QUOTE.length);
   return symbol;
 }
 
-export function binanceSpotSymbol(baseSymbol, quoteCurrency = DEFAULT_CRYPTO_QUOTE) {
+export function parseCryptoPairInput(value, defaultQuote = DEFAULT_CRYPTO_QUOTE) {
+  const raw = String(value || "").trim().toUpperCase();
+  const fallbackQuote = normalizeQuoteCurrency(defaultQuote);
+  if (!raw) throw new Error("Crypto symbol not found.");
+  const separated = raw.match(/^([A-Z0-9]{2,20})[\/_-](USD|IDR|USDT)$/);
+  if (separated) return { baseSymbol:normalizeCryptoSymbol(separated[1]), requestedQuote:separated[2], explicitQuote:true };
+  const compactQuote = ["USDT", "USD", "IDR"].find(quote => raw.endsWith(quote) && raw.length > quote.length);
+  if (compactQuote) return { baseSymbol:normalizeCryptoSymbol(raw.slice(0, -compactQuote.length)), requestedQuote:compactQuote, explicitQuote:true };
+  return { baseSymbol:normalizeCryptoSymbol(raw), requestedQuote:fallbackQuote, explicitQuote:false };
+}
+
+export function binanceSpotSymbol(baseSymbol, quoteCurrency = "USDT") {
   const base = normalizeCryptoSymbol(baseSymbol);
-  const quote = String(quoteCurrency || DEFAULT_CRYPTO_QUOTE).trim().toUpperCase();
-  if (!quoteSymbolPattern.test(quote)) throw new Error("Invalid crypto quote currency.");
+  const quote = String(quoteCurrency || "USDT").trim().toUpperCase();
+  if (!/^[A-Z0-9]{2,10}$/.test(quote)) throw new Error("Invalid crypto quote currency.");
   return `${base}${quote}`;
 }
 
-export function cryptoBaseSymbol(providerSymbol, quoteCurrency = DEFAULT_CRYPTO_QUOTE) {
+export function cryptoBaseSymbol(providerSymbol, quoteCurrency = "USDT") {
   const pair = String(providerSymbol || "").trim().toUpperCase();
-  const quote = String(quoteCurrency || DEFAULT_CRYPTO_QUOTE).trim().toUpperCase();
+  const quote = String(quoteCurrency || "USDT").trim().toUpperCase();
   if (!pair.endsWith(quote)) throw new Error("Invalid Binance spot symbol.");
   return normalizeCryptoSymbol(pair.slice(0, -quote.length));
+}
+
+export function providerQuoteCurrency(providerSymbol) {
+  const pair = String(providerSymbol || "").trim().toUpperCase();
+  return ["USDT", "FDUSD", "USDC", "USD", "IDR"].find(quote => pair.endsWith(quote)) || "USDT";
 }
 
 export function isCryptoAsset(row = {}) {
@@ -45,7 +68,26 @@ export function validCryptoPrice(value) {
   return Number.isFinite(price) && price > 0;
 }
 
-export function parseBinanceTicker(data = {}, { source = "rest" } = {}) {
+export function normalizeStableQuoteToUsd(value, sourceQuote) {
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  if (String(sourceQuote || "").toUpperCase() === "IDR") return null;
+  return amount;
+}
+
+export function convertCryptoPrice(value, sourceQuote, requestedQuote, usdIdr) {
+  const amount = Number(value);
+  const source = String(sourceQuote || "").toUpperCase();
+  const target = normalizeQuoteCurrency(requestedQuote);
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  if (source === target) return amount;
+  const usd = source === "IDR" ? amount / Number(usdIdr || 0) : normalizeStableQuoteToUsd(amount, source);
+  if (!Number.isFinite(usd) || usd <= 0) return null;
+  if (target === "IDR") return usd * Number(usdIdr || 0);
+  return usd;
+}
+
+export function parseBinanceTicker(data = {}, { source = "rest", sourceQuote = "USDT" } = {}) {
   const price = Number(data.lastPrice);
   if (!validCryptoPrice(price)) throw Object.assign(new Error("Binance returned no valid crypto price."), { code:"crypto_price_unavailable" });
   const timestamp = Number(data.closeTime || data.E || Date.now());
@@ -55,6 +97,7 @@ export function parseBinanceTicker(data = {}, { source = "rest" } = {}) {
     status: source === "websocket" ? "live" : "stale",
     provider: "binance",
     source,
+    sourceQuote,
     changePercent: Number(data.priceChangePercent),
     high: Number(data.highPrice),
     low: Number(data.lowPrice),
@@ -62,34 +105,36 @@ export function parseBinanceTicker(data = {}, { source = "rest" } = {}) {
   };
 }
 
-async function requestCryptoQuote(baseSymbol) {
+async function requestCryptoQuote(baseSymbol, requestedQuote = DEFAULT_CRYPTO_QUOTE, usdIdr = "") {
   const base = normalizeCryptoSymbol(baseSymbol);
+  const quote = normalizeQuoteCurrency(requestedQuote);
   let response;
-  try { response = await fetch(`${CVFINANCE_CRYPTO_API}?symbol=${encodeURIComponent(base)}`, { headers:{Accept:"application/json"}, cache:"no-store" }); }
-  catch { throw Object.assign(new Error("Unable to reach Crypto market data. Please try again."), { code:"crypto_network_error" }); }
+  try {
+    const fx = usdIdr ? `&usdIdr=${encodeURIComponent(usdIdr)}` : "";
+    response = await fetch(`${CVFINANCE_CRYPTO_API}?symbol=${encodeURIComponent(base)}&quote=${quote}${fx}`, { headers:{Accept:"application/json"}, cache:"no-store" });
+  } catch { throw Object.assign(new Error("Unable to reach Crypto market data. Please try again."), { code:"crypto_network_error" }); }
   const body = await response.json().catch(() => ({}));
   if (!response.ok || body.ok !== true) {
-    const message = body.code === "crypto_symbol_not_found" || body.code === "crypto_symbol_invalid" ? "Crypto symbol not found." : body.error || "Live Crypto price is temporarily unavailable.";
+    const message = body.code === "crypto_symbol_not_found" || body.code === "crypto_symbol_invalid" ? "Crypto symbol not found." : body.code === "crypto_price_route_unavailable" ? "No supported market-price route for this Crypto asset." : body.error || "Live Crypto price is temporarily unavailable.";
     throw Object.assign(new Error(message), { code:body.code || "crypto_provider_error", status:response.status });
   }
   return body;
 }
 
-export async function resolveCryptoSymbol(baseSymbol, quoteCurrency = DEFAULT_CRYPTO_QUOTE) {
-  if (String(quoteCurrency).toUpperCase() !== DEFAULT_CRYPTO_QUOTE) throw new Error("Only USDT crypto quotes are supported.");
-  const normalizedBase = normalizeCryptoSymbol(baseSymbol);
-  const providerSymbol = binanceSpotSymbol(normalizedBase, quoteCurrency);
-  const cached = exchangeInfoCache.get(providerSymbol);
-  if (cached && cached.expiresAt > Date.now()) return cached.value;
-  const body = await requestCryptoQuote(normalizedBase);
-  const value = { baseSymbol:body.symbol, quoteCurrency:body.quoteCurrency, providerSymbol:body.providerSymbol, status:"TRADING" };
-  exchangeInfoCache.set(providerSymbol, { value, expiresAt:Date.now()+60*60*1000 });
-  return value;
+export async function resolveCryptoPair(value, requestedQuote = DEFAULT_CRYPTO_QUOTE, usdIdr = "") {
+  const parsed = parseCryptoPairInput(value, requestedQuote);
+  return requestCryptoQuote(parsed.baseSymbol, parsed.requestedQuote, usdIdr);
 }
 
-export async function fetchBinanceTicker(providerSymbol) {
-  const body = await requestCryptoQuote(cryptoBaseSymbol(providerSymbol), DEFAULT_CRYPTO_QUOTE);
-  return { price:body.price, asOf:body.asOf, status:"stale", provider:"binance", source:"same-origin-rest", changePercent:body.changePercent24h, high:body.high, low:body.low, volume:body.volume };
+// Backward-compatible v8.2.x resolver; new positions use USD by default.
+export async function resolveCryptoSymbol(baseSymbol, quoteCurrency = DEFAULT_CRYPTO_QUOTE, usdIdr = "") {
+  return resolveCryptoPair(baseSymbol, quoteCurrency, usdIdr);
+}
+
+export async function fetchBinanceTicker(providerSymbol, requestedQuote = "USDT", usdIdr = "") {
+  const sourceQuote = providerQuoteCurrency(providerSymbol);
+  const body = await requestCryptoQuote(cryptoBaseSymbol(providerSymbol, sourceQuote), requestedQuote, usdIdr);
+  return { price:body.price, asOf:body.asOf, status:"stale", provider:"binance", source:"same-origin-rest", sourceQuote:body.sourceQuote || sourceQuote, changePercent:body.changePercent24h, high:body.high, low:body.low, volume:body.volume };
 }
 
 export class CryptoMarketStream {
@@ -167,7 +212,7 @@ export class CryptoMarketStream {
         const ticker = payload?.data || payload;
         if (!ticker?.s || !validCryptoPrice(ticker.lastPrice)) return;
         this.lastMessageAt = Date.now();
-        this.onTicker(String(ticker.s).toUpperCase(), parseBinanceTicker(ticker, {source:"websocket"}));
+        this.onTicker(String(ticker.s).toUpperCase(), parseBinanceTicker(ticker, {source:"websocket",sourceQuote:providerQuoteCurrency(ticker.s)}));
       };
       socket.onerror = () => { if (socket === this.socket) socket.close(); };
       socket.onclose = () => {

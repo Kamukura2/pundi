@@ -1,4 +1,6 @@
-# CVFinance v8.2.2
+# CVFinance v8.3.0
+
+v8.3.0 extends Crypto with flexible USD, IDR, and USDT requested quotes. User-facing pairs are resolved through validated Binance source symbols, with USD/IDR normalization using the existing CVFinance FX rate. Existing USDT positions remain unchanged.
 
 v8.2.2 fixes the authenticated Crypto runtime crash caused by passing USDT to Intl.NumberFormat as a fiat currency code. USDT now uses numeric formatting with an explicit suffix, while USD/IDR formatting and all Investment/Trading accounting remain unchanged.
 

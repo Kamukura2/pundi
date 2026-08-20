@@ -54,7 +54,7 @@ for (const key of ["FINNHUB_API_KEY","TWELVE_DATA_API_KEY","SUPABASE_URL","SUPAB
 const serviceWorker = read("public/sw.js");
 assert.match(serviceWorker, /pathname\.startsWith\("\/api\/"\)/);
 
-const jsFiles = ["app.js","api/config.js","api/_lib/rate-limit.js","api/_lib/dividends.js","api/stocks/dividends.js","api/stocks/fx.js","api/stocks/quote.js","api/stocks/validate.js","api/trading/quote.js","api/trading/benchmark.js","api/cron/refresh-stocks.js","api/crypto/quote.js","src/data/default-data.js","src/data/finance-model.js","src/data/electricity-model.js","src/data/currency-format.js","src/crypto/binance.js","src/data/repository.js","src/lib/idb.js","src/lib/supabase.js","src/stocks/client.js","src/stocks/dividends.js","src/stocks/holding.js","src/trading/model.js","src/sync/sync-manager.js"];
+const jsFiles = ["app.js","api/config.js","api/_lib/rate-limit.js","api/_lib/dividends.js","api/stocks/dividends.js","api/stocks/fx.js","api/stocks/quote.js","api/stocks/validate.js","api/trading/quote.js","api/trading/benchmark.js","api/cron/refresh-stocks.js","api/crypto/quote.js","src/data/default-data.js","src/data/finance-model.js","src/data/electricity-model.js","src/data/currency-format.js","src/crypto/binance.js","src/data/repository.js","src/lib/idb.js","src/lib/supabase.js","src/stocks/client.js","src/stocks/dividends.js","src/stocks/holding.js","src/trading/model.js","src/trading/crypto-lifecycle.js","src/sync/sync-manager.js"];
 for (const file of jsFiles) execFileSync(process.execPath, ["--check", resolve(root, file)], { stdio:"pipe" });
 
 for (const file of jsFiles.map(read)) {
@@ -99,10 +99,18 @@ assert.match(formatCryptoQuote(0.00005,"USDT"),/USDT$/,"Small crypto quantities/
 assert.match(formatFiatCurrency(72081.90,"USD"),/\$/,"USD fiat formatting must remain unchanged");
 assert.match(formatFiatCurrency(72081.90,"IDR"),/IDR|Rp/,"IDR fiat formatting must remain unchanged");
 
-const { binanceSpotSymbol, cryptoBaseSymbol, isCryptoAsset, normalizeCryptoSymbol } = await import("../src/crypto/binance.js");
+const { binanceSpotSymbol, convertCryptoPrice, cryptoBaseSymbol, isCryptoAsset, normalizeCryptoSymbol, parseCryptoPairInput } = await import("../src/crypto/binance.js");
 assert.equal(normalizeCryptoSymbol("btc"),"BTC","Crypto symbols must normalize to uppercase base symbols");
 assert.equal(binanceSpotSymbol("btc"),"BTCUSDT","Crypto symbols must map to the default USDT spot pair");
 assert.equal(cryptoBaseSymbol("BTCUSDT"),"BTC","Provider pairs must resolve back to their base symbol");
+assert.deepEqual(parseCryptoPairInput("BTC"),{baseSymbol:"BTC",requestedQuote:"USD",explicitQuote:false});
+assert.deepEqual(parseCryptoPairInput("BTCUSD"),{baseSymbol:"BTC",requestedQuote:"USD",explicitQuote:true});
+assert.deepEqual(parseCryptoPairInput("BTC/IDR"),{baseSymbol:"BTC",requestedQuote:"IDR",explicitQuote:true});
+assert.deepEqual(parseCryptoPairInput("BTC-USDT"),{baseSymbol:"BTC",requestedQuote:"USDT",explicitQuote:true});
+assert.deepEqual(parseCryptoPairInput("btc_idr"),{baseSymbol:"BTC",requestedQuote:"IDR",explicitQuote:true});
+assert.equal(convertCryptoPrice(70000,"USDT","USD",16250),70000);
+assert.equal(convertCryptoPrice(70000,"USDT","IDR",16250),1137500000);
+assert.equal(convertCryptoPrice(1137500000,"IDR","USD",16250),70000);
 assert.equal(isCryptoAsset({assetType:"crypto",market:"CRYPTO",currency:"USDT"}),true);
 assert.equal(isCryptoAsset({market:"NASDAQ",currency:"USD"}),false);
 assert.throws(()=>normalizeCryptoSymbol("BTC/USDT"),/Invalid crypto symbol/);
@@ -191,6 +199,10 @@ assert.doesNotMatch(migration015,/drop\s+table|truncate\s+|delete\s+from/i);
 const migration016 = read("supabase/migrations/016_crypto_asset_class.sql");
 for (const marker of ["asset_type","crypto","binance","USDT","stock_holdings","trading_positions","trading_ledger"]) assert.match(migration016,new RegExp(marker,"i"));
 assert.doesNotMatch(migration016,/drop\s+table|truncate\s+|delete\s+from/i);
+const migration017 = read("supabase/migrations/017_crypto_multi_quote.sql");
+for (const marker of ["USD','IDR','USDT","stock_holdings_crypto_mapping_check","trading_positions_crypto_mapping_check","trading_ledger_crypto_currency_check"]) assert.match(migration017,new RegExp(marker,"i"));
+assert.doesNotMatch(migration017,/display_symbol_market_currency|user_id_display_symbol_market_key/i,"Migration 017 must preserve existing position uniqueness");
+assert.doesNotMatch(migration017,/drop\s+table|truncate\s+|delete\s+from/i);
 const repositorySource = read("src/data/repository.js");
 assert.match(repositorySource,/"electricity_topups"/,"Top-ups must be a separate synchronized table");
 assert.match(repositorySource,/state\.electricityTopups/,"Top-ups must round-trip through synchronized state");
@@ -264,6 +276,14 @@ assert.equal(cryptoMetrics.unrealized,2550000,"Crypto unrealized P/L must use cu
 const mixedBenchmark=equityBenchmarkMetrics({positions:[{assetType:"equity",currency:"USD",quantity:1,avg:100,current:110},{assetType:"crypto",market:"CRYPTO",currency:"USDT",quantity:1,avg:60000,current:65000}],ledger:[{assetType:"equity",type:"opening",externalFlowIdr:1700000,cashDeltaIdr:0,cashDeltaUsd:0},{assetType:"crypto",type:"opening",externalFlowIdr:102000000,cashDeltaIdr:0,cashDeltaUsd:0}],fxRate:17000});
 assert.equal(mixedBenchmark.holdingsValue,1870000,"Mixed benchmark must retain the equity holding component");
 assert.equal(mixedBenchmark.externalFlows,1700000,"Mixed benchmark must exclude Crypto external flows");
+const { historicalCryptoQuote } = await import("../src/trading/crypto-lifecycle.js");
+const closedBtcUsd={id:"btc-tombstone",ticker:"BTC",market:"CRYPTO",assetType:"crypto",currency:"USD",quantity:0,date:"2026-08-20",__createdAt:"2026-08-20T10:00:00Z"};
+const closedBtcLedger=[{ticker:"BTC",market:"CRYPTO",assetType:"crypto",currency:"USD",type:"opening",date:"2026-08-20",__createdAt:"2026-08-20T09:00:00Z"},{ticker:"BTC",market:"CRYPTO",assetType:"crypto",currency:"USD",type:"sell",date:"2026-08-21",__createdAt:"2026-08-21T09:00:00Z"}];
+assert.equal(historicalCryptoQuote("BTC",{positions:[closedBtcUsd],ledger:closedBtcLedger}),"USD","Closed BTC history must lock Trading re-entry to its original quote");
+assert.equal(historicalCryptoQuote("BTC/IDR",{positions:[closedBtcUsd],ledger:closedBtcLedger}),"USD","Pair notation must not override an authoritative historical quote");
+const closedBtcUsdt={...closedBtcUsd,id:"btc-usdt",currency:"USDT"};
+assert.equal(historicalCryptoQuote("BTC",{positions:[closedBtcUsdt],ledger:[]}),"USDT","Historical USDT BTC must remain USDT on re-entry");
+assert.equal(historicalCryptoQuote("ETH",{positions:[],ledger:[]}),null,"Brand-new ETH must have no inherited quote");
 const removed=removeTradingPositionData({positions:[{id:"p1"},{id:"p2"}],ledger:[{id:"l1",positionId:"p1",date:"2026-02-01"},{id:"l2",positionId:"p2",date:"2026-01-01"}],snapshots:[{date:"2026-01-01"},{date:"2026-02-01"}]},"p1");
 assert.deepEqual(removed.positions,[{id:"p2"}]);assert.deepEqual(removed.ledger,[{id:"l2",positionId:"p2",date:"2026-01-01"}]);assert.deepEqual(removed.snapshots,[{date:"2026-01-01"}]);
 const ledgerDeletion=removeTradingLedgerEntry({positions:[],ledger:[{id:"deposit-a",type:"deposit",date:"2026-01-02",cashDeltaUsd:100,externalFlowIdr:1600000},{id:"deposit-b",type:"deposit",date:"2026-02-02",cashDeltaUsd:50,externalFlowIdr:800000}],snapshots:[{date:"2026-01-02"},{date:"2026-02-02"}]},"deposit-b");
@@ -411,9 +431,9 @@ assert.match(appSource, /tx-history-archive/, "Previous History months must rema
 
 const electricityIndex = read("index.html");
 const electricityCss = read("styles.css");
-assert.equal(JSON.parse(read("package.json")).version,"8.2.2","Package version must be v8.2.2");
-assert.match(electricityIndex,/<title>CVFinance v8\.2\.2<\/title>/,"Document title must be v8.2.2");
-assert.match(read("public/sw.js"),/cvfinance-shell-v8\.2\.2/,"Service-worker cache must invalidate for v8.2.2");
+assert.equal(JSON.parse(read("package.json")).version,"8.3.0","Package version must be v8.3.0");
+assert.match(electricityIndex,/<title>CVFinance v8\.3\.0<\/title>/,"Document title must be v8.3.0");
+assert.match(read("public/sw.js"),/cvfinance-shell-v8\.3\.0/,"Service-worker cache must invalidate for v8.3.0");
 assert.match(electricityIndex,/id="topUpElectricityBtn"[^>]*>\s*TOP UP\s*<\/button>/,"Electricity must expose a distinct TOP UP action");
 assert.match(electricityIndex,/id="addElectricityBtn"[^>]*>\s*＋ Reading\s*<\/button>/,"The existing Reading action must remain available");
 assert.match(electricityIndex,/id="electricityTopUpModal"/);
@@ -434,11 +454,16 @@ const cryptoApi = read("api/crypto/quote.js");
 assert.match(cryptoApi,/data-api\.binance\.vision/,"Crypto REST must be proxied through the official Binance endpoint server-side");
 assert.match(cryptoApi,/permissionSets/,"Binance SPOT validation must accept the current exchangeInfo permission shape");
 assert.match(cryptoApi,/Crypto symbol not found/);
-assert.match(cryptoApi,/Live Crypto price is temporarily unavailable/);
+assert.match(cryptoApi,/Crypto market data is temporarily unavailable/);
 const binanceSource = read("src/crypto/binance.js");
 assert.match(binanceSource,/CVFINANCE_CRYPTO_API/,"Browser Crypto REST must use the same-origin Vercel API route");
 assert.match(electricityIndex,/id="cryptoMarketStatus"/);
 assert.equal((appSource.match(/options:\["IDX","NASDAQ","NYSE","CRYPTO"\]/g)||[]).length,2,"Investment and Trading new-entry market selectors must match exactly");
+assert.equal((appSource.match(/options:\["USD","IDR","USDT"\]/g)||[]).length,2,"Investment and Trading Crypto quote selectors must match exactly");
+assert.match(appSource,/resolveCryptoPair\(parsed\.baseSymbol,parsed\.requestedQuote,state\.usdIdr\)/,"Investment must use the shared multi-quote resolver");
+assert.match(appSource,/resolveCryptoPair\(parsed\.baseSymbol,requestedQuote,state\.usdIdr\)/,"Trading must use the shared multi-quote resolver");
+assert.match(appSource,/already exists in this portfolio/,"Crypto duplicate detection must be base-symbol scoped");
+assert.doesNotMatch(appSource,/row\.currency===resolved\.requestedQuote/,"Crypto duplicate detection must not permit parallel quote-denominated rows");
 assert.doesNotMatch(appSource,/options:\[[^\]]*AMEX[^\]]*\]/,"AMEX must not be selectable in new-entry forms");
 assert.match(electricityIndex,/id="usdIdrRate"[\s\S]*id="cryptoMarketStatus"/,"Crypto status must sit beside the existing FX status");
 const syncInitSource = read("src/sync/sync-manager.js");
