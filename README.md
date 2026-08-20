@@ -1,4 +1,6 @@
-# CVFinance v8.2.0
+# CVFinance v8.2.1
+
+v8.2.1 fixes production Crypto quote resolution through a same-origin Vercel REST proxy, aligns Investment/Trading market selectors, simplifies Crypto symbol entry, and places Crypto status beside the existing FX status. Investment and Trading accounting are unchanged.
 
 v8.2.0 adds Crypto as a market-data-only asset class inside Stocks → Investment and Stocks → Trading. Binance public spot data is used without API credentials; crypto prices are displayed in USDT and normalized to IDR using the existing USD/IDR approximation for portfolio totals.
 

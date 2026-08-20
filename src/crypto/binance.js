@@ -1,5 +1,6 @@
 export const BINANCE_REST_BASE = "https://data-api.binance.vision/api/v3";
 export const BINANCE_WS_BASE = "wss://data-stream.binance.vision/stream?streams=";
+export const CVFINANCE_CRYPTO_API = "/api/crypto/quote";
 export const DEFAULT_CRYPTO_QUOTE = "USDT";
 
 // Portfolio normalization only: USDT is approximated with the existing USD/IDR rate.
@@ -61,29 +62,34 @@ export function parseBinanceTicker(data = {}, { source = "rest" } = {}) {
   };
 }
 
-async function binanceJson(path) {
-  const response = await fetch(`${BINANCE_REST_BASE}${path}`, { headers:{Accept:"application/json"}, cache:"no-store" });
+async function requestCryptoQuote(baseSymbol) {
+  const base = normalizeCryptoSymbol(baseSymbol);
+  let response;
+  try { response = await fetch(`${CVFINANCE_CRYPTO_API}?symbol=${encodeURIComponent(base)}`, { headers:{Accept:"application/json"}, cache:"no-store" }); }
+  catch { throw Object.assign(new Error("Unable to reach Crypto market data. Please try again."), { code:"crypto_network_error" }); }
   const body = await response.json().catch(() => ({}));
-  if (!response.ok || body.code < 0) throw Object.assign(new Error(body.msg || "Binance public market data request failed."), { code:"crypto_provider_error", status:response.status });
+  if (!response.ok || body.ok !== true) {
+    const message = body.code === "crypto_symbol_not_found" || body.code === "crypto_symbol_invalid" ? "Crypto symbol not found." : body.error || "Live Crypto price is temporarily unavailable.";
+    throw Object.assign(new Error(message), { code:body.code || "crypto_provider_error", status:response.status });
+  }
   return body;
 }
 
 export async function resolveCryptoSymbol(baseSymbol, quoteCurrency = DEFAULT_CRYPTO_QUOTE) {
-  const providerSymbol = binanceSpotSymbol(baseSymbol, quoteCurrency);
+  if (String(quoteCurrency).toUpperCase() !== DEFAULT_CRYPTO_QUOTE) throw new Error("Only USDT crypto quotes are supported.");
+  const normalizedBase = normalizeCryptoSymbol(baseSymbol);
+  const providerSymbol = binanceSpotSymbol(normalizedBase, quoteCurrency);
   const cached = exchangeInfoCache.get(providerSymbol);
   if (cached && cached.expiresAt > Date.now()) return cached.value;
-  const body = await binanceJson(`/exchangeInfo?symbol=${encodeURIComponent(providerSymbol)}`);
-  const symbol = body.symbols?.find(row => row.symbol === providerSymbol);
-  const spotAllowed = symbol?.isSpotTradingAllowed !== false && (!Array.isArray(symbol?.permissions) || symbol.permissions.includes("SPOT"));
-  if (!symbol || symbol.status !== "TRADING" || !spotAllowed) throw Object.assign(new Error(`${providerSymbol} is not an active Binance SPOT symbol.`), { code:"crypto_symbol_unavailable", status:422 });
-  const value = { baseSymbol:symbol.baseAsset, quoteCurrency:symbol.quoteAsset, providerSymbol:symbol.symbol, status:symbol.status };
+  const body = await requestCryptoQuote(normalizedBase);
+  const value = { baseSymbol:body.symbol, quoteCurrency:body.quoteCurrency, providerSymbol:body.providerSymbol, status:"TRADING" };
   exchangeInfoCache.set(providerSymbol, { value, expiresAt:Date.now()+60*60*1000 });
   return value;
 }
 
 export async function fetchBinanceTicker(providerSymbol) {
-  const pair = binanceSpotSymbol(cryptoBaseSymbol(providerSymbol), DEFAULT_CRYPTO_QUOTE);
-  return parseBinanceTicker(await binanceJson(`/ticker/24hr?symbol=${encodeURIComponent(pair)}`), {source:"rest"});
+  const body = await requestCryptoQuote(cryptoBaseSymbol(providerSymbol), DEFAULT_CRYPTO_QUOTE);
+  return { price:body.price, asOf:body.asOf, status:"stale", provider:"binance", source:"same-origin-rest", changePercent:body.changePercent24h, high:body.high, low:body.low, volume:body.volume };
 }
 
 export class CryptoMarketStream {

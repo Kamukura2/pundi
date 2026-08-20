@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-  <title>CVFinance v8.2.0</title>
+  <title>CVFinance v8.2.1</title>
   <meta name="theme-color" content="#d6249f">
   <meta name="description" content="Private synchronized personal finance dashboard">
   <meta name="mobile-web-app-capable" content="yes">
@@ -329,7 +329,6 @@
       <div id="stockWorkspaceTabs" class="segmented workspace-tabs stock-workspace-tabs" role="tablist" aria-label="Stock workspace">
         <button type="button" class="active" data-stock-workspace="investment" role="tab" aria-selected="true">Investment</button>
         <button type="button" data-stock-workspace="trading" role="tab" aria-selected="false">Trading</button>
-        <span id="cryptoMarketStatus" class="crypto-market-status crypto-status-offline" title="Binance public market data">CRYPTO OFFLINE</span>
       </div>
 
       <div id="investment" class="stock-workspace-view active" data-stock-view="investment">
@@ -359,6 +358,7 @@
           <div><p>Investment liquidity</p><h3>Netcash &amp; USD Wallet</h3></div>
           <div class="head-actions stock-rate-pills">
             <span id="usdIdrRate" class="pill fx-rate" title="Last saved exchange rate">USD/IDR loading…</span>
+            <span id="cryptoMarketStatus" class="crypto-market-status crypto-status-offline" title="Binance public market data">CRYPTO OFFLINE</span>
             <button id="editFxBtn" class="ghost-btn fx-refresh-btn" type="button" title="Set USD/IDR manually" aria-label="Set USD to IDR manually">✎</button>
             <button id="refreshFxBtn" class="ghost-btn fx-refresh-btn" type="button" title="Refresh USD/IDR now" aria-label="Refresh USD to IDR exchange rate">↻</button>
             <button id="investmentDepositBtn" class="primary-btn" type="button">＋ Add Funds</button>

@@ -1,4 +1,4 @@
-const SHELL_CACHE = "cvfinance-shell-v8.2.0-crypto";
+const SHELL_CACHE = "cvfinance-shell-v8.2.1-crypto-fetch";
 const SHELL = ["/", "/index.html", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", event => {

@@ -54,7 +54,7 @@ for (const key of ["FINNHUB_API_KEY","TWELVE_DATA_API_KEY","SUPABASE_URL","SUPAB
 const serviceWorker = read("public/sw.js");
 assert.match(serviceWorker, /pathname\.startsWith\("\/api\/"\)/);
 
-const jsFiles = ["app.js","api/config.js","api/_lib/rate-limit.js","api/_lib/dividends.js","api/stocks/dividends.js","api/stocks/fx.js","api/stocks/quote.js","api/stocks/validate.js","api/trading/quote.js","api/trading/benchmark.js","api/cron/refresh-stocks.js","src/data/default-data.js","src/data/finance-model.js","src/data/electricity-model.js","src/crypto/binance.js","src/data/repository.js","src/lib/idb.js","src/lib/supabase.js","src/stocks/client.js","src/stocks/dividends.js","src/stocks/holding.js","src/trading/model.js","src/sync/sync-manager.js"];
+const jsFiles = ["app.js","api/config.js","api/_lib/rate-limit.js","api/_lib/dividends.js","api/stocks/dividends.js","api/stocks/fx.js","api/stocks/quote.js","api/stocks/validate.js","api/trading/quote.js","api/trading/benchmark.js","api/cron/refresh-stocks.js","api/crypto/quote.js","src/data/default-data.js","src/data/finance-model.js","src/data/electricity-model.js","src/crypto/binance.js","src/data/repository.js","src/lib/idb.js","src/lib/supabase.js","src/stocks/client.js","src/stocks/dividends.js","src/stocks/holding.js","src/trading/model.js","src/sync/sync-manager.js"];
 for (const file of jsFiles) execFileSync(process.execPath, ["--check", resolve(root, file)], { stdio:"pipe" });
 
 for (const file of jsFiles.map(read)) {
@@ -404,9 +404,9 @@ assert.match(appSource, /tx-history-archive/, "Previous History months must rema
 
 const electricityIndex = read("index.html");
 const electricityCss = read("styles.css");
-assert.equal(JSON.parse(read("package.json")).version,"8.2.0","Package version must be v8.2.0");
-assert.match(electricityIndex,/<title>CVFinance v8\.2\.0<\/title>/,"Document title must be v8.2.0");
-assert.match(read("public/sw.js"),/cvfinance-shell-v8\.2\.0/,"Service-worker cache must invalidate for v8.2.0");
+assert.equal(JSON.parse(read("package.json")).version,"8.2.1","Package version must be v8.2.1");
+assert.match(electricityIndex,/<title>CVFinance v8\.2\.1<\/title>/,"Document title must be v8.2.1");
+assert.match(read("public/sw.js"),/cvfinance-shell-v8\.2\.1/,"Service-worker cache must invalidate for v8.2.1");
 assert.match(electricityIndex,/id="topUpElectricityBtn"[^>]*>\s*TOP UP\s*<\/button>/,"Electricity must expose a distinct TOP UP action");
 assert.match(electricityIndex,/id="addElectricityBtn"[^>]*>\s*＋ Reading\s*<\/button>/,"The existing Reading action must remain available");
 assert.match(electricityIndex,/id="electricityTopUpModal"/);
@@ -423,6 +423,16 @@ assert.match(electricityIndex,/CRYPTO/,"Stocks must expose the Crypto market sel
 assert.match(appSource,/CryptoMarketStream/,"Crypto prices must use one managed combined market stream");
 assert.match(appSource,/assetType/,"Stocks and Trading state must distinguish crypto from equity");
 assert.doesNotMatch(read(".env.example"),/BINANCE_(API_KEY|SECRET)/,"Binance public market data must not require credentials");
+const cryptoApi = read("api/crypto/quote.js");
+assert.match(cryptoApi,/data-api\.binance\.vision/,"Crypto REST must be proxied through the official Binance endpoint server-side");
+assert.match(cryptoApi,/Crypto symbol not found/);
+assert.match(cryptoApi,/Live Crypto price is temporarily unavailable/);
+const binanceSource = read("src/crypto/binance.js");
+assert.match(binanceSource,/CVFINANCE_CRYPTO_API/,"Browser Crypto REST must use the same-origin Vercel API route");
+assert.match(electricityIndex,/id="cryptoMarketStatus"/);
+assert.equal((appSource.match(/options:\["IDX","NASDAQ","NYSE","CRYPTO"\]/g)||[]).length,2,"Investment and Trading new-entry market selectors must match exactly");
+assert.doesNotMatch(appSource,/options:\[[^\]]*AMEX[^\]]*\]/,"AMEX must not be selectable in new-entry forms");
+assert.match(read("index.html"),/id="usdIdrRate"[\s\S]*id="cryptoMarketStatus"/,"Crypto status must sit beside the existing FX status");
 
 const app = read("app.js");
 assert.match(app, /portfolioPL\.textContent=`\$\{fmt\(pl\)\} · \$\{percent\(pl,inv\)\}`/);

@@ -1139,9 +1139,20 @@ function openSimple(title,fields,callback){
  simpleFields.innerHTML=fields.map(f=>{
   const input=f.options
    ? `<select id="sf_${f.key}">${f.options.map(o=>`<option ${String(o)===String(f.value)?'selected':''}>${o}</option>`).join("")}</select>`
-   : `<input id="sf_${f.key}" type="${f.type||'text'}" ${f.step?`step="${f.step}"`:''} ${f.inputmode?`inputmode="${f.inputmode}"`:''} ${f.value!==undefined?`value="${f.value}"`:''} ${f.required===false?'':'required'}>`;
-  return `<label>${f.label}${input}</label>`;
+   : `<input id="sf_${f.key}" type="${f.type||'text'}" ${f.step?`step="${f.step}"`:''} ${f.inputmode?`inputmode="${f.inputmode}"`:''} ${f.placeholder?`placeholder="${f.placeholder}"`:''} ${f.value!==undefined?`value="${f.value}"`:''} ${f.required===false?'':'required'}>`;
+  return `<label data-simple-field="${f.key}"><span data-simple-label="${f.key}">${f.label}</span>${input}${f.helper?`<small>${f.helper}</small>`:""}</label>`;
  }).join("");
+ const syncSimpleFields=()=>{
+  const market=String(q("#sf_market")?.value||"").toUpperCase(),crypto=market==="CRYPTO";
+  fields.forEach(field=>{
+   const wrapper=q(`[data-simple-field="${field.key}"]`),label=q(`[data-simple-label="${field.key}"]`);
+   if(!wrapper)return;
+   if(field.hideForCrypto)wrapper.hidden=crypto;
+   if(field.cryptoLabel&&label)label.textContent=crypto?field.cryptoLabel:field.label;
+  });
+ };
+ q("#sf_market")?.addEventListener("change",syncSimpleFields);
+ syncSimpleFields();
  simpleForm.onsubmit=async(e)=>{
   e.preventDefault();
   const obj={};
@@ -1630,9 +1641,9 @@ addClientBtn.onclick=()=>openSimple("Add Client",[
  {key:"status",label:"Status",options:["paid","pending"],value:"pending"}
 ],o=>state.clients.push({id:createId(),...o,sortOrder:state.clients.filter(row=>(row.clientType||"recurring")===o.clientType).length,endingPaid:o.clientType==="ending"&&o.status==="paid",status:o.status==="paid"?"paid":"pending",trackingMonth:monthKey(new Date())}));
 addTickerBtn.onclick=()=>openSimple("Add Ticker",[
- {key:"ticker",label:"Ticker / Crypto Symbol"},
+ {key:"ticker",label:"Ticker",cryptoLabel:"Crypto Symbol",placeholder:"BTC",helper:"Enter BTC, ETH, SOL, etc."},
  {key:"market",label:"Market",options:["IDX","NASDAQ","NYSE","CRYPTO"],value:"NASDAQ"},
- {key:"providerSymbol",label:"Provider Symbol (equity only)",required:false},
+ {key:"providerSymbol",label:"Provider Symbol",required:false,hideForCrypto:true},
  {key:"quantity",label:"Quantity (Crypto supports fractions)",type:"number",step:".00000001"},
  {key:"avg",label:"Average Price / Unit",type:"number",step:".00000001"},
  {key:"current",label:"Manual Fallback Price / Unit",type:"number",step:".00000001",value:0}
@@ -1653,7 +1664,7 @@ addTickerBtn.onclick=()=>openSimple("Add Ticker",[
  row.quantity=quantityForStorage(row.market,row.quantity);normalizeStockMapping(row);row.manualCurrent=row.current;row.priceSource="manual";row.priceStatus="manual";row.priceAsOf=null;row.base={};row.optimistic={};YEARS.slice(1).forEach(y=>{row.base[y]=row.current;row.optimistic[y]=row.current});state.stocks.push(row);queueMicrotask(()=>refreshInvestmentDividends({silent:true,force:true}));
 });
 addTradingPositionBtn.onclick=()=>openSimple("Add Trading Position",[
- {key:"ticker",label:"Ticker / Crypto Symbol"},{key:"market",label:"Market",options:["NASDAQ","NYSE","AMEX","CRYPTO"],value:"NASDAQ"},
+ {key:"ticker",label:"Ticker",cryptoLabel:"Crypto Symbol",placeholder:"BTC",helper:"Enter BTC, ETH, SOL, etc."},{key:"market",label:"Market",options:["IDX","NASDAQ","NYSE","CRYPTO"],value:"NASDAQ"},
  {key:"quantity",label:"Quantity (Crypto supports fractions)",type:"number",step:".00000001"},{key:"avg",label:"Entry Price / Unit",type:"number",step:".00000001"},
  {key:"date",label:"Opening Date",type:"date",value:todayISO()}
 ],async values=>{
