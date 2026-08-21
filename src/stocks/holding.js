@@ -1,4 +1,4 @@
-import { binanceSpotSymbol, isCryptoAsset } from "../crypto/binance.js";
+import { binanceSpotSymbol, isCryptoAsset, providerQuoteCurrency } from "../crypto/binance.js";
 
 export const IDX_SHARES_PER_LOT = 100;
 
@@ -21,11 +21,16 @@ export function normalizeStockMapping(stock, { resetProviderSymbol = false } = {
   const idx = isIdxMarket(stock.market);
   const ticker = String(stock.ticker || stock.displaySymbol || "").trim().toUpperCase();
   if (crypto) {
+    const providerSymbol = resetProviderSymbol || !stock.providerSymbol ? binanceSpotSymbol(ticker, "USDT") : String(stock.providerSymbol).trim().toUpperCase();
+    const sourceQuote = providerQuoteCurrency(providerSymbol);
+    const semanticQuote = ["IDR","USD","USDT"].includes(String(stock.currency || "").toUpperCase())
+      ? String(stock.currency).toUpperCase()
+      : ["IDR","USD","USDT"].includes(sourceQuote) ? sourceQuote : "USDT";
     const expected = {
       assetType: "crypto",
       provider: "binance",
-      currency: "USDT",
-      providerSymbol: resetProviderSymbol || !stock.providerSymbol ? binanceSpotSymbol(ticker) : String(stock.providerSymbol).trim().toUpperCase()
+      currency: semanticQuote,
+      providerSymbol
     };
     const changed = stock.assetType !== expected.assetType
       || stock.provider !== expected.provider

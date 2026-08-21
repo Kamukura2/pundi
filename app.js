@@ -2,6 +2,7 @@ import { createEmptyState, createId, createMvpSeed, readLegacyLocalStorage, YEAR
 import { annualExpenseBreakdown, annualOperatingPerformance, buildMonthlyTimeline, buildProjection, getBudgetProgress, getClientOutstanding, getClientPaidThisMonth, getCurrentNetWorth, getEndingClients, getEntrustedDeduction, getFixedIncome, getReceivableClients, getRecurringClients, getTotalOutstanding, getTotalPaid, getYearlyProjectionTotal, monthKey, monthlyBudgetRemaining, recordedExpenseForBudget, remainingYearExpenseBreakdown, remainingYearIncomeBreakdown } from "./src/data/finance-model.js";
 import { electricityHistoryEvents, electricityPeriods as calculateElectricityPeriods, latestElectricityBalance, parseTopUpAmount } from "./src/data/electricity-model.js";
 import { formatCryptoQuote, formatFiatCurrency } from "./src/data/currency-format.js";
+import { formatMoneyInput, isMoneyField, parseMoneyInput } from "./src/data/money-input.js";
 import { CryptoMarketStream, convertCryptoPrice, fetchBinanceTicker, isCryptoAsset, normalizeCryptoSymbol, normalizeQuoteValueToIdr, parseCryptoPairInput, providerQuoteCurrency, resolveCryptoPair } from "./src/crypto/binance.js";
 import { SyncManager } from "./src/sync/sync-manager.js";
 import { fetchHoldingDividends, fetchHoldingQuote, fetchTradingBenchmark, fetchTradingQuote, fetchUsdIdrRate, isPriceStale, validateHoldingSymbol } from "./src/stocks/client.js";
@@ -1140,11 +1141,13 @@ function renderAllPreservingScroll(){
 function openSimple(title,fields,callback){
  simpleTitle.textContent=title;
  simpleFields.innerHTML=fields.map(f=>{
+ const money=isMoneyField(f);
   const input=f.options
    ? `<select id="sf_${f.key}">${f.options.map(o=>`<option ${String(o)===String(f.value)?'selected':''}>${o}</option>`).join("")}</select>`
-   : `<input id="sf_${f.key}" type="${f.type||'text'}" ${f.step?`step="${f.step}"`:''} ${f.inputmode?`inputmode="${f.inputmode}"`:''} ${f.placeholder?`placeholder="${f.placeholder}"`:''} ${f.value!==undefined?`value="${f.value}"`:''} ${f.required===false?'':'required'}>`;
+   : `<input id="sf_${f.key}" type="${money?'text':f.type||'text'}" ${money?'inputmode="decimal" data-money-input':''} ${!money&&f.step?`step="${f.step}"`:''} ${f.inputmode?`inputmode="${f.inputmode}"`:''} ${f.placeholder?`placeholder="${f.placeholder}"`:''} ${f.value!==undefined?`value="${money?formatMoneyInput(f.value):f.value}"`:''} ${f.required===false?'':'required'}>`;
   return `<label data-simple-field="${f.key}"><span data-simple-label="${f.key}">${f.label}</span>${input}${f.helper?`<small>${f.helper}</small>`:""}</label>`;
  }).join("");
+ qa("[data-money-input]").forEach(input=>input.addEventListener("input",()=>{const raw=input.value.replace(/[^0-9,.-]/g,"");input.value=raw===""?"":formatMoneyInput(parseMoneyInput(raw));}));
  const syncSimpleFields=()=>{
   const market=String(q("#sf_market")?.value||"").toUpperCase(),crypto=market==="CRYPTO";
   fields.forEach(field=>{
@@ -1178,7 +1181,7 @@ function openSimple(title,fields,callback){
   const obj={};
   fields.forEach(f=>{
    const el=q("#sf_"+f.key);
-   obj[f.key]=f.type==="number"?Number(el.value):el.value;
+   obj[f.key]=isMoneyField(f)?parseMoneyInput(el.value):f.type==="number"?Number(el.value):el.value;
   });
   const result=await callback(obj);
   if(result===false)return;

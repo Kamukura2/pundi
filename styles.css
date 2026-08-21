@@ -484,7 +484,7 @@ select,input,.search{width:100%;min-width:0;height:46px;padding:0 12px;border-ra
 .credit-brand-icon svg,.credit-source-icon svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .credit-brand-icon.card,.credit-source-icon.card,.credit-facility.card .credit-brand-icon{background:linear-gradient(135deg,#7768ff,#3caeff)}
 .credit-brand-icon.shopee,.credit-source-icon.shopee,.credit-facility.shopee .credit-brand-icon{background:linear-gradient(135deg,#ff7b42,#ff4f61)}
-.credit-brand-icon.gopay,.credit-source-icon.gopay,.credit-facility.gopay .credit-brand-icon{background:linear-gradient(135deg,#18c6d8,#198cff)}
+.credit-brand-icon.gopay,.credit-source-icon.gopay,.credit-facility.gopay .credit-brand-icon{background:linear-gradient(135deg,#20c878,#079447);color:#eafff2}
 .credit-row{grid-template-columns:22px 44px minmax(0,1fr) auto 38px 38px;background:var(--panel-fill);border:1px solid var(--line)}
 .credit-source-icon{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;color:#fff}
 .credit-row .list-value{font-weight:900}

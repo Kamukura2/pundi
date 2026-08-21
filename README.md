@@ -1,6 +1,6 @@
-# CVFinance v8.3.1
+# CVFinance v8.3.2
 
-v8.3.1 is a surgical UI naming patch: the existing top-level Stocks navigation label is now displayed as Assets. The Stocks implementation, Investment/Trading workspaces, Crypto, persistence, and accounting behavior are unchanged.
+v8.3.2 releases the approved GoPayLater visual distinction, Indonesian money-input formatting, and direct-IDR crypto FX correction. The existing Stocks navigation label remains Assets; Investment/Trading workspaces, Crypto, persistence, and accounting behavior are preserved.
 
 v8.3.0 extends Crypto with flexible USD, IDR, and USDT requested quotes. User-facing pairs are resolved through validated Binance source symbols, with USD/IDR normalization using the existing CVFinance FX rate. Existing USDT positions remain unchanged.
 

@@ -56,7 +56,7 @@ for (const key of ["FINNHUB_API_KEY","TWELVE_DATA_API_KEY","SUPABASE_URL","SUPAB
 const serviceWorker = read("public/sw.js");
 assert.match(serviceWorker, /pathname\.startsWith\("\/api\/"\)/);
 
-const jsFiles = ["app.js","api/config.js","api/_lib/rate-limit.js","api/_lib/dividends.js","api/stocks/dividends.js","api/stocks/fx.js","api/stocks/quote.js","api/stocks/validate.js","api/trading/quote.js","api/trading/benchmark.js","api/cron/refresh-stocks.js","api/crypto/quote.js","src/data/default-data.js","src/data/finance-model.js","src/data/electricity-model.js","src/data/currency-format.js","src/crypto/binance.js","src/data/repository.js","src/lib/idb.js","src/lib/supabase.js","src/stocks/client.js","src/stocks/dividends.js","src/stocks/holding.js","src/trading/model.js","src/trading/crypto-lifecycle.js","src/sync/sync-manager.js"];
+const jsFiles = ["app.js","api/config.js","api/_lib/rate-limit.js","api/_lib/dividends.js","api/stocks/dividends.js","api/stocks/fx.js","api/stocks/quote.js","api/stocks/validate.js","api/trading/quote.js","api/trading/benchmark.js","api/cron/refresh-stocks.js","api/crypto/quote.js","src/data/default-data.js","src/data/finance-model.js","src/data/electricity-model.js","src/data/currency-format.js","src/data/money-input.js","src/crypto/binance.js","src/data/repository.js","src/lib/idb.js","src/lib/supabase.js","src/stocks/client.js","src/stocks/dividends.js","src/stocks/holding.js","src/trading/model.js","src/trading/crypto-lifecycle.js","src/sync/sync-manager.js"];
 for (const file of jsFiles) execFileSync(process.execPath, ["--check", resolve(root, file)], { stdio:"pipe" });
 
 for (const file of jsFiles.map(read)) {
@@ -95,13 +95,18 @@ assert.equal(parseTopUpAmount(0),null,"Zero top-up amounts must be rejected");
 assert.equal(parseTopUpAmount("12.5"),12.5,"Decimal top-up amounts must be accepted");
 
 const { formatCryptoQuote, formatFiatCurrency } = await import("../src/data/currency-format.js");
+const { formatMoneyInput, parseMoneyInput } = await import("../src/data/money-input.js");
+assert.equal(formatMoneyInput(2000000),"2.000.000");
+assert.equal(parseMoneyInput("2.000.000"),2000000);
+assert.equal(parseMoneyInput("2000000"),2000000);
 assert.doesNotThrow(()=>formatFiatCurrency(72081.90,"USDT"),"USDT must never be passed to Intl as a fiat currency code");
 assert.match(formatFiatCurrency(72081.90,"USDT"),/USDT$/,"USDT must display as a numeric quote with an explicit suffix");
 assert.match(formatCryptoQuote(0.00005,"USDT"),/USDT$/,"Small crypto quantities/quotes must remain format-safe");
 assert.match(formatFiatCurrency(72081.90,"USD"),/\$/,"USD fiat formatting must remain unchanged");
 assert.match(formatFiatCurrency(72081.90,"IDR"),/IDR|Rp/,"IDR fiat formatting must remain unchanged");
 
-const { binanceSpotSymbol, convertCryptoPrice, cryptoBaseSymbol, isCryptoAsset, normalizeCryptoSymbol, parseCryptoPairInput } = await import("../src/crypto/binance.js");
+const { binanceSpotSymbol, convertCryptoPrice, cryptoBaseSymbol, isCryptoAsset, normalizeCryptoSymbol, normalizeQuoteValueToIdr, parseCryptoPairInput } = await import("../src/crypto/binance.js");
+const { normalizeStockMapping: normalizeHoldingMapping } = await import("../src/stocks/holding.js");
 assert.equal(normalizeCryptoSymbol("btc"),"BTC","Crypto symbols must normalize to uppercase base symbols");
 assert.equal(binanceSpotSymbol("btc"),"BTCUSDT","Crypto symbols must map to the default USDT spot pair");
 assert.equal(cryptoBaseSymbol("BTCUSDT"),"BTC","Provider pairs must resolve back to their base symbol");
@@ -113,6 +118,14 @@ assert.deepEqual(parseCryptoPairInput("btc_idr"),{baseSymbol:"BTC",requestedQuot
 assert.equal(convertCryptoPrice(70000,"USDT","USD",16250),70000);
 assert.equal(convertCryptoPrice(70000,"USDT","IDR",16250),1137500000);
 assert.equal(convertCryptoPrice(1137500000,"IDR","USD",16250),70000);
+const directIdrHolding={ticker:"SOL",market:"CRYPTO",assetType:"crypto",providerSymbol:"SOLIDR",currency:"IDR"};
+normalizeHoldingMapping(directIdrHolding);
+assert.equal(directIdrHolding.currency,"IDR","Direct IDR provider symbols must retain IDR semantic currency");
+assert.equal(normalizeQuoteValueToIdr(1612798*2,directIdrHolding.currency,16250),3225596,"Direct IDR crypto valuation must not receive FX twice");
+const usdtHolding={ticker:"BTC",market:"CRYPTO",assetType:"crypto",providerSymbol:"BTCUSDT",currency:"USDT"};
+normalizeHoldingMapping(usdtHolding);
+assert.equal(usdtHolding.currency,"USDT");
+assert.equal(normalizeQuoteValueToIdr(600*1,"USDT",16250),9750000,"USDT crypto valuation must continue using FX normalization");
 assert.equal(isCryptoAsset({assetType:"crypto",market:"CRYPTO",currency:"USDT"}),true);
 assert.equal(isCryptoAsset({market:"NASDAQ",currency:"USD"}),false);
 assert.throws(()=>normalizeCryptoSymbol("BTC/USDT"),/Invalid crypto symbol/);
@@ -433,9 +446,9 @@ assert.match(appSource, /tx-history-archive/, "Previous History months must rema
 
 const electricityIndex = read("index.html");
 const electricityCss = read("styles.css");
-assert.equal(JSON.parse(read("package.json")).version,"8.3.1","Package version must be v8.3.1");
-assert.match(electricityIndex,/<title>CVFinance v8\.3\.1<\/title>/,"Document title must be v8.3.1");
-assert.match(read("public/sw.js"),/cvfinance-shell-v8\.3\.1/,"Service-worker cache must invalidate for v8.3.1");
+assert.equal(JSON.parse(read("package.json")).version,"8.3.2","Package version must be v8.3.2");
+assert.match(electricityIndex,/<title>CVFinance v8\.3\.2<\/title>/,"Document title must be v8.3.2");
+assert.match(read("public/sw.js"),/cvfinance-shell-v8\.3\.2/,"Service-worker cache must invalidate for v8.3.2");
 assert.match(electricityIndex,/id="topUpElectricityBtn"[^>]*>\s*TOP UP\s*<\/button>/,"Electricity must expose a distinct TOP UP action");
 assert.match(electricityIndex,/id="addElectricityBtn"[^>]*>\s*＋ Reading\s*<\/button>/,"The existing Reading action must remain available");
 assert.match(electricityIndex,/id="electricityTopUpModal"/);
