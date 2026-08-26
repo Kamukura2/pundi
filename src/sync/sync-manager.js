@@ -195,7 +195,10 @@ export class SyncManager {
     this.repository = null;
     this.user = null;
     await clearUserScopedState(previousUserId);
-    await supabase.auth.signOut({ scope:"local" });
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
+    const { data:{ session } } = await supabase.auth.getSession();
+    if (session) throw new Error("Sign-out did not clear the active session.");
     if (reload) location.reload();
   }
 }

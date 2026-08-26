@@ -35,6 +35,7 @@ const RECOVERY_USER_KEY="pundi-recovery-user";
 let recoveryMode=false;
 let recoveryUserId=null;
 let recoveryEventSeen=false;
+let recoverySubscription=null;
 let stockRefreshStarted=false;
 let fxRefreshTimer=null;
 let tradingRefreshTimer=null;
@@ -1869,7 +1870,7 @@ async function boot(){
    const supabase=await getSupabase();
    let recoveryEventResolve;
    const recoveryEventPromise=new Promise(resolve=>{recoveryEventResolve=resolve;});
-   const {data:{subscription}}=supabase.auth.onAuthStateChange((event,session)=>{
+   recoverySubscription=supabase.auth.onAuthStateChange((event,session)=>{
     if(event!=="PASSWORD_RECOVERY")return;
     recoveryEventSeen=true;recoveryMode=true;recoveryUserId=session?.user?.id||null;
     if(recoveryUserId)sessionStorage.setItem(RECOVERY_USER_KEY,recoveryUserId);
@@ -1893,14 +1894,14 @@ async function boot(){
     const previouslyBound=Boolean(savedRecoveryUser)&&savedRecoveryUser===recoverySession?.user?.id;
     const callbackSession=Boolean(recoverySession?.user)&&(recoveryEventSeen||callbackExchanged||Boolean(hashAccessToken));
     if(!recoverySession?.user||(!callbackSession&&!previouslyBound)){
-     recoveryMode=true;authGate.hidden=false;setAuthMode("expired");authError.textContent="This password reset link is invalid or has expired.";subscription.unsubscribe();return;
+     recoveryMode=true;authGate.hidden=false;setAuthMode("expired");authError.textContent="This password reset link is invalid or has expired.";recoverySubscription?.data?.subscription?.unsubscribe();recoverySubscription=null;return;
     }
     recoveryMode=true;recoveryUserId=recoverySession.user.id;
     sessionStorage.setItem(RECOVERY_USER_KEY,recoveryUserId);
-    authGate.hidden=false;setAuthMode("recovery");authEmail.value=recoverySession.user.email||"";authPassword.focus();subscription.unsubscribe();return;
+    authGate.hidden=false;setAuthMode("recovery");authEmail.value=recoverySession.user.email||"";authPassword.focus();return;
    }
    const flash=sessionStorage.getItem("pundi-auth-flash");
-   if(flash){sessionStorage.removeItem("pundi-auth-flash");authGate.hidden=false;setAuthMode("signin");authError.textContent=flash;authEmail.focus();}
+   if(flash){sessionStorage.removeItem("pundi-auth-flash");authGate.hidden=false;setAuthMode("signin");setAuthMessage("success",flash);authEmail.focus();}
    else{
     const user=await syncManager.connect();
     if(user)await showSignedIn(user);else{authGate.hidden=false;authEmail.focus();}
@@ -1924,7 +1925,13 @@ function setAuthMode(mode){
  authRecoveryCancel.hidden=!recovery;
  authModeToggle.hidden=forgot||recovery||expired||initializing;
  authModeToggle.textContent=signUp?"Already have an account? Sign in":"Don't have an account? Sign up";
+ authError.className="auth-message error";
  if(!expired)authError.textContent="";
+}
+
+function setAuthMessage(kind,message){
+ authError.className=`auth-message ${kind}`;
+ authError.textContent=message;
 }
 
 function authErrorMessage(error, mode){
@@ -1943,8 +1950,9 @@ authModeToggle.onclick=()=>setAuthMode(authMode==="signup"?"signin":"signup");
 authForgotPassword.onclick=()=>setAuthMode("forgot");
 authRecoveryCancel.onclick=async()=>{
  if(authMode!=="recovery")return;
- sessionStorage.removeItem(RECOVERY_PENDING_KEY);sessionStorage.removeItem(RECOVERY_USER_KEY);
  await syncManager.signOut({reload:false});
+ recoverySubscription?.data?.subscription?.unsubscribe();recoverySubscription=null;
+ sessionStorage.removeItem(RECOVERY_PENDING_KEY);sessionStorage.removeItem(RECOVERY_USER_KEY);
  recoveryMode=false;location.assign("/");
 };
 setAuthMode("signin");
@@ -1975,10 +1983,11 @@ authForm.onsubmit=async event=>{
    else authError.textContent="Account creation needs confirmation. Check your email.";
   }else if(authMode==="recovery"){
    await syncManager.changePassword(authPassword.value,{recovery:true,expectedUserId:recoveryUserId});
-   authError.textContent="Password updated successfully.";
-   sessionStorage.removeItem(RECOVERY_PENDING_KEY);sessionStorage.removeItem(RECOVERY_USER_KEY);
-   sessionStorage.setItem("pundi-auth-flash","Password updated. Sign in with your new password.");
+   setAuthMessage("success","Password updated successfully. Sign in with your new password.");
    await syncManager.signOut({reload:false});
+   recoverySubscription?.data?.subscription?.unsubscribe();recoverySubscription=null;
+   sessionStorage.removeItem(RECOVERY_PENDING_KEY);sessionStorage.removeItem(RECOVERY_USER_KEY);
+   sessionStorage.setItem("pundi-auth-flash","Password updated successfully. Sign in with your new password.");
    recoveryMode=false;location.assign("/");
   }else{
    const user=await syncManager.connect(email,authPassword.value);await showSignedIn(user);
