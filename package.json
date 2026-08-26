@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "check": "node scripts/check.mjs && node scripts/check-telegram.mjs",
-    "test:isolation": "node tests/integration/supabase-isolation.mjs"
+    "test:isolation": "node tests/integration/supabase-isolation.mjs",
+    "test:admin": "node tests/integration/admin-contract.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.55.0"
