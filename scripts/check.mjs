@@ -271,7 +271,8 @@ for (const marker of ["PUNDI_TEST_PROJECT_REF","admin API -> 401","-> 403","app_
 assert.match(adminHtml,/Product metadata only\. Private financial contents are never shown/);
 assert.match(adminHtml,/id="search"/); assert.match(adminHtml,/id="plan"/); assert.match(adminHtml,/id="status"/); assert.match(adminHtml,/id="prev"/); assert.match(adminHtml,/id="next"/);
 assert.match(adminClient,/cache:\s*["']no-store["']/,"Admin API fetch must bypass cached 304 responses");
-assert.match(adminApi,/Cache-Control.*no-store/i,"Admin API responses must not be cached");
+assert.match(adminApi,/Cache-Control.*no-store.*no-cache/i,"Admin API responses must not be conditionally cached");
+assert.match(adminApi,/Content-Type.*application\/json/i,"Admin API must declare a JSON response contract");
 assert.doesNotMatch(adminClient,/esm\.sh|jsdelivr|unpkg/i,"Admin bootstrap must not depend on a remote module CDN");
 assert.doesNotMatch(adminClient,/SUPABASE_SERVICE_ROLE_KEY|service_role/i,"Admin browser code must not contain service-role configuration");
 assert.doesNotMatch(adminClient,/password|refresh_token|balance|transaction|portfolio|holding/i,"Admin browser code must not request or render private finance fields");
