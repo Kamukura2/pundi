@@ -336,7 +336,7 @@ export class FinanceRepository {
 
   subscribe(onChange) {
     let timer;
-    const channel = this.supabase.channel(`cvfinance-${this.user.id}`);
+    const channel = this.supabase.channel(`pundi-${this.user.id}`);
     SAVE_TABLES.forEach(table => channel.on("postgres_changes", {event:"*",schema:"public",table,filter:`user_id=eq.${this.user.id}`}, () => {
       clearTimeout(timer);
       timer = setTimeout(onChange, 350);

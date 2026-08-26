@@ -24,9 +24,9 @@ const todayISO=()=>{
 };
 
 const state=createEmptyState();
-state.theme=localStorage.getItem("cvfinance-theme-cache")||"dark";
-state.language=localStorage.getItem("cvfinance-language-cache")||"en";
-state.stockView=localStorage.getItem("cvfinance-stock-view-cache")==="trading"?"trading":"investment";
+state.theme=localStorage.getItem("pundi-theme-cache")||"dark";
+state.language=localStorage.getItem("pundi-language-cache")||"en";
+state.stockView=localStorage.getItem("pundi-stock-view-cache")==="trading"?"trading":"investment";
 let syncManager;
 let stockRefreshStarted=false;
 let fxRefreshTimer=null;
@@ -190,7 +190,7 @@ function applyLanguage(){
   if(!el.hasAttribute(attr)||el.closest("#languageBtn"))return;const key=`i18n${attr.replace("-","")}`;
   if(el.dataset[key]===undefined)el.dataset[key]=el.getAttribute(attr);el.setAttribute(attr,state.language==="id"?translateText(el.dataset[key]):el.dataset[key]);
  }));
- localStorage.setItem("cvfinance-language-cache",state.language);
+ localStorage.setItem("pundi-language-cache",state.language);
 }
 
 function normalizeStockMappings() {
@@ -267,10 +267,10 @@ function attachTips(){
  });
 }
 function toastMsg(x){toast.textContent=x;toast.classList.add("show");setTimeout(()=>toast.classList.remove("show"),1400)}
-function setTheme(t){state.theme=t;document.documentElement.dataset.theme=t;localStorage.setItem("cvfinance-theme-cache",t);saveSettings();themeBtn.textContent=t==="dark"?"☀":"☾"}
+function setTheme(t){state.theme=t;document.documentElement.dataset.theme=t;localStorage.setItem("pundi-theme-cache",t);saveSettings();themeBtn.textContent=t==="dark"?"☀":"☾"}
 function setStockWorkspace(view,{refresh=true}={}){
  const next=view==="trading"?"trading":"investment";state.stockView=next;
- localStorage.setItem("cvfinance-stock-view-cache",next);
+ localStorage.setItem("pundi-stock-view-cache",next);
  qa("[data-stock-workspace]").forEach(button=>{const active=button.dataset.stockWorkspace===next;button.classList.toggle("active",active);button.setAttribute("aria-selected",String(active));});
  qa("[data-stock-view]").forEach(panel=>panel.classList.toggle("active",panel.dataset.stockView===next));
  kicker.textContent=next==="trading"?"ACTIVE PORTFOLIO & PERFORMANCE":"LONG-TERM PORTFOLIO & TARGETS";
@@ -1441,7 +1441,7 @@ async function refreshInvestmentDividends({silent=false,force=false}={}){
  if(!navigator.onLine||!investmentStocks.length){if(!investmentStocks.length)renderDividends();return false;}
  if(dividendRefreshPromise)return dividendRefreshPromise;
  const holdingSignature=investmentStocks.map(stock=>stock.id).sort().join(",");
- const refreshKey=`cvfinance-dividends-refresh:${todayISO()}:${holdingSignature}`;
+ const refreshKey=`pundi-dividends-refresh:${todayISO()}:${holdingSignature}`;
  if(!force&&localStorage.getItem(refreshKey)==="done")return false;
  dividendRefreshPromise=(async()=>{
   if(typeof refreshDividendsBtn!=="undefined")refreshDividendsBtn.disabled=true;
@@ -1799,8 +1799,8 @@ function applyCloudState(next,{preserveUi=false}={}){
  const ui={page:state.page==="trading"?"stocks":state.page,stockView:state.stockView||"investment",privacy:state.privacy,filter:state.filter,sort:state.sort,expenseView:state.expenseView,txEdit:null,prospectMode:state.prospectMode,tradingRange:state.tradingRange||"YTD"};
  Object.assign(state,next,ui);
  document.documentElement.dataset.theme=state.theme;
- localStorage.setItem("cvfinance-theme-cache",state.theme);
- localStorage.setItem("cvfinance-language-cache",state.language||"en");
+ localStorage.setItem("pundi-theme-cache",state.theme);
+ localStorage.setItem("pundi-language-cache",state.language||"en");
  themeBtn.textContent=state.theme==="dark"?"☀":"☾";
  baseGrowth.value=state.baseGrowth;optimisticGrowth.value=state.optimisticGrowth;
  const dividendStateChanged=advanceDividendLifecycle(state,new Date());

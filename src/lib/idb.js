@@ -1,4 +1,4 @@
-const DB_NAME = "cvfinance-cache-v1";
+const DB_NAME = "pundi-cache-v1";
 const DB_VERSION = 1;
 
 function openDb() {

@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "CVFinance",
-  "short_name": "CVFinance",
+  "name": "Pundi",
+  "short_name": "Pundi",
   "description": "Private synchronized personal finance dashboard",
   "start_url": "/",
   "scope": "/",

@@ -6,7 +6,7 @@ import { resolve } from "node:path";
 const root = resolve(import.meta.dirname, "..");
 const read = path => readFileSync(resolve(root, path), "utf8");
 const manifest = JSON.parse(read("public/manifest.webmanifest"));
-assert.equal(manifest.name, "CVFinance");
+assert.equal(manifest.name, "Pundi");
 assert.equal(manifest.display, "standalone");
 for (const icon of manifest.icons) assert.ok(existsSync(resolve(root, "public", icon.src.replace(/^\//, ""))), `Missing ${icon.src}`);
 
@@ -447,8 +447,8 @@ assert.match(appSource, /tx-history-archive/, "Previous History months must rema
 const electricityIndex = read("index.html");
 const electricityCss = read("styles.css");
 assert.equal(JSON.parse(read("package.json")).version,"8.3.2","Package version must be v8.3.2");
-assert.match(electricityIndex,/<title>CVFinance v8\.3\.2<\/title>/,"Document title must be v8.3.2");
-assert.match(read("public/sw.js"),/cvfinance-shell-v8\.3\.2/,"Service-worker cache must invalidate for v8.3.2");
+assert.match(electricityIndex,/<title>Pundi v8\.3\.2<\/title>/,"Document title must be v8.3.2");
+assert.match(read("public/sw.js"),/pundi-shell-v8\.3\.2/,"Service-worker cache must invalidate for v8.3.2");
 assert.match(electricityIndex,/id="topUpElectricityBtn"[^>]*>\s*TOP UP\s*<\/button>/,"Electricity must expose a distinct TOP UP action");
 assert.match(electricityIndex,/id="addElectricityBtn"[^>]*>\s*＋ Reading\s*<\/button>/,"The existing Reading action must remain available");
 assert.match(electricityIndex,/id="electricityTopUpModal"/);
@@ -539,4 +539,4 @@ assert.match(syncSource, /this\.pendingPersists/, "Realtime reloads must wait fo
 assert.match(syncSource, /await this\.repository\.loadCloud\(\);\s*result = await this\.repository\.save\(snapshot\)/, "Transient optimistic-lock conflicts must retry the unchanged local snapshot");
 assert.doesNotMatch(syncSource, /if \(\/conflict\/i\.test\(error\.message \|\| \"\"\)\) \{\s*const cloud[\s\S]*this\.onState\(cloud\)/, "A sync conflict must never overwrite unsaved local target input");
 
-console.log("CVFinance checks passed: schema, RLS markers, PWA, unified Stocks workspace, unchanged Investment/Trading isolation, matching wallet controls, dynamic Investment dividends, historical eligibility review, one-time dividend credit, dividend Prospect income, closed-position sync tombstone, active-only Trading cards and targets, same-ticker re-entry, desktop SELL handler, Trading equity reconciliation, Starting Funds label, mobile document scroll recovery, compact mobile Trading, unrestricted manual Sell price, isolated Reset All, realized-only Trading gain/loss, stable target sync, same-day SPY comparison, visible SPY API quote, safe ticker deletion, Twelve Data primary quotes, Finnhub fallback, Trading Insights, PAID-or-nominal client cards, persistent transaction templates, monthly History archives, Financial Action Plan isolation, Yahoo FX validation, offline queue coalescing, and JavaScript syntax.");
+console.log("Pundi checks passed: schema, RLS markers, PWA, unified Stocks workspace, unchanged Investment/Trading isolation, matching wallet controls, dynamic Investment dividends, historical eligibility review, one-time dividend credit, dividend Prospect income, closed-position sync tombstone, active-only Trading cards and targets, same-ticker re-entry, desktop SELL handler, Trading equity reconciliation, Starting Funds label, mobile document scroll recovery, compact mobile Trading, unrestricted manual Sell price, isolated Reset All, realized-only Trading gain/loss, stable target sync, same-day SPY comparison, visible SPY API quote, safe ticker deletion, Twelve Data primary quotes, Finnhub fallback, Trading Insights, PAID-or-nominal client cards, persistent transaction templates, monthly History archives, Financial Action Plan isolation, Yahoo FX validation, offline queue coalescing, and JavaScript syntax.");
