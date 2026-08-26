@@ -1953,7 +1953,7 @@ authRecoveryCancel.onclick=async()=>{
  await syncManager.signOut({reload:false});
  recoverySubscription?.data?.subscription?.unsubscribe();recoverySubscription=null;
  sessionStorage.removeItem(RECOVERY_PENDING_KEY);sessionStorage.removeItem(RECOVERY_USER_KEY);
- recoveryMode=false;location.assign("/");
+ recoveryMode=false;recoveryEventSeen=false;recoveryUserId=null;location.assign("/");
 };
 setAuthMode("signin");
 authForm.onsubmit=async event=>{
@@ -1988,11 +1988,11 @@ authForm.onsubmit=async event=>{
    recoverySubscription?.data?.subscription?.unsubscribe();recoverySubscription=null;
    sessionStorage.removeItem(RECOVERY_PENDING_KEY);sessionStorage.removeItem(RECOVERY_USER_KEY);
    sessionStorage.setItem("pundi-auth-flash","Password updated successfully. Sign in with your new password.");
-   recoveryMode=false;location.assign("/");
+   recoveryMode=false;recoveryEventSeen=false;recoveryUserId=null;location.assign("/");
   }else{
    const user=await syncManager.connect(email,authPassword.value);await showSignedIn(user);
   }
- }catch(error){authError.textContent=authErrorMessage(error,authMode)}
+ }catch(error){setAuthMessage("error",authErrorMessage(error,authMode))}
  finally{authSubmit.disabled=false;if(authMode==="signup")authSubmit.textContent="Create account";else if(authMode==="forgot")authSubmit.textContent="Send reset link";else if(authMode==="recovery")authSubmit.textContent="Update password";else authSubmit.textContent="Sign in";}
 };
 
