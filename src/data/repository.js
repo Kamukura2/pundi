@@ -13,6 +13,11 @@ const parentFirst = ["accounts","transactions","monthly_budgets","yearly_expense
 const deleteFirst = [...parentFirst].reverse();
 const meta = row => ({ __createdAt: row.created_at, __updatedAt: row.updated_at });
 const clean = value => JSON.parse(JSON.stringify(value));
+const withoutOwnership = value => {
+  if (Array.isArray(value)) return value.map(withoutOwnership);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(Object.entries(value).filter(([key]) => !["user_id","owner_user_id"].includes(key)).map(([key, item]) => [key, withoutOwnership(item)]));
+};
 const comparable = row => {
   const copy = { ...row };
   delete copy.created_at;
@@ -347,20 +352,21 @@ export class FinanceRepository {
 }
 
 export function exportBackup(state, userId) {
-  const data = clean(state);
+  const data = withoutOwnership(clean(state));
   ["page","privacy","filter","sort","expenseView","txEdit","prospectMode","stockView"].forEach(key => delete data[key]);
   return { format:"cvfinance-backup", version:1, exportedAt:new Date().toISOString(), userId, data };
 }
 
 export function validateBackup(value) {
-  if (value?.format !== "cvfinance-backup" || value?.version !== 1 || !value?.data) throw new Error("Invalid CVFinance backup file.");
+  if (value?.format !== "cvfinance-backup" || value?.version !== 1 || !value?.data) throw new Error("Invalid Pundi backup file.");
+  const data = withoutOwnership(clean(value.data));
   const required = ["accounts","transactions","budgets","yearly","events","creditFacilities","credit","clients","stocks","electricity"];
-  required.forEach(key => { if (!Array.isArray(value.data[key])) throw new Error(`Backup is missing ${key}.`); });
-  if (!Array.isArray(value.data.electricityTopups)) value.data.electricityTopups = [];
-  if (!Array.isArray(value.data.entrustedFunds)) value.data.entrustedFunds = [];
-  if (!Array.isArray(value.data.tradingPositions)) value.data.tradingPositions = [];
-  if (!Array.isArray(value.data.tradingLedger)) value.data.tradingLedger = [];
-  if (!Array.isArray(value.data.tradingSnapshots)) value.data.tradingSnapshots = [];
-  if (!Array.isArray(value.data.dividends)) value.data.dividends = [];
-  return { ...createEmptyState(), ...value.data, settingsId:createId() };
+  required.forEach(key => { if (!Array.isArray(data[key])) throw new Error(`Backup is missing ${key}.`); });
+  if (!Array.isArray(data.electricityTopups)) data.electricityTopups = [];
+  if (!Array.isArray(data.entrustedFunds)) data.entrustedFunds = [];
+  if (!Array.isArray(data.tradingPositions)) data.tradingPositions = [];
+  if (!Array.isArray(data.tradingLedger)) data.tradingLedger = [];
+  if (!Array.isArray(data.tradingSnapshots)) data.tradingSnapshots = [];
+  if (!Array.isArray(data.dividends)) data.dividends = [];
+  return { ...createEmptyState(), ...data, settingsId:createId() };
 }

@@ -1,3 +1,4 @@
+import { clearUserScopedState } from "../lib/idb.js";
 import { getSupabase } from "../lib/supabase.js";
 import { FinanceRepository, exportBackup, validateBackup } from "../data/repository.js";
 
@@ -142,7 +143,12 @@ export class SyncManager {
 
   async signOut() {
     const supabase = await getSupabase();
+    const previousUserId = this.user?.id;
     this.unsubscribe?.();
+    this.unsubscribe = null;
+    this.repository = null;
+    this.user = null;
+    await clearUserScopedState(previousUserId);
     await supabase.auth.signOut();
     location.reload();
   }

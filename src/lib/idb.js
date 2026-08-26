@@ -32,6 +32,21 @@ export const mutationPut = mutation => useStore("mutations", "readwrite", store 
 export const mutationDelete = key => useStore("mutations", "readwrite", store => store.delete(key));
 export const mutationList = () => useStore("mutations", "readonly", store => store.getAll());
 export const mutationCount = () => useStore("mutations", "readonly", store => store.count());
+export async function clearUserScopedState(userId) {
+  if (!userId) return;
+  const snapshotKey = `snapshot:${userId}`;
+  const db = await openDb();
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(["cache", "mutations"], "readwrite");
+    tx.objectStore("cache").delete(snapshotKey);
+    const mutations = tx.objectStore("mutations");
+    const request = mutations.getAll();
+    request.onsuccess = () => request.result.filter(item => item.userId === userId).forEach(item => mutations.delete(item.key));
+    request.onerror = () => reject(request.error);
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror = () => reject(tx.error);
+  });
+}
 export async function mutationClear() {
   return useStore("mutations", "readwrite", store => store.clear());
 }
