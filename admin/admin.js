@@ -1,15 +1,23 @@
-const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+import { createClient } from "@supabase/supabase-js";
+import { bootstrapAdminState, withTimeout } from "./state.js";
 const $ = id => document.getElementById(id);
 let supabase, session, records=[], page=0;
 const pageSize=20;
+const BOOT_TIMEOUT_MS=10000;
 const esc = value => String(value ?? "").replace(/[&<>"']/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[char]));
 const date = value => value ? new Date(value).toLocaleString() : "—";
 function showError(message){ $("error").textContent=message; }
 async function api(method="GET", body){
-  const response=await fetch("/api/admin",{method,headers:{Authorization:`Bearer ${session.access_token}`,"Content-Type":"application/json"},body:body?JSON.stringify(body):undefined});
-  const data=await response.json().catch(()=>({}));
-  if(!response.ok) throw new Error(data.error || `Admin request failed (${response.status}).`);
-  return data;
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),BOOT_TIMEOUT_MS);
+  try{
+    const response=await fetch("/api/admin",{method,headers:{Authorization:`Bearer ${session.access_token}`,"Content-Type":"application/json"},body:body?JSON.stringify(body):undefined,signal:controller.signal});
+    const data=await response.json().catch(()=>null);
+    if(!data || typeof data!=="object") throw Object.assign(new Error("Admin API returned an invalid response."),{status:response.status});
+    if(!response.ok) throw Object.assign(new Error(data.error || `Admin request failed (${response.status}).`),{status:response.status});
+    return data;
+  }catch(error){ if(error.name==="AbortError") throw new Error("Admin API request timed out. Please retry."); throw error; }
+  finally{ clearTimeout(timer); }
 }
 function renderCards(overview){
   const cards=[["Total Users",overview.total_users],["New Users · 7 Days",overview.new_users_7_days],["New Users · 30 Days",overview.new_users_30_days],["Active · 7 Days",overview.active_users_7_days],["Free Users",overview.free_users],["Paid Users",overview.paid_users]];
@@ -24,8 +32,8 @@ function renderRows(){
 }
 async function load(){
   showError("");
-  const params=new URLSearchParams({search:$("search").value,plan:$("plan").value,status:$("status").value,sort:$("sort").value});
-  const data=await api("GET",null).then(value=>value);
+  const data=await api("GET",null);
+  if(!data.overview || !Array.isArray(data.users)) throw new Error("Admin API returned an invalid dashboard response.");
   // Filtering is repeated locally for responsive pagination; API remains the authorization boundary.
   const search=$("search").value.trim().toLowerCase(), plan=$("plan").value, status=$("status").value;
   records=(data.users||[]).filter(row=>(!search||row.email.toLowerCase().includes(search)||row.user_id.toLowerCase().includes(search))&&(!plan||(plan==="paid"?row.plan!=="free":row.plan===plan))&&(!status||row.subscription_status===status));
@@ -45,12 +53,23 @@ function showDetail(row){
 }
 async function boot(){
   try{
-    const config=await fetch("/api/config",{cache:"no-store"}).then(response=>response.json());
+    $("notice").textContent="Loading authenticated admin session…";
+    $("notice").classList.remove("error");
+    const config=await withTimeout(fetch("/api/config",{cache:"no-store"}).then(async response=>{if(!response.ok)throw new Error("Supabase configuration unavailable.");return response.json();}),"Supabase configuration",BOOT_TIMEOUT_MS);
+    if(!config.supabaseUrl || !config.supabaseAnonKey)throw new Error("Supabase configuration is incomplete.");
     supabase=createClient(config.supabaseUrl,config.supabaseAnonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
-    ({data:{session}}=await supabase.auth.getSession());
-    if(!session){$("notice").textContent="Sign in to Pundi first, then open /admin.";return;}
-    await load();
-  }catch(error){$("notice").textContent=error.message;$("notice").classList.add("error");}
+    const result=await bootstrapAdminState({getSession:()=>supabase.auth.getSession().then(({data})=>data.session),loadDashboard:nextSession=>{session=nextSession;return load();},timeoutMs:BOOT_TIMEOUT_MS});
+    if(result.state==="dashboard")return;
+    $("dashboard").hidden=true;
+    if(result.state==="unauthenticated")$("notice").textContent="You are not signed in. Sign in to Pundi, then open /admin.";
+    else if(result.state==="denied")$("notice").textContent="Access denied. This account is not an admin.";
+    else throw result.error || new Error("Unable to load the admin dashboard.");
+  }catch(error){
+    $("dashboard").hidden=true;
+    $("notice").textContent=error.message || "Unable to load the admin dashboard.";
+    $("notice").classList.add("error");
+    const retry=document.createElement("button"); retry.textContent="Retry"; retry.className="primary"; retry.onclick=()=>{retry.remove();boot();}; $("notice").append(" ",retry);
+  }
 }
 ["search","plan","status","sort"].forEach(id=>$(id).oninput=()=>load().catch(error=>showError(error.message)));
 $("refresh").onclick=()=>load().catch(error=>showError(error.message)); $("prev").onclick=()=>{page--;renderRows()}; $("next").onclick=()=>{page++;renderRows()}; $("close").onclick=()=>$("drawer").hidden=true; $("drawer").onclick=event=>{if(event.target.id==="drawer")$("drawer").hidden=true}; $("signOut").onclick=async()=>{await supabase?.auth.signOut();location.href="/"};
