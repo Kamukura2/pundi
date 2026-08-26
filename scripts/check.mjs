@@ -69,6 +69,8 @@ const env = read(".env.example");
 for (const key of ["FINNHUB_API_KEY","TWELVE_DATA_API_KEY","SUPABASE_URL","SUPABASE_ANON_KEY"]) assert.match(env, new RegExp(`^${key}=`, "m"));
 const serviceWorker = read("public/sw.js");
 assert.match(serviceWorker, /pathname\.startsWith\("\/api\/"\)/);
+assert.match(serviceWorker, /const copy = response\.clone\(\);[\s\S]*?cache\.put\(request, copy\)/, "Service Worker must clone asset responses before asynchronous cache writes");
+assert.doesNotMatch(serviceWorker, /cache\.put\(request, response\.clone\(\)\)/, "Service Worker must not clone asset responses inside the cache callback");
 
 const jsFiles = ["app.js","api/config.js","api/_lib/rate-limit.js","api/_lib/dividends.js","api/stocks/dividends.js","api/stocks/fx.js","api/stocks/quote.js","api/stocks/validate.js","api/trading/quote.js","api/trading/benchmark.js","api/cron/refresh-stocks.js","api/crypto/quote.js","src/data/default-data.js","src/data/finance-model.js","src/data/electricity-model.js","src/data/currency-format.js","src/data/money-input.js","src/crypto/binance.js","src/data/repository.js","src/lib/idb.js","src/lib/supabase.js","src/stocks/client.js","src/stocks/dividends.js","src/stocks/holding.js","src/trading/model.js","src/trading/crypto-lifecycle.js","src/sync/sync-manager.js"];
 for (const file of jsFiles) execFileSync(process.execPath, ["--check", resolve(root, file)], { stdio:"pipe" });
