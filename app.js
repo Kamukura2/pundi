@@ -1852,9 +1852,7 @@ async function boot(){
  baseGrowth.value=state.baseGrowth;optimisticGrowth.value=state.optimisticGrowth;renderAll();applyLanguage();
  if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{});
  try{
-   const config=await withTimeout(fetch("/api/config",{cache:"no-store"}).then(async response=>{if(!response.ok)throw new Error("Supabase configuration unavailable.");return response.json();}),"Supabase configuration",BOOT_TIMEOUT_MS);
-   if(!config.supabaseUrl || !config.supabaseAnonKey)throw new Error("Supabase configuration is incomplete.");
-   supabase=createClient(config.supabaseUrl,config.supabaseAnonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+   const supabase=await getSupabase();
    if(new URLSearchParams(location.hash.replace(/^#/,"?")).get("type")==="recovery"){
     const {data:{session:recoverySession}}=await supabase.auth.getSession();
     if(!recoverySession?.user)throw new Error("Password reset link is invalid or expired. Please request a new link.");
