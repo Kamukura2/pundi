@@ -252,8 +252,8 @@ assert.match(repositorySource,/filter:`user_id=eq\.\$\{this\.user\.id\}`/,"Realt
 const isolationHarness = read("tests/integration/supabase-isolation.mjs");
 const adminContract = read("tests/integration/admin-contract.mjs");
 const adminApi = read("api/admin.js");
-const adminHtml = read("admin/index.html");
-const adminClient = read("admin/admin.js");
+const adminHtml = read("public/admin/index.html");
+const adminClient = read("public/admin/admin.js");
 const packageJson = JSON.parse(read("package.json"));
 assert.equal(packageJson.scripts["test:isolation"],"node tests/integration/supabase-isolation.mjs","Two-user isolation harness must remain an explicit npm command");
 assert.equal(packageJson.scripts["test:admin"],"node tests/integration/admin-contract.mjs","Admin contract harness must remain an explicit npm command");
