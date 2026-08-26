@@ -68,6 +68,7 @@ async function audit(db, adminId, targetId, action, beforeMetadata, afterMetadat
   if (auditError) throw Object.assign(new Error("Audit log write failed."), { status:503, code:"audit_unavailable" });
 }
 export default async function handler(request, response) {
+  response.setHeader("Cache-Control","private, no-store, max-age=0");
   if (request.method !== "GET" && request.method !== "POST") return error(response,405,"Method not allowed.","method_not_allowed");
   try {
     const { db, user:adminUser } = await authenticate(request);
