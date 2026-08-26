@@ -249,6 +249,11 @@ assert.match(repositorySource,/cacheKey = `snapshot:\$\{user\.id\}`/,"Finance ca
 assert.match(repositorySource,/mutationList\(\)\)\.filter\(item => item\.userId === this\.user\.id\)/,"Offline queue must be filtered by authenticated user");
 assert.match(repositorySource,/channel\(`pundi-\$\{this\.user\.id\}`\)/,"Realtime channel must be user-scoped");
 assert.match(repositorySource,/filter:`user_id=eq\.\$\{this\.user\.id\}`/,"Realtime events must be filtered by authenticated user");
+const isolationHarness = read("tests/integration/supabase-isolation.mjs");
+const packageJson = JSON.parse(read("package.json"));
+assert.equal(packageJson.scripts["test:isolation"],"node tests/integration/supabase-isolation.mjs","Two-user isolation harness must remain an explicit npm command");
+for (const marker of ["PUNDI_TEST_PROJECT_REF","ndeycwoyjwyntjkgbzlz","admin.createUser","admin.deleteUser","clearUserScopedState","removeChannel","PUNDI_PHASE_1_1"]) assert.match(isolationHarness,new RegExp(marker),`Isolation harness missing ${marker}`);
+assert.doesNotMatch(isolationHarness,/console\.log\([^\n]*(?:password|token|api_key|service_role)/i,"Isolation harness must not log credentials or tokens");
 const migration018 = read("supabase/migrations/018_owner_scoped_relationships.sql");
 for (const marker of ["credit_items_user_facility_fkey","stock_price_targets_user_holding_fkey","investment_dividends_user_holding_fkey","trading_ledger_user_position_fkey","foreign key \\(user_id, facility_id\\)","foreign key \\(user_id, holding_id\\)","foreign key \\(user_id, position_id\\)"]) assert.match(migration018,new RegExp(marker,"i"));
 assert.doesNotMatch(migration018,/drop\s+table|truncate\s+|delete\s+from/i,"Ownership migration must be forward-only");
