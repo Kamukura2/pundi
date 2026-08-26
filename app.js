@@ -29,6 +29,12 @@ state.language=localStorage.getItem("pundi-language-cache")||"en";
 state.stockView=localStorage.getItem("pundi-stock-view-cache")==="trading"?"trading":"investment";
 let syncManager;
 let authMode="signin";
+const RECOVERY_ROUTE="/auth/reset-password";
+const RECOVERY_PENDING_KEY="pundi-recovery-pending";
+const RECOVERY_USER_KEY="pundi-recovery-user";
+let recoveryMode=false;
+let recoveryUserId=null;
+let recoveryEventSeen=false;
 let stockRefreshStarted=false;
 let fxRefreshTimer=null;
 let tradingRefreshTimer=null;
@@ -1822,6 +1828,7 @@ function updateSyncStatus(info){
 syncManager=new SyncManager({onState:applyCloudState,onStatus:updateSyncStatus});
 
 async function showSignedIn(user){
+ if(recoveryMode) return;
  authGate.hidden=true;document.body.classList.remove("auth-locked");
  accountEmail.textContent=user.email||"Private account";
  try{
@@ -1852,35 +1859,60 @@ async function boot(){
  baseGrowth.value=state.baseGrowth;optimisticGrowth.value=state.optimisticGrowth;renderAll();applyLanguage();
  if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{});
  try{
+   const hashParams=new URLSearchParams(location.hash.replace(/^#/,"?"));
+   const recoverySignal=location.pathname===RECOVERY_ROUTE||hashParams.get("type")==="recovery";
+   if(recoverySignal)sessionStorage.setItem(RECOVERY_PENDING_KEY,"1");
    const supabase=await getSupabase();
-   if(new URLSearchParams(location.hash.replace(/^#/,"?")).get("type")==="recovery"){
+   const {data:{subscription}}=supabase.auth.onAuthStateChange((event,session)=>{
+    if(event!=="PASSWORD_RECOVERY")return;
+    recoveryEventSeen=true;recoveryMode=true;recoveryUserId=session?.user?.id||null;
+    if(recoveryUserId)sessionStorage.setItem(RECOVERY_USER_KEY,recoveryUserId);
+   });
+   if(recoverySignal||sessionStorage.getItem(RECOVERY_PENDING_KEY)==="1"){
     const {data:{session:recoverySession}}=await supabase.auth.getSession();
-    if(!recoverySession?.user)throw new Error("Password reset link is invalid or expired. Please request a new link.");
-    authGate.hidden=false;setAuthMode("recovery");authEmail.value=recoverySession.user.email||"";authPassword.focus();return;
+    const savedRecoveryUser=sessionStorage.getItem(RECOVERY_USER_KEY);
+    const boundToRecovery=recoveryEventSeen&&recoverySession?.user?.id===recoveryUserId;
+    const previouslyBound=Boolean(savedRecoveryUser)&&savedRecoveryUser===recoverySession?.user?.id;
+    if(!recoverySession?.user||(!boundToRecovery&&!previouslyBound)){
+     recoveryMode=true;authGate.hidden=false;setAuthMode("expired");authError.textContent="This password reset link is invalid or has expired.";subscription.unsubscribe();return;
+    }
+    recoveryMode=true;recoveryUserId=recoverySession.user.id;
+    sessionStorage.setItem(RECOVERY_USER_KEY,recoveryUserId);
+    authGate.hidden=false;setAuthMode("recovery");authEmail.value=recoverySession.user.email||"";authPassword.focus();subscription.unsubscribe();return;
    }
-   const user=await syncManager.connect();
-   if(user)await showSignedIn(user);else{authGate.hidden=false;authEmail.focus();}
- }catch(error){authGate.hidden=false;authError.textContent=error.message;updateSyncStatus({kind:"error",message:"Setup required",detail:error.message});}
+   const flash=sessionStorage.getItem("pundi-auth-flash");
+   if(flash){sessionStorage.removeItem("pundi-auth-flash");authGate.hidden=false;setAuthMode("signin");authError.textContent=flash;authEmail.focus();}
+   else{
+    const user=await syncManager.connect();
+    if(user)await showSignedIn(user);else{authGate.hidden=false;authEmail.focus();}
+   }
+ }catch(error){authGate.hidden=false;authError.textContent="Unable to prepare password recovery. Please request a new reset link.";updateSyncStatus({kind:"error",message:"Setup required",detail:error.message});}
 }
 
 function setAuthMode(mode){
  authMode=mode;
- const signUp=mode==="signup", forgot=mode==="forgot", recovery=mode==="recovery";
- authTitle.textContent=signUp?"Sign up":forgot?"Reset password":recovery?"Set new password":"Sign in";
- authDescription.textContent=signUp?"Create a private Pundi account. Your finance data stays isolated.":forgot?"Enter your email and we’ll send a password reset link.":recovery?"Choose a new password for your Pundi account.":"Use a private account created in Supabase. Each account has isolated data.";
+ const signUp=mode==="signup", forgot=mode==="forgot", recovery=mode==="recovery", expired=mode==="expired";
+ authTitle.textContent=signUp?"Sign up":forgot?"Reset password":recovery?"Set new password":expired?"Password reset unavailable":"Sign in";
+ authDescription.textContent=signUp?"Create a private Pundi account. Your finance data stays isolated.":forgot?"Enter your email and we’ll send a password reset link.":recovery?"Choose a new password for your Pundi account.":expired?"This password reset link is invalid or has expired.":"Use a private account created in Supabase. Each account has isolated data.";
  authConfirmField.hidden=!(signUp||recovery);authConfirm.required=signUp||recovery;
- authPassword.hidden=forgot;authPassword.required=!forgot;
- authPassword.closest("label").hidden=forgot;
+ authPassword.hidden=forgot||expired;authPassword.required=!forgot&&!expired;
+ authPassword.closest("label").hidden=forgot||expired;
  authPassword.autocomplete=signUp||recovery?"new-password":"current-password";
- authSubmit.textContent=signUp?"Create account":forgot?"Send reset link":recovery?"Update password":"Sign in";
- authForgotPassword.hidden=signUp||forgot||recovery;
- authModeToggle.hidden=forgot||recovery;
+ authSubmit.textContent=signUp?"Create account":forgot?"Send reset link":recovery?"Update password":expired?"Request a new reset link":"Sign in";
+ authSubmit.disabled=false;
+ authForgotPassword.hidden=signUp||forgot||recovery||expired;
+ authRecoveryCancel.hidden=!recovery;
+ authModeToggle.hidden=forgot||recovery||expired;
  authModeToggle.textContent=signUp?"Already have an account? Sign in":"Don't have an account? Sign up";
- authError.textContent="";
+ if(!expired)authError.textContent="";
 }
 
 function authErrorMessage(error, mode){
  const message=String(error?.message||"").toLowerCase();
+ if(message.includes("password should be")||message.includes("password must")||message.includes("weak password")||message.includes("password is too"))return "Password does not meet Supabase password requirements.";
+ if(message.includes("network")||message.includes("fetch")||message.includes("timeout"))return "Network error. Check your connection and try again.";
+ if(message.includes("expired")||message.includes("invalid")||message.includes("otp")||message.includes("code"))return "This password reset link is invalid or has expired.";
+ if(mode==="recovery")return "Unable to complete password recovery. Request a new reset link and try again.";
  if(message.includes("already registered")||message.includes("already been registered"))return "An account with this email already exists. Try signing in.";
  if(message.includes("invalid email")||message.includes("email address"))return "Enter a valid email address.";
  if(message.includes("password")&&message.includes("6"))return "Password must be at least 6 characters.";
@@ -1889,14 +1921,23 @@ function authErrorMessage(error, mode){
 
 authModeToggle.onclick=()=>setAuthMode(authMode==="signup"?"signin":"signup");
 authForgotPassword.onclick=()=>setAuthMode("forgot");
+authRecoveryCancel.onclick=async()=>{
+ if(authMode!=="recovery")return;
+ sessionStorage.removeItem(RECOVERY_PENDING_KEY);sessionStorage.removeItem(RECOVERY_USER_KEY);
+ await syncManager.signOut({reload:false});
+ recoveryMode=false;location.assign("/");
+};
 setAuthMode("signin");
 authForm.onsubmit=async event=>{
  event.preventDefault();
  const email=authEmail.value.trim();
+ if(authMode==="expired"){
+  sessionStorage.removeItem(RECOVERY_PENDING_KEY);sessionStorage.removeItem(RECOVERY_USER_KEY);setAuthMode("forgot");authEmail.focus();return;
+ }
  if(!authEmail.checkValidity()){authError.textContent="Enter a valid email address.";return;}
  if(authMode==="forgot"){
   authError.textContent="";authSubmit.disabled=true;authSubmit.textContent="Sending…";
-  try{await syncManager.requestPasswordReset(email);authError.textContent="If an account exists, a password reset link has been sent.";}
+  try{await syncManager.requestPasswordReset(email);sessionStorage.removeItem(RECOVERY_PENDING_KEY);sessionStorage.removeItem(RECOVERY_USER_KEY);authError.textContent="If an account exists, a password reset link has been sent.";}
   catch(error){authError.textContent="Unable to request a password reset. Please try again.";}
   finally{authSubmit.disabled=false;authSubmit.textContent="Send reset link";}
   return;
@@ -1913,14 +1954,16 @@ authForm.onsubmit=async event=>{
    else if(user)authError.textContent="Check your email to confirm your account.";
    else authError.textContent="Account creation needs confirmation. Check your email.";
   }else if(authMode==="recovery"){
-   await syncManager.changePassword(authPassword.value);
-   const user=await syncManager.connect();
-   await showSignedIn(user);
-   history.replaceState(null,"",location.pathname);
+   await syncManager.changePassword(authPassword.value,{recovery:true,expectedUserId:recoveryUserId});
+   authError.textContent="Password updated successfully.";
+   sessionStorage.removeItem(RECOVERY_PENDING_KEY);sessionStorage.removeItem(RECOVERY_USER_KEY);
+   sessionStorage.setItem("pundi-auth-flash","Password updated. Sign in with your new password.");
+   await syncManager.signOut({reload:false});
+   recoveryMode=false;location.assign("/");
   }else{
    const user=await syncManager.connect(email,authPassword.value);await showSignedIn(user);
   }
- }catch(error){authError.textContent=authMode==="recovery"?"Unable to update password. The reset link may be expired.":authErrorMessage(error,authMode)}
+ }catch(error){authError.textContent=authErrorMessage(error,authMode)}
  finally{authSubmit.disabled=false;if(authMode==="signup")authSubmit.textContent="Create account";else if(authMode==="forgot")authSubmit.textContent="Send reset link";else if(authMode==="recovery")authSubmit.textContent="Update password";else authSubmit.textContent="Sign in";}
 };
 

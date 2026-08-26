@@ -14,7 +14,8 @@
     "test:admin-render": "node tests/integration/admin-render-contract.mjs",
     "test:admin-smoke": "node tests/integration/admin-production-smoke.mjs",
     "test:account-lifecycle": "node tests/integration/account-lifecycle-contract.mjs",
-    "test:account-lifecycle-integration": "node tests/integration/account-lifecycle-integration.mjs"
+    "test:account-lifecycle-integration": "node tests/integration/account-lifecycle-integration.mjs",
+    "test:password-recovery": "node tests/integration/password-recovery-contract.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.55.0"

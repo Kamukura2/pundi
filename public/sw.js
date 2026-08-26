@@ -1,4 +1,4 @@
-const SHELL_CACHE = "pundi-shell-v8.3.2-admin-bootstrap";
+const SHELL_CACHE = "pundi-shell-v8.3.3-recovery-state-machine";
 const SHELL = ["/", "/index.html", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", event => {

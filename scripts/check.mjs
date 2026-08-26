@@ -273,10 +273,12 @@ assert.doesNotMatch(adminSmoke,/console\.log\([^\n]*(?:accessToken|refreshToken|
 assert.doesNotMatch(adminSmoke,/set_plan|set_entitlement|admin\.createUser|admin\.deleteUser|\.insert\(|\.upsert\(|\.delete\(/i,"Admin smoke must remain read-only");
 assert.equal(packageJson.scripts["test:account-lifecycle"],"node tests/integration/account-lifecycle-contract.mjs","Account lifecycle contract must remain an explicit npm command");
 assert.equal(packageJson.scripts["test:account-lifecycle-integration"],"node tests/integration/account-lifecycle-integration.mjs","Account lifecycle integration must remain an explicit npm command");
+assert.equal(packageJson.scripts["test:password-recovery"],"node tests/integration/password-recovery-contract.mjs","Password recovery contract must remain an explicit npm command");
 assert.match(accountLifecycleIntegration,/explicit Pundi test configuration/);
 assert.match(accountLifecycleIntegration,/admin\.auth\.admin\.createUser/);
 assert.match(accountLifecycleIntegration,/admin\.auth\.admin\.deleteUser/);
 for (const marker of ["resetPasswordForEmail","emailRedirectTo: window.location.origin","updateUser","changePassword","prompt","DELETE","Final confirmation"]) assert.match(accountLifecycle+authSyncSource,new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")),`Account lifecycle contract missing ${marker}`);
+for (const marker of ["/auth/reset-password","PASSWORD_RECOVERY","recoveryMode","expectedUserId","Password updated successfully.","Request a new reset link"]) assert.match(authAppSource+authSyncSource,new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")),`Password recovery contract missing ${marker}`);
 for (const marker of ["auth.getUser","auth.admin.deleteUser","confirmation_required","admin_deletion_blocked","clearUserScopedState","scope:\"local\""]) assert.match(accountApi+accountLifecycle+authSyncSource,new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")),`Account lifecycle security missing ${marker}`);
 assert.doesNotMatch(accountApi,/body\.user_id|request\.body\.user_id/i,"Account deletion must use JWT identity, not client user ID");
 
@@ -533,7 +535,7 @@ const electricityIndex = read("index.html");
 const electricityCss = read("styles.css");
 assert.equal(JSON.parse(read("package.json")).version,"8.3.2","Package version must be v8.3.2");
 assert.match(electricityIndex,/<title>Pundi v8\.3\.2<\/title>/,"Document title must be v8.3.2");
-assert.match(read("public/sw.js"),/pundi-shell-v8\.3\.2/,"Service-worker cache must invalidate for v8.3.2");
+assert.match(read("public/sw.js"),/pundi-shell-v8\.3\.3-recovery-state-machine/,"Service-worker cache must invalidate for the recovery state-machine release");
 assert.match(electricityIndex,/id="topUpElectricityBtn"[^>]*>\s*TOP UP\s*<\/button>/,"Electricity must expose a distinct TOP UP action");
 assert.match(electricityIndex,/id="addElectricityBtn"[^>]*>\s*＋ Reading\s*<\/button>/,"The existing Reading action must remain available");
 assert.match(electricityIndex,/id="electricityTopUpModal"/);

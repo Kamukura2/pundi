@@ -12,7 +12,7 @@ const schema = read("supabase/migrations/001_initial_schema.sql") + read("supaba
 
 assert.match(html, /Forgot password\?/);
 assert.match(sync, /resetPasswordForEmail/);
-assert.match(sync, /emailRedirectTo: window\.location\.origin/);
+assert.match(sync, /window\.location\.origin\}\/auth\/reset-password/);
 assert.match(app, /URLSearchParams\([\s\S]*get\("type"\).*recovery/);
 assert.match(app, /updatePassword|changePassword/);
 assert.match(app, /Set new password/);

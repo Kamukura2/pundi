@@ -143,14 +143,17 @@ export class SyncManager {
 
   async requestPasswordReset(email) {
     const supabase = await getSupabase();
-    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
+    const redirectTo = `${window.location.origin}/auth/reset-password`;
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
     if (error) throw error;
   }
 
-  async changePassword(password) {
+  async changePassword(password, { recovery = false, expectedUserId = null } = {}) {
     const supabase = await getSupabase();
     const { data:{ session } } = await supabase.auth.getSession();
     if (!session?.user) throw new Error("Authentication required.");
+    if (recovery && !session.user.id) throw new Error("Recovery session is unavailable.");
+    if (recovery && expectedUserId && session.user.id !== expectedUserId) throw new Error("Recovery session does not match the reset request.");
     const { error } = await supabase.auth.updateUser({ password });
     if (error) throw error;
   }
@@ -184,7 +187,7 @@ export class SyncManager {
     return body;
   }
 
-  async signOut() {
+  async signOut({ reload = true } = {}) {
     const supabase = await getSupabase();
     const previousUserId = this.user?.id;
     this.unsubscribe?.();
@@ -192,7 +195,7 @@ export class SyncManager {
     this.repository = null;
     this.user = null;
     await clearUserScopedState(previousUserId);
-    await supabase.auth.signOut();
-    location.reload();
+    await supabase.auth.signOut({ scope:"local" });
+    if (reload) location.reload();
   }
 }

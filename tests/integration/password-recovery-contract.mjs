@@ -1,0 +1,34 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
+const root = resolve(import.meta.dirname, "..", "..");
+const read = file => readFileSync(resolve(root, file), "utf8");
+const app = read("app.js");
+const sync = read("src/sync/sync-manager.js");
+const html = read("index.html");
+const vercel = read("vercel.json");
+const sw = read("public/sw.js");
+
+assert.match(sync, /resetPasswordForEmail\(email, \{ redirectTo \}\)/);
+assert.match(sync, /window\.location\.origin\}\/auth\/reset-password/);
+assert.match(vercel, /\/auth\/reset-password/);
+assert.match(sw, /v8\.3\.3-recovery-state-machine/);
+assert.match(app, /onAuthStateChange\(\(event,session\)=>/);
+assert.match(app, /event!=="PASSWORD_RECOVERY"/);
+assert.match(app, /recoveryMode=true/);
+assert.match(app, /if\(recoveryMode\) return/);
+assert.match(app, /location\.pathname===RECOVERY_ROUTE/);
+assert.match(app, /user\?\.id===recoveryUserId/);
+assert.match(app, /changePassword\(authPassword\.value,\{recovery:true,expectedUserId:recoveryUserId\}\)/);
+assert.match(app, /Password updated successfully\./);
+assert.match(app, /pundi-auth-flash/);
+assert.match(app, /signOut\(\{reload:false\}\)/);
+assert.match(app, /setAuthMode\("expired"\)/);
+assert.match(app, /This password reset link is invalid or has expired\./);
+assert.match(app, /authMode==="expired"/);
+assert.match(app, /Passwords do not match/);
+assert.match(app, /Network error/);
+assert.match(app, /authRecoveryCancel/);
+assert.match(html, /id="authRecoveryCancel"/);
+console.log("Password recovery contract PASS: dedicated route, recovery precedence, session binding, safe reset completion, expired-link state, and error categories");
