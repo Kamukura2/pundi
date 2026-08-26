@@ -257,12 +257,18 @@ const adminClient = read("admin/admin.js");
 const adminState = read("admin/state.js");
 const adminLoadingContract = read("tests/integration/admin-loading-contract.mjs");
 const adminRenderContract = read("tests/integration/admin-render-contract.mjs");
+const adminSmoke = read("tests/integration/admin-production-smoke.mjs");
 const packageJson = JSON.parse(read("package.json"));
 assert.equal(packageJson.scripts["test:isolation"],"node tests/integration/supabase-isolation.mjs","Two-user isolation harness must remain an explicit npm command");
 assert.equal(packageJson.scripts["test:admin"],"node tests/integration/admin-contract.mjs","Admin contract harness must remain an explicit npm command");
 assert.equal(packageJson.scripts["test:admin-loading"],"node tests/integration/admin-loading-contract.mjs","Admin loading contract must remain an explicit npm command");
 assert.equal(packageJson.scripts["test:admin-render"],"node tests/integration/admin-render-contract.mjs","Admin render contract must remain an explicit npm command");
-for (const marker of ["normalizeDashboardPayload","renderCardsHtml","renderRowsHtml","renderFailureHtml","showFailure","No dashboard data available"]) assert.match(adminState+adminClient+adminRenderContract,new RegExp(marker,"i"),`Admin render path missing ${marker}`);
+assert.equal(packageJson.scripts["test:admin-smoke"],"node tests/integration/admin-production-smoke.mjs","Production admin smoke must remain an explicit npm command");
+for (const marker of ["https://pundi-silk.vercel.app","ndeycwoyjwyntjkgbzlz","signInWithPassword","Authorization","cache: \"no-store\"","normalizeDashboardPayload","renderCardsHtml","renderRowsHtml"]) assert.match(adminSmoke,new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")),`Admin smoke missing ${marker}`);
+for (const marker of ["password","access_token","refresh_token","service_role","balance","transaction_description","investment_value","holding_value","expense_amount"]) assert.match(adminSmoke,new RegExp(marker,"i"),`Admin smoke privacy guard missing ${marker}`);
+assert.doesNotMatch(adminSmoke,/console\.log\([^\n]*(?:accessToken|refreshToken|serviceRole|Authorization|\$\{password\}|\$\{access_token\})/i,"Admin smoke must not log secrets or auth headers");
+assert.doesNotMatch(adminSmoke,/set_plan|set_entitlement|admin\.createUser|admin\.deleteUser|\.insert\(|\.upsert\(|\.delete\(/i,"Admin smoke must remain read-only");
+
 
 for (const marker of ["dashboard","unauthenticated","403","500","network failure","invalid dashboard response","timed out"]) assert.match(adminLoadingContract,new RegExp(marker,"i"),`Admin loading regression missing ${marker}`);
 for (const marker of ["PUNDI_TEST_PROJECT_REF","ndeycwoyjwyntjkgbzlz","admin.createUser","admin.deleteUser","clearUserScopedState","removeChannel","PUNDI_PHASE_1_1"]) assert.match(isolationHarness,new RegExp(marker),`Isolation harness missing ${marker}`);
