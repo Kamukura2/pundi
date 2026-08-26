@@ -1860,20 +1860,39 @@ async function boot(){
  if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{});
  try{
    const hashParams=new URLSearchParams(location.hash.replace(/^#/,"?"));
-   const recoverySignal=location.pathname===RECOVERY_ROUTE||hashParams.get("type")==="recovery";
+   const queryParams=new URLSearchParams(location.search);
+   const callbackCode=queryParams.get("code");
+   const hashAccessToken=hashParams.get("access_token");
+   const recoverySignal=location.pathname===RECOVERY_ROUTE||Boolean(callbackCode)||hashParams.get("type")==="recovery";
    if(recoverySignal)sessionStorage.setItem(RECOVERY_PENDING_KEY,"1");
+   if(recoverySignal){authGate.hidden=false;setAuthMode("initializing");authError.textContent="Verifying reset link…";}
    const supabase=await getSupabase();
+   let recoveryEventResolve;
+   const recoveryEventPromise=new Promise(resolve=>{recoveryEventResolve=resolve;});
    const {data:{subscription}}=supabase.auth.onAuthStateChange((event,session)=>{
     if(event!=="PASSWORD_RECOVERY")return;
     recoveryEventSeen=true;recoveryMode=true;recoveryUserId=session?.user?.id||null;
     if(recoveryUserId)sessionStorage.setItem(RECOVERY_USER_KEY,recoveryUserId);
+    recoveryEventResolve?.(session);
    });
    if(recoverySignal||sessionStorage.getItem(RECOVERY_PENDING_KEY)==="1"){
+    let callbackExchanged=false;
+    if(callbackCode){
+     const {error}=await supabase.auth.exchangeCodeForSession(callbackCode);
+     if(error)throw error;
+     callbackExchanged=true;
+     history.replaceState(null,"",RECOVERY_ROUTE);
+    }
+    await supabase.auth.getSession();
+    if(!recoveryEventSeen){
+     await Promise.race([recoveryEventPromise,new Promise(resolve=>setTimeout(resolve,1500))]);
+    }
     const {data:{session:recoverySession}}=await supabase.auth.getSession();
     const savedRecoveryUser=sessionStorage.getItem(RECOVERY_USER_KEY);
     const boundToRecovery=recoveryEventSeen&&recoverySession?.user?.id===recoveryUserId;
     const previouslyBound=Boolean(savedRecoveryUser)&&savedRecoveryUser===recoverySession?.user?.id;
-    if(!recoverySession?.user||(!boundToRecovery&&!previouslyBound)){
+    const callbackSession=Boolean(recoverySession?.user)&&(recoveryEventSeen||callbackExchanged||Boolean(hashAccessToken));
+    if(!recoverySession?.user||(!callbackSession&&!previouslyBound)){
      recoveryMode=true;authGate.hidden=false;setAuthMode("expired");authError.textContent="This password reset link is invalid or has expired.";subscription.unsubscribe();return;
     }
     recoveryMode=true;recoveryUserId=recoverySession.user.id;
@@ -1891,18 +1910,19 @@ async function boot(){
 
 function setAuthMode(mode){
  authMode=mode;
- const signUp=mode==="signup", forgot=mode==="forgot", recovery=mode==="recovery", expired=mode==="expired";
- authTitle.textContent=signUp?"Sign up":forgot?"Reset password":recovery?"Set new password":expired?"Password reset unavailable":"Sign in";
- authDescription.textContent=signUp?"Create a private Pundi account. Your finance data stays isolated.":forgot?"Enter your email and we’ll send a password reset link.":recovery?"Choose a new password for your Pundi account.":expired?"This password reset link is invalid or has expired.":"Use a private account created in Supabase. Each account has isolated data.";
+ const signUp=mode==="signup", forgot=mode==="forgot", recovery=mode==="recovery", expired=mode==="expired", initializing=mode==="initializing";
+ authTitle.textContent=signUp?"Sign up":forgot?"Reset password":recovery?"Set new password":expired?"Password reset unavailable":initializing?"Verifying reset link…":"Sign in";
+ authDescription.textContent=signUp?"Create a private Pundi account. Your finance data stays isolated.":forgot?"Enter your email and we’ll send a password reset link.":recovery?"Choose a new password for your Pundi account.":expired?"This password reset link is invalid or has expired.":initializing?"Verifying reset link…":"Use a private account created in Supabase. Each account has isolated data.";
  authConfirmField.hidden=!(signUp||recovery);authConfirm.required=signUp||recovery;
- authPassword.hidden=forgot||expired;authPassword.required=!forgot&&!expired;
- authPassword.closest("label").hidden=forgot||expired;
+ authPassword.hidden=forgot||expired||initializing;authPassword.required=!forgot&&!expired&&!initializing;
+ authPassword.closest("label").hidden=forgot||expired||initializing;
+ authEmail.closest("label").hidden=initializing;
  authPassword.autocomplete=signUp||recovery?"new-password":"current-password";
- authSubmit.textContent=signUp?"Create account":forgot?"Send reset link":recovery?"Update password":expired?"Request a new reset link":"Sign in";
- authSubmit.disabled=false;
- authForgotPassword.hidden=signUp||forgot||recovery||expired;
+ authSubmit.textContent=signUp?"Create account":forgot?"Send reset link":recovery?"Update password":expired?"Request a new reset link":initializing?"Verifying…":"Sign in";
+ authSubmit.disabled=initializing;
+ authForgotPassword.hidden=signUp||forgot||recovery||expired||initializing;
  authRecoveryCancel.hidden=!recovery;
- authModeToggle.hidden=forgot||recovery||expired;
+ authModeToggle.hidden=forgot||recovery||expired||initializing;
  authModeToggle.textContent=signUp?"Already have an account? Sign in":"Don't have an account? Sign up";
  if(!expired)authError.textContent="";
 }
