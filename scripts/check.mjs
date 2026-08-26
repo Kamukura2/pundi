@@ -21,7 +21,21 @@ assert.match(index,/data-stock-workspace="investment"/);assert.match(index,/data
 assert.match(index,/id="dividendTickerList"/);assert.match(index,/id="investmentDepositBtn"/);
 for(const marker of ["data-investment-edit=\"IDR\"","data-investment-edit=\"USD\"","data-trading-edit=\"IDR\"","data-trading-edit=\"USD\""])assert.match(index,new RegExp(marker));
 assert.match(index, /manifest\.webmanifest/);
+const authAppSource = read("app.js");
+const authSyncSource = read("src/sync/sync-manager.js");
 assert.match(index, /authForm/);
+assert.match(index, /Don't have an account\? Sign up/);
+assert.match(authAppSource, /Already have an account\? Sign in/);
+assert.match(index, /id="authConfirm"/);
+assert.match(authAppSource, /Create account/);
+assert.match(index, /authModeToggle/);
+
+assert.match(authAppSource, /password must be at least 6 characters/i, "Sign-up must validate the Supabase password minimum");
+assert.match(authAppSource, /Passwords do not match/i, "Sign-up must reject password mismatches");
+assert.match(authAppSource, /Check your email to confirm your account\./, "Email confirmation must not be reported as an authenticated session");
+assert.match(authSyncSource, /auth\.signUp\(\{ email, password, options: \{ emailRedirectTo: window\.location\.origin \} \}\)/, "Sign-up must use the existing Pundi Supabase client with a Pundi redirect");
+assert.match(authAppSource, /authModeToggle\.onclick/, "Sign-in and sign-up modes must be switchable");
+assert.match(authAppSource, /signUp\(authEmail\.value\.trim\(\),\s*authPassword\.value\)/, "Valid sign-up must call SyncManager.signUp");
 assert.match(index, /annualPerformanceDashboard/);
 assert.match(index, /Decision Metrics/);
 assert.match(index, /target-price-board/);

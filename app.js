@@ -28,6 +28,7 @@ state.theme=localStorage.getItem("pundi-theme-cache")||"dark";
 state.language=localStorage.getItem("pundi-language-cache")||"en";
 state.stockView=localStorage.getItem("pundi-stock-view-cache")==="trading"?"trading":"investment";
 let syncManager;
+let authMode="signin";
 let stockRefreshStarted=false;
 let fxRefreshTimer=null;
 let tradingRefreshTimer=null;
@@ -1850,11 +1851,48 @@ async function boot(){
  }catch(error){authGate.hidden=false;authError.textContent=error.message;updateSyncStatus({kind:"error",message:"Setup required",detail:error.message});}
 }
 
+function setAuthMode(mode){
+ authMode=mode;
+ const signUp=mode==="signup";
+ authTitle.textContent=signUp?"Sign up":"Sign in";
+ authDescription.textContent=signUp?"Create a private Pundi account. Your finance data stays isolated.":"Use a private account created in Supabase. Each account has isolated data.";
+ authConfirmField.hidden=!signUp;authConfirm.required=signUp;
+ authPassword.autocomplete=signUp?"new-password":"current-password";
+ authSubmit.textContent=signUp?"Create account":"Sign in";
+ authModeToggle.textContent=signUp?"Already have an account? Sign in":"Don't have an account? Sign up";
+ authError.textContent="";
+}
+
+function authErrorMessage(error, mode){
+ const message=String(error?.message||"").toLowerCase();
+ if(message.includes("already registered")||message.includes("already been registered"))return "An account with this email already exists. Try signing in.";
+ if(message.includes("invalid email")||message.includes("email address"))return "Enter a valid email address.";
+ if(message.includes("password")&&message.includes("6"))return "Password must be at least 6 characters.";
+ return mode==="signup"?"Unable to create account. Please check your details and try again.":"Unable to sign in. Check your email and password.";
+}
+
+authModeToggle.onclick=()=>setAuthMode(authMode==="signup"?"signin":"signup");
+setAuthMode("signin");
 authForm.onsubmit=async event=>{
- event.preventDefault();authError.textContent="";authSubmit.disabled=true;authSubmit.textContent="Signing in…";
- try{const user=await syncManager.connect(authEmail.value,authPassword.value);await showSignedIn(user)}
- catch(error){authError.textContent=error.message}
- finally{authSubmit.disabled=false;authSubmit.textContent="Sign in";}
+ event.preventDefault();
+ if(authMode==="signup"){
+  const email=authEmail.value.trim();
+  if(!authEmail.checkValidity()){authError.textContent="Enter a valid email address.";return;}
+  if(authPassword.value.length<6){authError.textContent="Password must be at least 6 characters.";return;}
+  if(authPassword.value!==authConfirm.value){authError.textContent="Passwords do not match.";return;}
+ }
+ authError.textContent="";authSubmit.disabled=true;authSubmit.textContent=authMode==="signup"?"Creating account…":"Signing in…";
+ try{
+  if(authMode==="signup"){
+   const {user,session}=await syncManager.signUp(authEmail.value.trim(),authPassword.value);
+   if(session?.user)await showSignedIn(session.user);
+   else if(user)authError.textContent="Check your email to confirm your account.";
+   else authError.textContent="Account creation needs confirmation. Check your email.";
+  }else{
+   const user=await syncManager.connect(authEmail.value.trim(),authPassword.value);await showSignedIn(user);
+  }
+ }catch(error){authError.textContent=authErrorMessage(error,authMode)}
+ finally{authSubmit.disabled=false;if(authMode==="signup")authSubmit.textContent="Create account";else authSubmit.textContent="Sign in";}
 };
 
 dataBtn.onclick=()=>dataModal.showModal();

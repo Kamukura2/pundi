@@ -50,6 +50,13 @@ export class SyncManager {
     return this.user;
   }
 
+  async signUp(email, password) {
+    const supabase = await getSupabase();
+    const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin } });
+    if (error) throw error;
+    return data;
+  }
+
   async handleRemoteChange() {
     if (!this.repository || this.busy || this.pendingPersists || await this.repository.pendingCount()) return;
     try {

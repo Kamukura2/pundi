@@ -14,8 +14,8 @@
   <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
   <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
-  <script type="module" crossorigin src="/assets/index-Vd1Fu6E-.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-_LiT3VLk.css">
+  <script type="module" crossorigin src="/assets/index-CcxhmdGr.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-Bk2gYKip.css">
 </head>
 <body class="auth-locked">
 <div class="app">
@@ -689,11 +689,13 @@
 <section id="authGate" class="auth-gate" hidden>
   <form id="authForm" class="auth-card">
     <div class="brand auth-brand"><div class="logo">C</div><div><b>Pundi</b><small>Private cloud access</small></div></div>
-    <h2>Sign in</h2>
-    <p>Use a private account created in Supabase. Each account has isolated data.</p>
+    <h2 id="authTitle">Sign in</h2>
+    <p id="authDescription">Use a private account created in Supabase. Each account has isolated data.</p>
     <label>Email<input id="authEmail" type="email" autocomplete="username" required></label>
-    <label>Password<input id="authPassword" type="password" autocomplete="current-password" required></label>
+    <label>Password<input id="authPassword" type="password" autocomplete="current-password" minlength="6" required></label>
+    <label id="authConfirmField" hidden>Confirm Password<input id="authConfirm" type="password" autocomplete="new-password" minlength="6"></label>
     <button id="authSubmit" class="primary-btn" type="submit">Sign in</button>
+    <button id="authModeToggle" class="text-link" type="button">Don't have an account? Sign up</button>
     <small id="authError" class="auth-error"></small>
   </form>
 </section>
