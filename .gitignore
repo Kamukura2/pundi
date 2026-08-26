@@ -1,3 +1,4 @@
 .vercel
 .env*
+runtime/admin-smoke-health/
 supabase/.temp/
