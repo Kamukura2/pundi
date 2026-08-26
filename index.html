@@ -664,6 +664,19 @@
       <button type="button" class="ghost-btn close-dialog">×</button>
     </div>
     <div class="account-line"><span>Signed in as</span><b id="accountEmail">—</b></div>
+    <section class="account-settings" aria-labelledby="accountSettingsTitle">
+      <p id="accountSettingsTitle">Account settings</p>
+      <div class="account-summary"><span>Created</span><b id="accountCreatedAt">—</b><span>Plan</span><b id="accountPlan">Free</b><span>Status</span><b id="accountStatus">Active</b></div>
+      <h4>Security</h4>
+      <form id="changePasswordForm" class="form-grid">
+        <label>New password<input id="newPassword" type="password" autocomplete="new-password" minlength="6" required></label>
+        <label>Confirm new password<input id="confirmNewPassword" type="password" autocomplete="new-password" minlength="6" required></label>
+        <small id="passwordChangeMessage" class="form-error" role="status"></small>
+        <button id="changePasswordBtn" class="primary-btn" type="submit">Change password</button>
+      </form>
+      <button id="deleteAccountBtn" class="danger-btn" type="button">Delete my account</button>
+      <small id="accountSettingsMessage" class="form-error" role="status"></small>
+    </section>
     <div class="mobile-more">
       <p>More sections</p>
       <div class="mobile-more-grid">
@@ -695,6 +708,7 @@
     <label>Password<input id="authPassword" type="password" autocomplete="current-password" minlength="6" required></label>
     <label id="authConfirmField" hidden>Confirm Password<input id="authConfirm" type="password" autocomplete="new-password" minlength="6"></label>
     <button id="authSubmit" class="primary-btn" type="submit">Sign in</button>
+    <button id="authForgotPassword" class="text-link" type="button">Forgot password?</button>
     <button id="authModeToggle" class="text-link" type="button">Don't have an account? Sign up</button>
     <small id="authError" class="auth-error"></small>
   </form>

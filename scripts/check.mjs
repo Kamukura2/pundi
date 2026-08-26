@@ -258,6 +258,9 @@ const adminState = read("admin/state.js");
 const adminLoadingContract = read("tests/integration/admin-loading-contract.mjs");
 const adminRenderContract = read("tests/integration/admin-render-contract.mjs");
 const adminSmoke = read("tests/integration/admin-production-smoke.mjs");
+const accountApi = read("api/account.js");
+const accountLifecycle = read("tests/integration/account-lifecycle-contract.mjs");
+const accountLifecycleIntegration = read("tests/integration/account-lifecycle-integration.mjs");
 const packageJson = JSON.parse(read("package.json"));
 assert.equal(packageJson.scripts["test:isolation"],"node tests/integration/supabase-isolation.mjs","Two-user isolation harness must remain an explicit npm command");
 assert.equal(packageJson.scripts["test:admin"],"node tests/integration/admin-contract.mjs","Admin contract harness must remain an explicit npm command");
@@ -268,6 +271,14 @@ for (const marker of ["https://pundi-silk.vercel.app","ndeycwoyjwyntjkgbzlz","si
 for (const marker of ["password","access_token","refresh_token","service_role","balance","transaction_description","investment_value","holding_value","expense_amount"]) assert.match(adminSmoke,new RegExp(marker,"i"),`Admin smoke privacy guard missing ${marker}`);
 assert.doesNotMatch(adminSmoke,/console\.log\([^\n]*(?:accessToken|refreshToken|serviceRole|Authorization|\$\{password\}|\$\{access_token\})/i,"Admin smoke must not log secrets or auth headers");
 assert.doesNotMatch(adminSmoke,/set_plan|set_entitlement|admin\.createUser|admin\.deleteUser|\.insert\(|\.upsert\(|\.delete\(/i,"Admin smoke must remain read-only");
+assert.equal(packageJson.scripts["test:account-lifecycle"],"node tests/integration/account-lifecycle-contract.mjs","Account lifecycle contract must remain an explicit npm command");
+assert.equal(packageJson.scripts["test:account-lifecycle-integration"],"node tests/integration/account-lifecycle-integration.mjs","Account lifecycle integration must remain an explicit npm command");
+assert.match(accountLifecycleIntegration,/explicit Pundi test configuration/);
+assert.match(accountLifecycleIntegration,/admin\.auth\.admin\.createUser/);
+assert.match(accountLifecycleIntegration,/admin\.auth\.admin\.deleteUser/);
+for (const marker of ["resetPasswordForEmail","emailRedirectTo: window.location.origin","updateUser","changePassword","prompt","DELETE","Final confirmation"]) assert.match(accountLifecycle+authSyncSource,new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")),`Account lifecycle contract missing ${marker}`);
+for (const marker of ["auth.getUser","auth.admin.deleteUser","confirmation_required","admin_deletion_blocked","clearUserScopedState","scope:\"local\""]) assert.match(accountApi+accountLifecycle+authSyncSource,new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")),`Account lifecycle security missing ${marker}`);
+assert.doesNotMatch(accountApi,/body\.user_id|request\.body\.user_id/i,"Account deletion must use JWT identity, not client user ID");
 
 
 for (const marker of ["dashboard","unauthenticated","403","500","network failure","invalid dashboard response","timed out"]) assert.match(adminLoadingContract,new RegExp(marker,"i"),`Admin loading regression missing ${marker}`);

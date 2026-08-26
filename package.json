@@ -12,7 +12,9 @@
     "test:admin": "node tests/integration/admin-contract.mjs",
     "test:admin-loading": "node tests/integration/admin-loading-contract.mjs",
     "test:admin-render": "node tests/integration/admin-render-contract.mjs",
-    "test:admin-smoke": "node tests/integration/admin-production-smoke.mjs"
+    "test:admin-smoke": "node tests/integration/admin-production-smoke.mjs",
+    "test:account-lifecycle": "node tests/integration/account-lifecycle-contract.mjs",
+    "test:account-lifecycle-integration": "node tests/integration/account-lifecycle-integration.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.55.0"

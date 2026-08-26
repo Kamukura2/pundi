@@ -1824,6 +1824,12 @@ syncManager=new SyncManager({onState:applyCloudState,onStatus:updateSyncStatus})
 async function showSignedIn(user){
  authGate.hidden=true;document.body.classList.remove("auth-locked");
  accountEmail.textContent=user.email||"Private account";
+ try{
+  const account=await syncManager.accountMetadata();
+  accountCreatedAt.textContent=account.created_at?new Date(account.created_at).toLocaleDateString():"—";
+  accountPlan.textContent=account.subscription?.plan||"free";
+  accountStatus.textContent=account.account_status||"active";
+ }catch(error){accountSettingsMessage.textContent="Account settings unavailable.";}
  legacyImportBtn.hidden=!readLegacyLocalStorage();
  if(!validUsdIdr(state.usdIdr)){
   state.usdIdr=DEFAULT_USD_IDR;
@@ -1846,19 +1852,31 @@ async function boot(){
  baseGrowth.value=state.baseGrowth;optimisticGrowth.value=state.optimisticGrowth;renderAll();applyLanguage();
  if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{});
  try{
-  const user=await syncManager.connect();
-  if(user)await showSignedIn(user);else{authGate.hidden=false;authEmail.focus();}
+   const config=await withTimeout(fetch("/api/config",{cache:"no-store"}).then(async response=>{if(!response.ok)throw new Error("Supabase configuration unavailable.");return response.json();}),"Supabase configuration",BOOT_TIMEOUT_MS);
+   if(!config.supabaseUrl || !config.supabaseAnonKey)throw new Error("Supabase configuration is incomplete.");
+   supabase=createClient(config.supabaseUrl,config.supabaseAnonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+   if(new URLSearchParams(location.hash.replace(/^#/,"?")).get("type")==="recovery"){
+    const {data:{session:recoverySession}}=await supabase.auth.getSession();
+    if(!recoverySession?.user)throw new Error("Password reset link is invalid or expired. Please request a new link.");
+    authGate.hidden=false;setAuthMode("recovery");authEmail.value=recoverySession.user.email||"";authPassword.focus();return;
+   }
+   const user=await syncManager.connect();
+   if(user)await showSignedIn(user);else{authGate.hidden=false;authEmail.focus();}
  }catch(error){authGate.hidden=false;authError.textContent=error.message;updateSyncStatus({kind:"error",message:"Setup required",detail:error.message});}
 }
 
 function setAuthMode(mode){
  authMode=mode;
- const signUp=mode==="signup";
- authTitle.textContent=signUp?"Sign up":"Sign in";
- authDescription.textContent=signUp?"Create a private Pundi account. Your finance data stays isolated.":"Use a private account created in Supabase. Each account has isolated data.";
- authConfirmField.hidden=!signUp;authConfirm.required=signUp;
- authPassword.autocomplete=signUp?"new-password":"current-password";
- authSubmit.textContent=signUp?"Create account":"Sign in";
+ const signUp=mode==="signup", forgot=mode==="forgot", recovery=mode==="recovery";
+ authTitle.textContent=signUp?"Sign up":forgot?"Reset password":recovery?"Set new password":"Sign in";
+ authDescription.textContent=signUp?"Create a private Pundi account. Your finance data stays isolated.":forgot?"Enter your email and we’ll send a password reset link.":recovery?"Choose a new password for your Pundi account.":"Use a private account created in Supabase. Each account has isolated data.";
+ authConfirmField.hidden=!(signUp||recovery);authConfirm.required=signUp||recovery;
+ authPassword.hidden=forgot;authPassword.required=!forgot;
+ authPassword.closest("label").hidden=forgot;
+ authPassword.autocomplete=signUp||recovery?"new-password":"current-password";
+ authSubmit.textContent=signUp?"Create account":forgot?"Send reset link":recovery?"Update password":"Sign in";
+ authForgotPassword.hidden=signUp||forgot||recovery;
+ authModeToggle.hidden=forgot||recovery;
  authModeToggle.textContent=signUp?"Already have an account? Sign in":"Don't have an account? Sign up";
  authError.textContent="";
 }
@@ -1872,31 +1890,62 @@ function authErrorMessage(error, mode){
 }
 
 authModeToggle.onclick=()=>setAuthMode(authMode==="signup"?"signin":"signup");
+authForgotPassword.onclick=()=>setAuthMode("forgot");
 setAuthMode("signin");
 authForm.onsubmit=async event=>{
  event.preventDefault();
- if(authMode==="signup"){
-  const email=authEmail.value.trim();
-  if(!authEmail.checkValidity()){authError.textContent="Enter a valid email address.";return;}
+ const email=authEmail.value.trim();
+ if(!authEmail.checkValidity()){authError.textContent="Enter a valid email address.";return;}
+ if(authMode==="forgot"){
+  authError.textContent="";authSubmit.disabled=true;authSubmit.textContent="Sending…";
+  try{await syncManager.requestPasswordReset(email);authError.textContent="If an account exists, a password reset link has been sent.";}
+  catch(error){authError.textContent="Unable to request a password reset. Please try again.";}
+  finally{authSubmit.disabled=false;authSubmit.textContent="Send reset link";}
+  return;
+ }
+ if(authMode==="signup"||authMode==="recovery"){
   if(authPassword.value.length<6){authError.textContent="Password must be at least 6 characters.";return;}
   if(authPassword.value!==authConfirm.value){authError.textContent="Passwords do not match.";return;}
  }
- authError.textContent="";authSubmit.disabled=true;authSubmit.textContent=authMode==="signup"?"Creating account…":"Signing in…";
+ authError.textContent="";authSubmit.disabled=true;authSubmit.textContent=authMode==="signup"?"Creating account…":authMode==="recovery"?"Updating…":"Signing in…";
  try{
   if(authMode==="signup"){
    const {user,session}=await syncManager.signUp(authEmail.value.trim(),authPassword.value);
    if(session?.user)await showSignedIn(session.user);
    else if(user)authError.textContent="Check your email to confirm your account.";
    else authError.textContent="Account creation needs confirmation. Check your email.";
+  }else if(authMode==="recovery"){
+   await syncManager.changePassword(authPassword.value);
+   const user=await syncManager.connect();
+   await showSignedIn(user);
+   history.replaceState(null,"",location.pathname);
   }else{
-   const user=await syncManager.connect(authEmail.value.trim(),authPassword.value);await showSignedIn(user);
+   const user=await syncManager.connect(email,authPassword.value);await showSignedIn(user);
   }
- }catch(error){authError.textContent=authErrorMessage(error,authMode)}
- finally{authSubmit.disabled=false;if(authMode==="signup")authSubmit.textContent="Create account";else authSubmit.textContent="Sign in";}
+ }catch(error){authError.textContent=authMode==="recovery"?"Unable to update password. The reset link may be expired.":authErrorMessage(error,authMode)}
+ finally{authSubmit.disabled=false;if(authMode==="signup")authSubmit.textContent="Create account";else if(authMode==="forgot")authSubmit.textContent="Send reset link";else if(authMode==="recovery")authSubmit.textContent="Update password";else authSubmit.textContent="Sign in";}
 };
 
-dataBtn.onclick=()=>dataModal.showModal();
+dataBtn.onclick=async()=>{dataModal.showModal();try{const account=await syncManager.accountMetadata();accountCreatedAt.textContent=account.created_at?new Date(account.created_at).toLocaleDateString():"—";accountPlan.textContent=account.subscription?.plan||"free";accountStatus.textContent=account.account_status||"active";}catch(error){accountSettingsMessage.textContent="Account settings unavailable.";}};
 syncStatus.onclick=()=>dataModal.showModal();
+changePasswordForm.onsubmit=async event=>{
+ event.preventDefault();passwordChangeMessage.textContent="";
+ if(newPassword.value.length<6){passwordChangeMessage.textContent="Password must be at least 6 characters.";return;}
+ if(newPassword.value!==confirmNewPassword.value){passwordChangeMessage.textContent="Passwords do not match.";return;}
+ changePasswordBtn.disabled=true;
+ try{await syncManager.changePassword(newPassword.value);changePasswordForm.reset();passwordChangeMessage.textContent="Password changed successfully.";}
+ catch(error){passwordChangeMessage.textContent="Unable to change password. Please try again.";}
+ finally{changePasswordBtn.disabled=false;}
+};
+deleteAccountBtn.onclick=async()=>{
+ accountSettingsMessage.textContent="";
+ const typed=prompt("This permanently deletes your Pundi account and all its finance data. Type DELETE to continue.");
+ if(typed!=="DELETE"){accountSettingsMessage.textContent="Account deletion cancelled. Type DELETE exactly to continue.";return;}
+ if(!confirm("Final confirmation: permanently delete this Pundi account and all owned data? This cannot be undone."))return;
+ deleteAccountBtn.disabled=true;
+ try{await syncManager.deleteAccount("DELETE");for(const key of Object.keys(localStorage))if(/^pundi-|^cvfinance-/i.test(key))localStorage.removeItem(key);location.reload();}
+ catch(error){accountSettingsMessage.textContent=error.message||"Account deletion failed.";deleteAccountBtn.disabled=false;}
+};
 exportBackupBtn.onclick=()=>syncManager.downloadBackup(state);
 importBackupBtn.onclick=()=>backupFile.click();
 backupFile.onchange=async()=>{

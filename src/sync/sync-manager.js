@@ -141,6 +141,49 @@ export class SyncManager {
     return this.replaceAll(validateBackup(parsed));
   }
 
+  async requestPasswordReset(email) {
+    const supabase = await getSupabase();
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
+    if (error) throw error;
+  }
+
+  async changePassword(password) {
+    const supabase = await getSupabase();
+    const { data:{ session } } = await supabase.auth.getSession();
+    if (!session?.user) throw new Error("Authentication required.");
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) throw error;
+  }
+
+  async accountMetadata() {
+    const supabase = await getSupabase();
+    const { data:{ session } } = await supabase.auth.getSession();
+    if (!session?.access_token) throw new Error("Authentication required.");
+    const response = await fetch("/api/account", { cache:"no-store", headers:{ Authorization:`Bearer ${session.access_token}`, "Cache-Control":"no-cache" } });
+    const body = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(body?.error || "Account metadata unavailable.");
+    return body;
+  }
+
+  async deleteAccount(confirmation) {
+    if (confirmation !== "DELETE") throw new Error("Type DELETE to confirm account deletion.");
+    const supabase = await getSupabase();
+    const userId = this.user?.id;
+    if (!userId) throw new Error("Authentication required.");
+    const { data:{ session } } = await supabase.auth.getSession();
+    if (!session?.access_token) throw new Error("Authentication required.");
+    const response = await fetch("/api/account", { method:"DELETE", cache:"no-store", headers:{ Authorization:`Bearer ${session.access_token}`, "Content-Type":"application/json", "Cache-Control":"no-cache" }, body:JSON.stringify({confirmation}) });
+    const body = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(body?.error || "Account deletion failed.");
+    this.unsubscribe?.();
+    this.unsubscribe = null;
+    this.repository = null;
+    this.user = null;
+    await clearUserScopedState(userId);
+    await supabase.auth.signOut({ scope:"local" });
+    return body;
+  }
+
   async signOut() {
     const supabase = await getSupabase();
     const previousUserId = this.user?.id;
