@@ -12,7 +12,7 @@ const result = { status: "PASS", origin, financeMutations: 0 };
 try {
   await page.goto(origin, { waitUntil: "networkidle" });
   await page.locator("#authGate").waitFor({ state: "visible", timeout: 30000 });
-  assert.match(await page.title(), /Pundi v8\.3\.4/);
+  assert.match(await page.title(), /Pundi v8\.3\.5/);
   for (let attempt = 1; attempt <= 3 && await page.locator("#authGate").isVisible(); attempt++) {
     if (attempt > 1) await page.reload({ waitUntil: "networkidle" });
     await page.locator("#authEmail").fill(email);
@@ -24,7 +24,8 @@ try {
   await page.locator("#primarySidebar").waitFor({ state: "visible", timeout: 30000 });
   await page.locator("#onboardingCard").waitFor({ state: "visible", timeout: 30000 });
   assert.equal(await page.locator("#onboardingCard").isVisible(), true);
-  for (const id of ["onboardingAddAccount", "onboardingAddTransaction", "onboardingExploreAssets", "onboardingDismiss"]) assert.equal(await page.locator(`#${id}`).count(), 1);
+  for (const id of ["onboardingAddAccount", "onboardingAddTransaction", "onboardingExploreAssets"]) assert.equal(await page.locator(`#${id}`).count(), 1);
+  assert.equal(await page.locator("[data-onboarding-dismiss]").count(), 1);
   for (const target of ["accumulation", "cashflow", "stocks"]) { await page.locator(`[data-page="${target}"]`).first().click(); await page.locator(`#${target}`).waitFor({ state: "visible", timeout: 10000 }); }
   await page.locator("#dataBtn").click();
   await page.locator("#dataModal").waitFor({ state: "visible", timeout: 10000 });
