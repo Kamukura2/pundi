@@ -8,34 +8,36 @@ These templates are Pundi-only and use the same-origin production URL. They do n
 
 **Subject:** Confirm your Pundi account
 
-```text
-Welcome to Pundi.
+```html
+<h2>Welcome to Pundi</h2>
 
-Confirm your email address to activate your private Pundi account:
-{{ .ConfirmationURL }}
+<p>Thanks for creating your Pundi account.</p>
 
-If you did not create this account, you can ignore this email.
+<p>Please confirm your email address to finish setting up your account.</p>
 
-Pundi
-Private cloud finance workspace
-https://pundi-silk.vercel.app/
+<p><a href="{{ .ConfirmationURL }}">Confirm my email</a></p>
+
+<p>If you did not create a Pundi account, you can safely ignore this email.</p>
+
+<p>— Pundi</p>
 ```
 
 ## Password recovery email
 
 **Subject:** Reset your Pundi password
 
-```text
-We received a request to reset your Pundi password.
+```html
+<h2>Reset your Pundi password</h2>
 
-Choose a new password here:
-{{ .ConfirmationURL }}
+<p>We received a request to reset the password for your Pundi account.</p>
 
-If you did not request this, you can ignore this email. The link will expire according to your Pundi Auth configuration.
+<p><a href="{{ .ConfirmationURL }}">Reset my password</a></p>
 
-Pundi
-Private cloud finance workspace
-https://pundi-silk.vercel.app/
+<p>If you did not request a password reset, you can safely ignore this email.</p>
+
+<p>This link should only be used by you and should not be shared.</p>
+
+<p>— Pundi</p>
 ```
 
 ## Email-change / reauthentication email
