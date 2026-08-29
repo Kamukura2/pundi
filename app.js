@@ -75,6 +75,11 @@ const save=(options)=>syncManager?.persist(state,options);
 const saveSettings=()=>save();
 const q=(s)=>document.querySelector(s);
 const qa=(s)=>[...document.querySelectorAll(s)];
+const onboardingCard=q("#onboardingCard");
+const onboardingDismiss=q("[data-onboarding-dismiss]");
+const onboardingAddAccount=q("#onboardingAddAccount");
+const onboardingAddTransaction=q("#onboardingAddTransaction");
+const onboardingExploreAssets=q("#onboardingExploreAssets");
 const electricityTopUpModal=q("#electricityTopUpModal");
 const electricityTopUpForm=q("#electricityTopUpForm");
 const electricityTopUpAmount=q("#electricityTopUpAmount");
@@ -816,7 +821,7 @@ function renderTrading(){
  spyPeriodReturn.textContent=`${series.spyReturn>=0?"+":""}${series.spyReturn.toFixed(2)}%`;
  tradingAlpha.textContent=`${alpha>=0?"+":""}${alpha.toFixed(2)}%`;
  spyCurrentPrice.textContent=!hasEquityBenchmark?"N/A":Number(state.spyQuote?.price)>0?new Intl.NumberFormat("en-US",{style:"currency",currency:"USD",minimumFractionDigits:2,maximumFractionDigits:4}).format(state.spyQuote.price):"Waiting for API";
- spyCurrentMeta.textContent=!hasEquityBenchmark?"Crypto benchmark unavailable in v8.2.0":hasCryptoTrading?"Equity benchmark only · Crypto excluded":state.spyQuote?.asOf?`${String(state.spyQuote.provider||"API").toUpperCase()} · ${new Date(state.spyQuote.asOf).toLocaleString("en-GB",{dateStyle:"medium",timeStyle:"short"})}`:"Current SPY quote";
+ spyCurrentMeta.textContent=!hasEquityBenchmark?"Crypto benchmark unavailable in this release":hasCryptoTrading?"Equity benchmark only · Crypto excluded":state.spyQuote?.asOf?`${String(state.spyQuote.provider||"API").toUpperCase()} · ${new Date(state.spyQuote.asOf).toLocaleString("en-GB",{dateStyle:"medium",timeStyle:"short"})}`:"Current SPY quote";
  tradingPeriodReturn.className=series.portfolioReturn<0?"negative":"positive";spyPeriodReturn.className=series.spyReturn<0?"negative":"positive";tradingAlpha.className=alpha<0?"negative":"positive";
  tradingPerformanceChart.innerHTML=!hasEquityBenchmark?`<div class="trading-empty"><b>Crypto benchmark: N/A</b><span>No equity component is available for SPY comparison.</span></div>`:series.labels.length?lineMulti([
   {name:"Portfolio",vals:series.portfolio,color:"#2bd49a"},{name:"SPY",vals:series.spy,color:"#a460e8"}
@@ -1816,6 +1821,20 @@ function applyCloudState(next,{preserveUi=false}={}){
  if(repairedPositionState||closedPositionState.closedPositionIds.length||dividendStateChanged){recordTradingSnapshot();queueMicrotask(()=>save({background:true}));}
 }
 
+function hasFinanceData(){
+ return [state.accounts,state.transactions,state.budgets,state.yearly,state.events,state.credit,state.clients,state.stocks,state.electricity,state.electricityTopups,state.tradingPositions,state.tradingLedger,state.entrustedFunds].some(rows=>Array.isArray(rows)&&rows.length>0);
+}
+function renderOnboarding(userId){
+ const key=userId?`pundi-onboarding-dismissed:${userId}`:"";
+ const visible=Boolean(key&&!hasFinanceData()&&!localStorage.getItem(key));
+ onboardingCard.hidden=!visible;
+ if(!visible)return;
+ onboardingDismiss.onclick=()=>{localStorage.setItem(key,"1");onboardingCard.hidden=true;};
+ onboardingAddAccount.onclick=()=>addAccountBtn.click();
+ onboardingAddTransaction.onclick=()=>document.querySelector("[data-open-tx]")?.click();
+ onboardingExploreAssets.onclick=()=>switchPage("stocks");
+}
+
 function updateSyncStatus(info){
  if(typeof syncStatus==="undefined")return;
  syncStatus.className=`sync-status ${info.kind}`;
@@ -1839,6 +1858,7 @@ async function showSignedIn(user){
   accountStatus.textContent=account.account_status||"active";
  }catch(error){accountSettingsMessage.textContent="Account settings unavailable.";}
  legacyImportBtn.hidden=!readLegacyLocalStorage();
+ renderOnboarding(user.id);
  if(!validUsdIdr(state.usdIdr)){
   state.usdIdr=DEFAULT_USD_IDR;
   state.usdIdrMeta={provider:"manual",status:"sanitized fallback",asOf:new Date().toISOString(),error:"Previously saved rate was outside the safe range."};

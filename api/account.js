@@ -30,7 +30,9 @@ export default async function handler(request, response) {
     const { data:admin, error:adminError } = await db.from("app_admins").select("user_id,role").eq("user_id",user.id).maybeSingle();
     if (adminError) throw Object.assign(new Error("Account status unavailable."), { status:503, code:"metadata_unavailable" });
     if (request.method === "GET") return reply(response,200,{ email:user.email || "", created_at:user.created_at || null, account_status:user.banned_until ? "banned" : "active", subscription:safeSubscription(subscription), is_admin:Boolean(admin), admin_role:admin?.role || null });
-    const body = typeof request.body === "string" ? JSON.parse(request.body || "{}") : (request.body || {});
+    let body;
+    try { body = typeof request.body === "string" ? JSON.parse(request.body || "{}") : (request.body || {}); }
+    catch { return reply(response,400,{ error:"Malformed JSON request.", code:"invalid_json" }); }
     if (body.confirmation !== "DELETE") return reply(response,400,{ error:"Type DELETE to confirm account deletion.", code:"confirmation_required" });
     if (admin) return reply(response,403,{ error:"Admin accounts cannot be deleted from self-service settings. Remove admin access first.", code:"admin_deletion_blocked" });
     const { error:auditCleanupError } = await db.from("admin_audit_log").delete().eq("target_user_id",user.id);

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-  <title>Pundi v8.3.2</title>
+  <title>Pundi v8.3.3</title>
   <meta name="theme-color" content="#d6249f">
   <meta name="description" content="Private synchronized personal finance dashboard">
   <meta name="mobile-web-app-capable" content="yes">
@@ -75,6 +75,20 @@
         <button id="languageBtn" class="language-btn" title="Switch language"><span>US</span><span>ID</span></button>
       </div>
     </header>
+
+    <section id="onboardingCard" class="onboarding-card" hidden aria-labelledby="onboardingTitle">
+      <div>
+        <small class="eyebrow">GET STARTED</small>
+        <h2 id="onboardingTitle">Welcome to Pundi</h2>
+        <p>Start with your first account or transaction. Pundi keeps your finance data private and synced to this account.</p>
+      </div>
+      <div class="onboarding-actions">
+        <button class="primary-btn" id="onboardingAddAccount" type="button">＋ Create account</button>
+        <button class="ghost-btn" id="onboardingAddTransaction" type="button">＋ Record transaction</button>
+        <button class="text-link" id="onboardingExploreAssets" type="button">Explore Assets</button>
+        <button class="text-link" data-onboarding-dismiss type="button">Dismiss</button>
+      </div>
+    </section>
 
     <section id="accumulation" class="page active">
       <div class="hero-grid">

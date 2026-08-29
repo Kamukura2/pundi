@@ -1,8 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
+import { ENTITLEMENT_FEATURES, ENTITLEMENT_STATUSES, resolveEntitlements } from "../src/entitlements/resolver.js";
 
-const FEATURES = ["core_finance","cloud_sync","advanced_insights","export","premium_features"];
-const PLANS = { free:["core_finance","cloud_sync"], paid:FEATURES };
-const STATUS = new Set(["free","trialing","active","past_due","cancelled","expired"]);
+const FEATURES = ENTITLEMENT_FEATURES;
+const STATUS = ENTITLEMENT_STATUSES;
 
 function error(response, status, message, code) { return response.status(status).json({ error:message, code }); }
 function adminClient() {
@@ -23,21 +23,18 @@ async function authenticate(request) {
   return { db, user, admin };
 }
 function safeUser(user, subscription, overrides, counts) {
-  const plan = subscription?.plan || "free";
-  const status = subscription?.status || "free";
-  const base = new Set(PLANS[plan] || PLANS.free);
-  const entitlements = Object.fromEntries(FEATURES.map(feature => [feature, overrides[feature]?.enabled ?? base.has(feature)]));
+  const resolved = resolveEntitlements(subscription, overrides);
   return {
     email:user.email || "",
     user_id:user.id,
     created_at:user.created_at,
     last_active:user.last_sign_in_at || null,
-    plan,
-    subscription_status:status,
-    subscription_provider:subscription?.provider || "manual",
+    plan:resolved.plan,
+    subscription_status:resolved.status,
+    subscription_provider:resolved.provider,
     subscription_started_at:subscription?.started_at || null,
     current_period_end:subscription?.current_period_end || null,
-    feature_entitlements:entitlements,
+    feature_entitlements:resolved.entitlements,
     account_status:user.banned_until ? "banned" : "active",
     aggregate_record_counts:counts || undefined
   };
@@ -85,7 +82,9 @@ export default async function handler(request, response) {
       const filtered = records.filter(row => (!q || row.email.toLowerCase().includes(q) || row.user_id.toLowerCase().includes(q)) && (!plan || (plan === "paid" ? row.plan !== "free" : row.plan === plan)) && (!status || row.subscription_status === status)).sort((a,b) => (Date.parse(a.created_at)-Date.parse(b.created_at))*sort);
       return response.status(200).json({ overview:{ total_users:records.length, new_users_7_days:records.filter(row => Date.now()-Date.parse(row.created_at)<=7*864e5).length, new_users_30_days:records.filter(row => Date.now()-Date.parse(row.created_at)<=30*864e5).length, active_users_7_days:records.filter(row => row.last_active && Date.now()-Date.parse(row.last_active)<=7*864e5).length, free_users:records.filter(row => row.plan === "free").length, paid_users:records.filter(row => row.plan !== "free").length }, users:filtered, page:1, page_size:1000, total:filtered.length });
     }
-    const body = typeof request.body === "string" ? JSON.parse(request.body || "{}") : (request.body || {});
+    let body;
+    try { body = typeof request.body === "string" ? JSON.parse(request.body || "{}") : (request.body || {}); }
+    catch { return error(response,400,"Malformed JSON request.","invalid_json"); }
     const target = users.find(candidate => candidate.id === body.user_id);
     if (!target) return error(response,404,"User not found.","not_found");
     if (body.action === "set_plan") {

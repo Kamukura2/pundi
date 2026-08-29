@@ -1,4 +1,4 @@
-# Pundi Operations Runbook v1
+# Pundi Operations Runbook v2
 
 Pundi is an isolated finance product. Keep all operations scoped to the Pundi repository, the `creativevista/pundi` Vercel project, and Supabase ref `ndeycwoyjwyntjkgbzlz`.
 
@@ -78,6 +78,32 @@ Inspect the actual migration sequence and production identity before any databas
 ## Scheduler and health
 
 Keep one existing Windows health scheduler if present; do not create duplicate tasks. Health checks should use sanitized logs, bounded retention, the dedicated smoke account, and read-only API assertions. A missing credential is an explicit blocked state, not a reason to skip silently.
+
+## Productization v2
+
+- Product version is `8.3.3`, sourced from `package.json`, lockfile, README heading, document title, and the service-worker shell cache key.
+- The onboarding card is rendered only after authenticated cloud state loads, only when all finance collections are empty, and is dismissed under `pundi-onboarding-dismissed:<userId>`. It creates no sample records and is safe across logout/account switching.
+- Entitlements are resolved by `src/entitlements/resolver.js`: unknown/missing metadata defaults to Free, manual provenance is preserved, and explicit per-feature overrides take precedence. No payment provider or feature gating is active.
+- Production security headers are configured in `vercel.json`. CSP permits only same-origin app resources, the verified Pundi Supabase HTTPS/WSS endpoints, and required inline styles used by the current UI. `frame-ancestors 'none'`, `nosniff`, strict-origin referrer policy, and restrictive Permissions-Policy are enabled.
+- `/api/account` and `/api/admin` reject malformed JSON with a safe 400 response. Sensitive responses remain private/no-store.
+- The service worker uses `pundi-shell-v8.3.3`, excludes `/api/*`, synchronously clones responses before asynchronous caching, and deletes old shell caches during activation.
+
+## Regression commands
+
+- `npm run test:productization-v2`: onboarding, headers, API parsing, cache identity, and release identity contract.
+- `npm run test:entitlement`: canonical resolver semantics and override precedence.
+- `npm run test:regression`: productization, lifecycle, recovery, admin contracts, and two-user isolation.
+- `npm run test:admin-smoke`: read-only production health runner using the designated smoke account.
+
+After every runtime release, run `npm run check`, `npm run build`, restore generated `dist` if needed, and run `git diff --check`.
+
+## Health and deployment markers
+
+The expected production build identity is Pundi `8.3.3`; the build/deployment commit is tracked separately by Git/Vercel and is never derived from a secret or exposed environment value. Verify the production alias and response headers headlessly after deployment. Do not claim authenticated UI behavior from a public HTTP check alone.
+
+## Auth email blocker
+
+`docs/AUTH_EMAIL_TEMPLATES.md` remains prepared. Custom SMTP, sender-domain verification, template application, and mailbox delivery testing remain `BLOCKED_EXTERNAL` until an approved provider/domain is configured.
 
 ## Rollback outline
 

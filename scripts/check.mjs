@@ -533,9 +533,9 @@ assert.match(appSource, /tx-history-archive/, "Previous History months must rema
 
 const electricityIndex = read("index.html");
 const electricityCss = read("styles.css");
-assert.equal(JSON.parse(read("package.json")).version,"8.3.2","Package version must be v8.3.2");
-assert.match(electricityIndex,/<title>Pundi v8\.3\.2<\/title>/,"Document title must be v8.3.2");
-assert.match(read("public/sw.js"),/pundi-shell-v8\.3\.4-recovery-completion/,"Service-worker cache must invalidate for the recovery-completion release");
+assert.equal(JSON.parse(read("package.json")).version,"8.3.3","Package version must be v8.3.3");
+assert.match(electricityIndex,/<title>Pundi v8\.3\.3<\/title>/,"Document title must be v8.3.3");
+assert.match(read("public/sw.js"),/pundi-shell-v8\.3\.3/,"Service-worker cache must invalidate for the v8.3.3 release");
 assert.match(electricityIndex,/id="topUpElectricityBtn"[^>]*>\s*TOP UP\s*<\/button>/,"Electricity must expose a distinct TOP UP action");
 assert.match(electricityIndex,/id="addElectricityBtn"[^>]*>\s*＋ Reading\s*<\/button>/,"The existing Reading action must remain available");
 assert.match(electricityIndex,/id="electricityTopUpModal"/);

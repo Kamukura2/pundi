@@ -1,0 +1,11 @@
+import assert from "node:assert/strict";
+import { resolveEntitlements } from "../../src/entitlements/resolver.js";
+let result=resolveEntitlements();
+assert.equal(result.plan,"free"); assert.equal(result.provider,"manual"); assert.equal(result.entitlements.core_finance,true); assert.equal(result.entitlements.premium_features,false);
+result=resolveEntitlements({plan:"paid",status:"active",provider:"manual"});
+assert.equal(result.plan,"paid"); assert.equal(result.provider,"manual"); assert.equal(result.entitlements.premium_features,true);
+result=resolveEntitlements({plan:"paid",status:"expired",provider:"manual"},{premium_features:{enabled:false},core_finance:{enabled:true}});
+assert.equal(result.entitlements.premium_features,false); assert.equal(result.entitlements.core_finance,true);
+result=resolveEntitlements({plan:"unknown",status:"unknown",provider:"provider-x"});
+assert.deepEqual(result,{plan:"free",status:"free",provider:"provider-x",entitlements:{core_finance:true,cloud_sync:true,advanced_insights:false,export:false,premium_features:false}});
+console.log("Entitlement resolver contract PASS");
