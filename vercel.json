@@ -6,7 +6,35 @@
       "schedule": "15 23 * * 1-5"
     }
   ],
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "has": [{ "type": "host", "value": "www.pundi.online" }],
+      "destination": "https://pundi.online/$1",
+      "permanent": true
+    }
+  ],
   "rewrites": [
+    {
+      "source": "/",
+      "has": [{ "type": "host", "value": "pundi.online" }],
+      "destination": "/landing.html"
+    },
+    {
+      "source": "/privacy",
+      "has": [{ "type": "host", "value": "pundi.online" }],
+      "destination": "/privacy.html"
+    },
+    {
+      "source": "/terms",
+      "has": [{ "type": "host", "value": "pundi.online" }],
+      "destination": "/terms.html"
+    },
+    {
+      "source": "/support",
+      "has": [{ "type": "host", "value": "pundi.online" }],
+      "destination": "/support.html"
+    },
     { "source": "/auth/reset-password", "destination": "/index.html" },
     { "source": "/auth/reset-password/", "destination": "/index.html" }
   ],
@@ -17,7 +45,7 @@
         { "key": "X-Content-Type-Options", "value": "nosniff" },
         { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
         { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(), payment=()" },
-        { "key": "Content-Security-Policy", "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://pundi-silk.vercel.app; font-src 'self' data:; connect-src 'self' https://ndeycwoyjwyntjkgbzlz.supabase.co wss://ndeycwoyjwyntjkgbzlz.supabase.co; worker-src 'self' blob:; manifest-src 'self'" }
+        { "key": "Content-Security-Policy", "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://ndeycwoyjwyntjkgbzlz.supabase.co wss://ndeycwoyjwyntjkgbzlz.supabase.co; worker-src 'self' blob:; manifest-src 'self'" }
       ]
     }
   ]

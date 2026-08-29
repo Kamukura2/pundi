@@ -19,7 +19,7 @@ const home = (await fetchText("/")).text;
 const assets = [...home.matchAll(/(?:src|href)="(\/assets\/[^"]+)/g)].map(match => match[1]);
 let bundle = "";
 for (const asset of assets) bundle += (await fetchText(asset)).text;
-assert.ok(bundle.includes("Pundi v8.3.5 · build ${Br}"));
+assert.ok(bundle.includes("Pundi v8.4.0 · build ${Br}"));
 assert.ok(bundle.includes(`const Br="${expectedBuild}"`));
 assert.doesNotMatch(bundle, /SUPABASE_SERVICE_ROLE_KEY|service_role_key\s*[:=]|smoke password|cvfinance\.supabase\.co/i);
 const admin = await fetch(origin + "/api/admin", { cache: "no-store" });

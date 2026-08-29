@@ -1,6 +1,6 @@
 {
   "name": "pundi",
-  "version": "8.3.5",
+  "version": "8.4.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -23,6 +23,7 @@
     "test:api-contract": "node tests/integration/api-contract.mjs",
     "test:responsive": "node tests/integration/responsive-contract.mjs",
     "test:a11y": "node tests/integration/a11y-contract.mjs",
+    "test:domains": "node tests/integration/public-launch-contract.mjs",
     "test:empty-states": "node tests/integration/empty-state-contract.mjs",
     "test:double-submit": "node tests/integration/double-submit-contract.mjs",
     "test:build-identity": "node tests/integration/build-identity-contract.mjs",

@@ -1,6 +1,6 @@
 # Pundi Technical Beta Baseline
 
-- Product version: `8.3.5`
+- Product version: `8.4.0`
 - Current production URL: `https://pundi-silk.vercel.app`
 - Current runtime build: verified by `npm run test:health-v4` against the production alias
 - Supabase project ref: `ndeycwoyjwyntjkgbzlz`

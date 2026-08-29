@@ -78,7 +78,7 @@ const saveSettings=()=>save();
 const q=(s)=>document.querySelector(s);
 const qa=(s)=>[...document.querySelectorAll(s)];
 const releaseIdentity=q("#releaseIdentity");
-if(releaseIdentity) releaseIdentity.textContent = `Pundi v8.3.5 · build ${BUILD_ID}`;
+if(releaseIdentity) releaseIdentity.textContent = `Pundi v8.4.0 · build ${BUILD_ID}`;
 const onboardingCard=q("#onboardingCard");
 const onboardingDismiss=q("[data-onboarding-dismiss]");
 const onboardingAddAccount=q("#onboardingAddAccount");
@@ -1600,6 +1600,7 @@ qa("[data-stock-workspace]").forEach(button=>button.onclick=()=>setStockWorkspac
 themeBtn.onclick=()=>setTheme(state.theme==="dark"?"light":"dark");
 languageBtn.onclick=()=>{state.language=state.language==="en"?"id":"en";applyLanguage();saveSettings();renderAll();switchPage(state.page);};
 privacyBtn.onclick=()=>{state.privacy=!state.privacy; document.body.classList.toggle("private-hidden",state.privacy); privacyBtn.textContent=state.privacy?"🙈":"👁"; renderAll();};
+feedbackBtn.onclick=()=>{ window.location.href="https://pundi.online/support"; };
 qa("#cashFilter button").forEach(b=>b.onclick=()=>{qa("#cashFilter button").forEach(x=>x.classList.remove("active")); b.classList.add("active"); state.filter=b.dataset.filter; renderCashflow();});
 cashSort.onchange=()=>{state.sort=cashSort.value; renderCashflow();};
 txSearch.oninput=()=>renderCashflow();
