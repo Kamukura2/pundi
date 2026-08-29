@@ -2,7 +2,7 @@
 
 - Product version: `8.3.5`
 - Current production URL: `https://pundi-silk.vercel.app`
-- Current runtime build: `27f6a53` (production remains intentionally on the v8.3.4 runtime until the v8.3.5 runtime release gate completes)
+- Current runtime build: `bf8de0a`
 - Supabase project ref: `ndeycwoyjwyntjkgbzlz`
 - Repository: `https://github.com/Kamukura2/pundi`
 
