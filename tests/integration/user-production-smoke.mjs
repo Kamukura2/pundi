@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
 
-const origin = "https://pundi-silk.vercel.app";
+const origin = process.env.PUNDI_PRODUCTION_URL || "https://app.pundi.online";
 const email = process.env.PUNDI_USER_SMOKE_EMAIL || "";
 const password = process.env.PUNDI_USER_SMOKE_PASSWORD || "";
 if (!email || !password) throw new Error("ACTION REQUIRED: local user-smoke credentials are missing.");
@@ -12,7 +12,7 @@ const result = { status: "PASS", origin, financeMutations: 0 };
 try {
   await page.goto(origin, { waitUntil: "networkidle" });
   await page.locator("#authGate").waitFor({ state: "visible", timeout: 30000 });
-  assert.match(await page.title(), /Pundi v8\.3\.5/);
+  assert.match(await page.title(), /Pundi v8\.4\.0/);
   for (let attempt = 1; attempt <= 3 && await page.locator("#authGate").isVisible(); attempt++) {
     if (attempt > 1) await page.reload({ waitUntil: "networkidle" });
     await page.locator("#authEmail").fill(email);

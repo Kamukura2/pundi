@@ -11,9 +11,9 @@ for (const route of routes) {
   assert.equal(response.status, 200, `${route} status`);
   results[route] = { status: response.status, contentType: response.headers.get("content-type") };
   for (const header of ["content-security-policy", "x-content-type-options", "referrer-policy", "permissions-policy"]) assert.ok(response.headers.get(header), `${route} missing ${header}`);
-  if (route === "/") assert.match(text, /Pundi v8\.3\.5/);
+  if (route === "/") assert.match(text, /Pundi v8\.4\.0/);
   if (route === "/api/config") { const body = JSON.parse(text); assert.match(body.supabaseUrl, /ndeycwoyjwyntjkgbzlz/); assert.equal(response.headers.get("cache-control"), "no-store"); }
-  if (route === "/sw.js") assert.match(text, /pundi-shell-v8\.3\.5/);
+  if (route === "/sw.js") assert.match(text, /pundi-shell-v8\.4\.0/);
 }
 const home = (await fetchText("/")).text;
 const assets = [...home.matchAll(/(?:src|href)="(\/assets\/[^"]+)/g)].map(match => match[1]);
