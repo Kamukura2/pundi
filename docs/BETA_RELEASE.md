@@ -1,6 +1,6 @@
 # Pundi Technical Beta Baseline
 
-- Product version: `8.4.0`
+- Product version: `8.5.0`
 - Current production URL: `https://app.pundi.online`
 - Public site URL: `https://pundi.online`
 - Legacy compatibility URL: `https://pundi-silk.vercel.app`

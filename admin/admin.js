@@ -1,8 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 import { bootstrapAdminState, withTimeout } from "./state.js";
 import { normalizeDashboardPayload, renderCardsHtml, renderFailureHtml, renderRowsHtml } from "./render.js";
+import { normalizeFeedbackList, FEEDBACK_STATUSES, FEEDBACK_PRIORITIES } from "../src/feedback/contract.js";
 const $ = id => document.getElementById(id);
-let supabase, session, records=[], page=0;
+let supabase, session, records=[], feedback=[], page=0;
 const pageSize=20;
 const BOOT_TIMEOUT_MS=10000;
 const esc = value => String(value ?? "").replace(/[&<>"']/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[char]));
@@ -21,6 +22,13 @@ function renderRows(){
   $("prev").disabled=page===0; $("next").disabled=(page+1)*pageSize>=records.length;
   document.querySelectorAll("[data-detail]").forEach(button=>button.onclick=()=>showDetail(records.find(row=>row.user_id===button.dataset.detail)));
 }
+function renderFeedback(){
+  const search=$("feedbackSearch").value.trim().toLowerCase(), status=$("feedbackStatus").value, category=$("feedbackCategory").value;
+  const rows=feedback.filter(row=>(!search||`${row.message} ${row.page} ${row.user_email}`.toLowerCase().includes(search))&&(!status||row.status===status)&&(!category||row.category===category));
+  $("feedbackMetrics").textContent=`${feedback.length} total · ${feedback.filter(row=>row.status==="New").length} new · ${feedback.filter(row=>!["Resolved","Closed"].includes(row.status)).length} unresolved · ${feedback.filter(row=>Date.now()-Date.parse(row.created_at)<=7*864e5).length} in the last 7 days`;
+  $("feedbackRows").innerHTML=rows.map(row=>`<article class="feedback-item"><div class="feedback-meta"><b>${esc(row.category)}</b><span>${esc(row.user_email||row.user_id.slice(0,8)+"…")} · ${date(row.created_at)}</span><span>${esc(row.page||"—")} · ${esc(row.app_version||"—")} · build ${esc(row.build_id||"—")}</span></div><p class="feedback-text">${esc(row.message)}</p><div class="feedback-edit"><select data-feedback-status="${esc(row.id)}">${FEEDBACK_STATUSES.map(value=>`<option ${value===row.status?"selected":""}>${value}</option>`).join("")}</select><select data-feedback-priority="${esc(row.id)}">${FEEDBACK_PRIORITIES.map(value=>`<option ${value===row.priority?"selected":""}>${value}</option>`).join("")}</select><input data-feedback-note="${esc(row.id)}" value="${esc(row.admin_note)}" maxlength="1000" placeholder="Admin note"><button class="primary" data-feedback-save="${esc(row.id)}">Save</button></div></article>`).join("")||`<p class="meta">No matching feedback.</p>`;
+  document.querySelectorAll("[data-feedback-save]").forEach(button=>button.onclick=async()=>{const id=button.dataset.feedbackSave;button.disabled=true;try{await api("POST",{action:"update_feedback",id,status:document.querySelector(`[data-feedback-status="${CSS.escape(id)}"]`).value,priority:document.querySelector(`[data-feedback-priority="${CSS.escape(id)}"]`).value,admin_note:document.querySelector(`[data-feedback-note="${CSS.escape(id)}"]`).value});await load();}catch(error){showError(error.message);button.disabled=false;}});
+}
 async function api(method="GET", body){
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),BOOT_TIMEOUT_MS);
@@ -36,6 +44,7 @@ async function api(method="GET", body){
 async function load(){
   showError("");
   const data=normalizeDashboardPayload(await api("GET",null));
+  feedback=normalizeFeedbackList(data.feedback||[]);
   // Filtering is repeated locally for responsive pagination; API remains the authorization boundary.
   const search=$("search").value.trim().toLowerCase(), plan=$("plan").value, status=$("status").value;
   records=data.users.filter(row=>{
@@ -43,7 +52,7 @@ async function load(){
     return (!search||email.includes(search)||userId.includes(search)) && (!plan||(plan==="paid"?row.plan!=="free":row.plan===plan)) && (!status||row.subscription_status===status);
   });
   if($("sort").value==="oldest")records.reverse();
-  page=0; renderCards(data.overview); renderRows(); $("dashboard").hidden=false; $("notice").hidden=true;
+  page=0; renderCards(data.overview); renderRows(); renderFeedback(); $("dashboard").hidden=false; $("notice").hidden=true;
 }
 function showDetail(row){
   if(!row)return;
@@ -86,6 +95,6 @@ async function boot(){
     showFailure(error.message || "Unable to load the admin dashboard.");
   }
 }
-["search","plan","status","sort"].forEach(id=>$(id).oninput=()=>load().catch(error=>showError(error.message)));
+["search","plan","status","sort","feedbackSearch","feedbackStatus","feedbackCategory"].forEach(id=>$(id).oninput=()=>load().catch(error=>showError(error.message)));
 $("refresh").onclick=()=>load().catch(error=>showError(error.message)); $("prev").onclick=()=>{page--;renderRows()}; $("next").onclick=()=>{page++;renderRows()}; $("close").onclick=()=>$("drawer").hidden=true; $("drawer").onclick=event=>{if(event.target.id==="drawer")$("drawer").hidden=true}; $("signOut").onclick=async()=>{await supabase?.auth.signOut();location.href="/"};
 boot();

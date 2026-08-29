@@ -16,6 +16,7 @@ export default defineConfig({
         privacy: "privacy.html",
         terms: "terms.html",
         support: "support.html",
+        updates: "updates.html",
         admin: "admin/index.html"
       }
     }

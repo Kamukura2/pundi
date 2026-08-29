@@ -53,9 +53,10 @@ const failure = renderFailureHtml("Admin API failed.");
 assert.match(failure, /Admin API failed/);
 assert.match(failure, /Retry/);
 assert.match(failure, /No dashboard data available/);
+assert.ok(Array.isArray(normalizeDashboardPayload({ overview: baseOverview, users: [], feedback: [] }).feedback));
 
 const html = await readFile(new URL("../../admin/index.html", import.meta.url), "utf8");
-for (const id of ["notice", "dashboard", "cards", "error", "userRows", "count", "refresh"]) {
+for (const id of ["notice", "dashboard", "cards", "error", "userRows", "count", "refresh", "feedbackRows", "feedbackSearch", "feedbackStatus", "feedbackCategory"]) {
   assert.match(html, new RegExp(`id=["']${id}["']`), `missing DOM target #${id}`);
 }
 

@@ -40,7 +40,7 @@ export function normalizeDashboardPayload(value) {
       aggregate_record_counts: object(item.aggregate_record_counts),
     };
   });
-  return { overview, users };
+  return { overview, users, feedback: Array.isArray(value.feedback) ? value.feedback : [] };
 }
 
 export function renderCardsHtml(overview) {

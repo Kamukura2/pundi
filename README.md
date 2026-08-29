@@ -1,4 +1,4 @@
-# Pundi v8.4.0
+# Pundi v8.5.0
 
 v8.3.2 releases the approved GoPayLater visual distinction, Indonesian money-input formatting, and direct-IDR crypto FX correction. The existing Stocks navigation label remains Assets; Investment/Trading workspaces, Crypto, persistence, and accounting behavior are preserved.
 

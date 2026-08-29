@@ -35,6 +35,11 @@
       "has": [{ "type": "host", "value": "pundi.online" }],
       "destination": "/support.html"
     },
+    {
+      "source": "/updates",
+      "has": [{ "type": "host", "value": "pundi.online" }],
+      "destination": "/updates.html"
+    },
     { "source": "/auth/reset-password", "destination": "/index.html" },
     { "source": "/auth/reset-password/", "destination": "/index.html" }
   ],

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-  <title>Pundi v8.4.0 · Private finance workspace</title>
+  <title>Pundi v8.5.0 · Private finance workspace</title>
   <meta name="robots" content="noindex, nofollow, noarchive">
   <meta name="theme-color" content="#d6249f">
   <meta name="description" content="Private synchronized personal finance workspace for your accounts, cash flow, assets, and plans.">
@@ -23,7 +23,7 @@
   <aside id="primarySidebar" class="sidebar" aria-label="Primary navigation">
     <div class="brand">
       <div class="logo">C</div>
-      <div><b>Pundi</b><small>Personal Finance OS</small></div>
+      <div><b>Pundi <span class="beta-badge">Beta</span></b><small>Personal Finance OS</small></div>
     </div>
 
     <nav class="nav-list">
@@ -635,7 +635,7 @@
   </main>
 
   <button class="mobile-add-transaction" data-open-tx type="button" aria-label="Add transaction" title="Add transaction">＋</button>
-  <footer id="releaseIdentity" class="release-identity" aria-label="Release identity">Pundi v8.3.4</footer>
+  <footer id="releaseIdentity" class="release-identity" aria-label="Release identity">Pundi v8.5.0 · Beta</footer>
 </div>
 
 <dialog id="txModal">
@@ -714,6 +714,18 @@
     </div>
     <input id="backupFile" type="file" accept="application/json,.json" hidden>
   </div>
+</dialog>
+
+<dialog id="feedbackModal">
+  <form id="feedbackForm" class="modal" novalidate>
+    <div class="panel-head"><div><p>Controlled beta</p><h3>Send feedback</h3></div><button type="button" class="ghost-btn close-dialog" aria-label="Close">×</button></div>
+    <p class="feedback-intro">Pundi is currently in beta. Some features may change as we improve the product.</p>
+    <label for="feedbackCategory">Category<select id="feedbackCategory" required><option value="">Choose a category</option><option>Bug</option><option>Feature request</option><option>Usability</option><option>Data / calculation issue</option><option>Other</option></select></label>
+    <label for="feedbackMessage">Message<textarea id="feedbackMessage" rows="7" maxlength="4000" required placeholder="What were you trying to do, and what happened?"></textarea></label>
+    <small id="feedbackCounter" class="form-help">0 / 4000</small>
+    <small id="feedbackMessageStatus" class="form-error" role="status" aria-live="polite"></small>
+    <div class="modal-actions"><button id="feedbackCancel" class="ghost-btn close-dialog" type="button">Cancel</button><button id="feedbackSubmit" class="primary-btn" type="submit">Send feedback</button></div>
+  </form>
 </dialog>
 
 <section id="authGate" class="auth-gate" hidden>
