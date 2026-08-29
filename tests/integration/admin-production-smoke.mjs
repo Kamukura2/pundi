@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { createClient } from "@supabase/supabase-js";
 import { normalizeDashboardPayload, renderCardsHtml, renderRowsHtml } from "../../admin/render.js";
 
-const PRODUCTION_ORIGIN = "https://pundi-silk.vercel.app";
+// Legacy fallback remains available: https://pundi-silk.vercel.app
+const PRODUCTION_ORIGIN = process.env.PUNDI_PRODUCTION_URL || "https://app.pundi.online";
 const PUNDI_REF = "ndeycwoyjwyntjkgbzlz";
 const PUNDI_SUPABASE_HOST = `${PUNDI_REF}.supabase.co`;
 const email = process.env.PUNDI_ADMIN_SMOKE_EMAIL || "";

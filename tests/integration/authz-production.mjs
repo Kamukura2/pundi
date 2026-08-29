@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { createClient } from "@supabase/supabase-js";
-const origin="https://pundi-silk.vercel.app";
+const origin=process.env.PUNDI_PRODUCTION_URL || "https://app.pundi.online";
 const env=Object.fromEntries(fs.readFileSync(".env.user-smoke.local","utf8").split(/\r?\n/).filter(x=>x.includes("=")).map(x=>{const i=x.indexOf("=");return [x.slice(0,i),x.slice(i+1)]}));
 const admin=Object.fromEntries(fs.readFileSync(".env.admin-smoke.local","utf8").split(/\r?\n/).filter(x=>x.includes("=")).map(x=>{const i=x.indexOf("=");return [x.slice(0,i),x.slice(i+1)]}));
 const cfg=await (await fetch(origin+"/api/config",{cache:"no-store"})).json();assert.match(cfg.supabaseUrl,/ndeycwoyjwyntjkgbzlz/);
