@@ -16,7 +16,7 @@ Ownership/RLS and Realtime isolation are preserved. Auth recovery and account li
 
 ## Known blocker
 
-Branded Auth email configuration is applied. Provider delivery-log confirmation and mailbox visual verification remain pending. Do not mark this milestone complete until both confirmation and recovery delivery are verified.
+Branded Auth Email + Custom SMTP: COMPLETE. Resend custom SMTP, Pundi sender identity, confirmation/recovery templates, and controlled confirmation/recovery mailbox verification passed.
 
 ## Rollback pointer
 

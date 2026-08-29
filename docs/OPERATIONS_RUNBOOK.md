@@ -120,7 +120,7 @@ Run 3 and Run 4 introduced no database migration. For a bad frontend deployment,
 - Confirmation subject: `Confirm your Pundi account`.
 - Recovery subject: `Reset your Pundi password`.
 - Confirmation and recovery templates: applied in the Pundi Supabase Auth project.
-- Delivery and mailbox verification: pending provider-log and mailbox confirmation.
+- Delivery and mailbox verification: PASS; confirmation and recovery messages were verified by the owner.
 - Email-change template: not applicable to the current Pundi UI.
 
 Maintain these settings only in the Pundi Supabase Auth project. Never place SMTP credentials in source, client configuration, logs, or documentation.

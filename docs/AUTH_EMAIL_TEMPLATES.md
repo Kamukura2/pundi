@@ -1,6 +1,6 @@
 # Pundi Auth Email Templates v1
 
-Status: **APPLIED — DELIVERY VERIFICATION PENDING**. The Pundi Supabase Auth project has the confirmation and recovery templates configured. Provider delivery-log confirmation and mailbox visual verification remain outstanding.
+Status: **COMPLETE**. The Pundi Supabase Auth project has the confirmation and recovery templates configured and verified through controlled delivery and mailbox inspection.
 
 These templates are Pundi-only and use the same-origin production URL. They do not claim payment, legal, or delivery guarantees.
 
@@ -52,11 +52,11 @@ If a future Pundi release adds email changing, validate this template against th
 - [x] Verify the sender domain with the SMTP provider.
 - [x] Configure Resend custom SMTP in Supabase Auth SMTP settings.
 - [x] Set the verified sender name to `Pundi` and sender address to `no-reply@auth.pundi.online`.
-- [ ] Confirm the Site URL is `https://pundi-silk.vercel.app`.
-- [ ] Keep the recovery redirect allowlist entry at `https://pundi-silk.vercel.app/auth/reset-password`.
-- [ ] Send one controlled confirmation and recovery test using a designated non-customer account.
-- [ ] Confirm the template links land on the Pundi origin and do not contain CVFinance branding.
-- [ ] Record the provider configuration privately; never commit SMTP credentials.
+- [x] Confirm the Site URL is `https://pundi-silk.vercel.app`.
+- [x] Keep the recovery redirect allowlist entry at `https://pundi-silk.vercel.app/auth/reset-password`.
+- [x] Send one controlled confirmation and recovery test using a designated non-customer account.
+- [x] Confirm the template links land on the Pundi origin and do not contain CVFinance branding.
+- [x] Record the provider configuration privately; never commit SMTP credentials.
 
 ## Current truth
 
@@ -65,9 +65,9 @@ If a future Pundi release adds email changing, validate this template against th
 - Verified sender domain: `auth.pundi.online`.
 - Sender: `Pundi <no-reply@auth.pundi.online>`.
 - Branded templates: applied in the Pundi Supabase Auth project.
-- Mailbox verification: pending.
-- Provider delivery-log confirmation: pending.
-- External blocker: confirm provider delivery and complete controlled mailbox verification.
+- Mailbox verification: PASS.
+- Provider delivery-log confirmation: not available in the local environment; mailbox delivery and headers verified by owner.
+- External blocker: none.
 
 ## Rollback
 
