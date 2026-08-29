@@ -16,7 +16,7 @@ Ownership/RLS and Realtime isolation are preserved. Auth recovery and account li
 
 ## Known blocker
 
-Branded Auth email remains `BLOCKED_EXTERNAL`: approve an SMTP provider, verify the Pundi sender domain, configure Supabase Auth SMTP, apply `docs/AUTH_EMAIL_TEMPLATES.md`, and perform mailbox verification.
+Branded Auth email configuration is applied. Provider delivery-log confirmation and mailbox visual verification remain pending. Do not mark this milestone complete until both confirmation and recovery delivery are verified.
 
 ## Rollback pointer
 

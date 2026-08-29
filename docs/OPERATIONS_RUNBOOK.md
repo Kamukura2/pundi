@@ -112,12 +112,23 @@ The expected production build identity is Pundi `8.3.5`; the build marker is the
 
 Run 3 and Run 4 introduced no database migration. For a bad frontend deployment, identify the current and previous `READY` deployment in the existing `creativevista/pundi` Vercel project, promote the previous Pundi deployment using the Vercel dashboard or `vercel promote <deployment-url> --scope creativevista`, then verify `https://pundi-silk.vercel.app` and the production health runner. Do not use database rollback commands for these frontend-only releases and do not point the alias backward until deployment identity is confirmed.
 
-## Auth email blocker
+## Auth email configuration
 
-Custom SMTP, sender-domain verification, Auth template application, and mailbox delivery testing remain `BLOCKED_EXTERNAL`. Do not add provider credentials to source or test through a real mailbox.
-`docs/AUTH_EMAIL_TEMPLATES.md` remains prepared. Custom SMTP, sender-domain verification, template application, and mailbox delivery testing remain `BLOCKED_EXTERNAL` until an approved provider/domain is configured.
+- Provider: Resend.
+- Verified sender domain: `auth.pundi.online`.
+- Sender: `Pundi <no-reply@auth.pundi.online>`.
+- Confirmation subject: `Confirm your Pundi account`.
+- Recovery subject: `Reset your Pundi password`.
+- Confirmation and recovery templates: applied in the Pundi Supabase Auth project.
+- Delivery and mailbox verification: pending provider-log and mailbox confirmation.
+- Email-change template: not applicable to the current Pundi UI.
 
-## Rollback outline
+Maintain these settings only in the Pundi Supabase Auth project. Never place SMTP credentials in source, client configuration, logs, or documentation.
+
+## Auth email rollback
+
+If SMTP authentication fails, the sender domain loses verification, the provider is unavailable, or a template is malformed: inspect the provider/Supabase delivery error, restore the last known-good Auth template, and if necessary disable custom SMTP to return to the prior Supabase delivery behavior. Retain the Pundi recovery redirect and do not change the application recovery route. Re-enable custom SMTP only after credentials/provider status and a controlled test are verified.
+
 
 - Application: redeploy the prior verified Pundi commit through `creativevista/pundi`.
 - Database: use only an explicitly reviewed forward-compatible repair; never reset production.
