@@ -36,6 +36,7 @@ try {
   }
   if ([string]::IsNullOrWhiteSpace($env:PUNDI_ADMIN_SMOKE_EMAIL) -or [string]::IsNullOrWhiteSpace($env:PUNDI_ADMIN_SMOKE_PASSWORD) -or [string]::IsNullOrWhiteSpace($env:PUNDI_USER_SMOKE_EMAIL) -or [string]::IsNullOrWhiteSpace($env:PUNDI_USER_SMOKE_PASSWORD)) { throw 'Smoke credential variables are missing.' }
 
+  $env:PUNDI_EXPECTED_BUILD = 'c22360c'
   $stdoutFile = Join-Path $HealthDir (".stdout-{0}.tmp" -f [guid]::NewGuid())
   $stderrFile = Join-Path $HealthDir (".stderr-{0}.tmp" -f [guid]::NewGuid())
   try {

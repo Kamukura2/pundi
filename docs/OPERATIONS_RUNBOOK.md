@@ -108,6 +108,10 @@ After every runtime release, run `npm run check`, `npm run build`, restore gener
 
 The expected production build identity is Pundi `8.3.5`; the build marker is the non-secret Git short SHA and the deployment commit is tracked separately by Git/Vercel. Verify the production alias, exact marker, and response headers headlessly after deployment. Do not claim authenticated UI behavior from a public HTTP check alone.
 
+## Rollback rehearsal
+
+Run 3 and Run 4 introduced no database migration. For a bad frontend deployment, identify the current and previous `READY` deployment in the existing `creativevista/pundi` Vercel project, promote the previous Pundi deployment using the Vercel dashboard or `vercel promote <deployment-url> --scope creativevista`, then verify `https://pundi-silk.vercel.app` and the production health runner. Do not use database rollback commands for these frontend-only releases and do not point the alias backward until deployment identity is confirmed.
+
 ## Auth email blocker
 
 Custom SMTP, sender-domain verification, Auth template application, and mailbox delivery testing remain `BLOCKED_EXTERNAL`. Do not add provider credentials to source or test through a real mailbox.
