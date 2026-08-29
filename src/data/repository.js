@@ -13,10 +13,33 @@ const parentFirst = ["accounts","transactions","monthly_budgets","yearly_expense
 const deleteFirst = [...parentFirst].reverse();
 const meta = row => ({ __createdAt: row.created_at, __updatedAt: row.updated_at });
 const clean = value => JSON.parse(JSON.stringify(value));
+const UNSAFE_BACKUP_KEYS = new Set(["user_id","owner_id","owner_user_id","admin","admin_id","admin_role","is_admin","role","access_token","refresh_token","id_token","token","session","auth","authorization","service_role_key"]);
+const PROTOTYPE_KEYS = new Set(["__proto__","constructor","prototype"]);
 const withoutOwnership = value => {
   if (Array.isArray(value)) return value.map(withoutOwnership);
   if (!value || typeof value !== "object") return value;
-  return Object.fromEntries(Object.entries(value).filter(([key]) => !["user_id","owner_user_id"].includes(key)).map(([key, item]) => [key, withoutOwnership(item)]));
+  return Object.fromEntries(Object.entries(value)
+    .filter(([key]) => !UNSAFE_BACKUP_KEYS.has(key.toLowerCase()) && !PROTOTYPE_KEYS.has(key))
+    .map(([key, item]) => [key, withoutOwnership(item)]));
+};
+const NUMERIC_FIELDS = new Set(["balance","amount","monthly","paid","carry","limit","monthlyAmount","yearlyAmount","quantity","avg","current","targetPrice","stopLoss","remaining","kwh","amountPerShare","eligibleShares","fxRate","creditedAmountNative","cashDeltaIdr","cashDeltaUsd","externalFlowIdr","realizedPlIdr","equityIdr","netContributionsIdr","holdingsValueIdr","cashValueIdr","spyPrice","benchmarkEquityIdr","benchmarkExternalFlowsIdr","benchmarkHoldingsValueIdr","benchmarkCashValueIdr","baseGrowth","optimisticGrowth","usdIdr","rateKwh","paidAmount"]);
+const validateBackupNumbers = value => {
+  const walk = (item, key = "") => {
+    if (Array.isArray(item)) return item.forEach(child => walk(child, key));
+    if (!item || typeof item !== "object") {
+      if (NUMERIC_FIELDS.has(key) && (typeof item !== "number" || !Number.isFinite(item))) throw new Error(`Backup contains invalid numeric field: ${key}.`);
+      return;
+    }
+    Object.entries(item).forEach(([childKey, child]) => walk(child, childKey));
+  };
+  walk(value);
+};
+const validateBackupIds = data => {
+  Object.entries(data).forEach(([collection, rows]) => {
+    if (!Array.isArray(rows)) return;
+    const ids = rows.map(row => row && row.id).filter(Boolean);
+    if (new Set(ids).size !== ids.length) throw new Error(`Backup contains duplicate IDs in ${collection}.`);
+  });
 };
 const comparable = row => {
   const copy = { ...row };
@@ -359,7 +382,9 @@ export function exportBackup(state, userId) {
 
 export function validateBackup(value) {
   if (value?.format !== "cvfinance-backup" || value?.version !== 1 || !value?.data) throw new Error("Invalid Pundi backup file.");
+  validateBackupNumbers(value.data);
   const data = withoutOwnership(clean(value.data));
+  validateBackupIds(data);
   const required = ["accounts","transactions","budgets","yearly","events","creditFacilities","credit","clients","stocks","electricity"];
   required.forEach(key => { if (!Array.isArray(data[key])) throw new Error(`Backup is missing ${key}.`); });
   if (!Array.isArray(data.electricityTopups)) data.electricityTopups = [];

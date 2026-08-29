@@ -12,6 +12,8 @@ import { getSupabase } from "./src/lib/supabase.js";
 import { applyOpeningPosition, applyTrade, archiveClosedTradingPositions, cashEvent, equityBenchmarkMetrics, performancePreview, performanceSeries, reconcileTradingPositions, removeTradingLedgerEntry, removeTradingPositionData, setTradingWalletBalance, tradingMetrics, tradingPositionCost, tradingPositionValue, tradingTargetSimulation, upsertDailySnapshot } from "./src/trading/model.js";
 import { historicalCryptoQuote } from "./src/trading/crypto-lifecycle.js";
 
+const BUILD_ID = __PUNDI_BUILD_ID__;
+
 const COLORS=["#7F66FF","#39C3FF","#FF8F63","#36D695","#F4C24F","#FF6EA8","#62C8FF","#8D7AFF"];
 const COMPANY_EXPENSE_TAG="Expense Perusahaan";
 const DEFAULT_USD_IDR=17810;
@@ -75,6 +77,8 @@ const save=(options)=>syncManager?.persist(state,options);
 const saveSettings=()=>save();
 const q=(s)=>document.querySelector(s);
 const qa=(s)=>[...document.querySelectorAll(s)];
+const releaseIdentity=q("#releaseIdentity");
+if(releaseIdentity)releaseIdentity.textContent=`Pundi v8.3.4 · build ${BUILD_ID}`;
 const onboardingCard=q("#onboardingCard");
 const onboardingDismiss=q("[data-onboarding-dismiss]");
 const onboardingAddAccount=q("#onboardingAddAccount");

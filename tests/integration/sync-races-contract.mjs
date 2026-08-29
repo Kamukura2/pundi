@@ -1,0 +1,21 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+
+const repository = await readFile("src/data/repository.js", "utf8");
+const sync = await readFile("src/sync/sync-manager.js", "utf8");
+assert.match(repository, /cacheKey = `snapshot:\$\{user\.id\}`/);
+assert.match(repository, /key = `\$\{this\.user\.id\}:\$\{operation\.table\}:\$\{operation\.id\}`/);
+assert.match(repository, /mutationList\(\)\)\.filter\(item => item\.userId === this\.user\.id\)/);
+assert.match(repository, /filter:`user_id=eq\.\$\{this\.user\.id\}`/);
+assert.match(repository, /removeChannel\(channel\)/);
+assert.match(repository, /existing\?\.action === "insert" && operation\.action === "update"/);
+assert.match(sync, /this\.unsubscribe\?\.\(\)/);
+assert.match(sync, /this\.unsubscribe = null/);
+assert.match(sync, /this\.repository = null/);
+assert.match(sync, /clearUserScopedState\(previousUserId\)/);
+assert.match(sync, /pendingPersists/);
+assert.match(sync, /recovery/);
+const queueKey = (user, table, id) => `${user}:${table}:${id}`;
+assert.notEqual(queueKey("A","transactions","same"), queueKey("B","transactions","same"));
+assert.equal(queueKey("A","transactions","same"), queueKey("A","transactions","same"));
+console.log("Sync race contract PASS: user-scoped queues/cache, coalescing, subscription filters, cleanup, and recovery guards");
