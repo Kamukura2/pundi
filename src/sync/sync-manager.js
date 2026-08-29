@@ -131,7 +131,7 @@ export class SyncManager {
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type:"application/json" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `cvfinance-backup-${new Date().toISOString().slice(0,10)}.json`;
+    link.download = `pundi-backup-${new Date().toISOString().slice(0,10)}.json`;
     link.click();
     URL.revokeObjectURL(link.href);
   }

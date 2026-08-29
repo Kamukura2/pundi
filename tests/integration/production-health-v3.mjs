@@ -11,15 +11,15 @@ for (const route of routes) {
   assert.equal(response.status, 200, `${route} status`);
   results[route] = { status: response.status, contentType: response.headers.get("content-type") };
   for (const header of ["content-security-policy", "x-content-type-options", "referrer-policy", "permissions-policy"]) assert.ok(response.headers.get(header), `${route} missing ${header}`);
-  if (route === "/") assert.match(text, /Pundi v8\.3\.4/);
+  if (route === "/") assert.match(text, /Pundi v8\.3\.5/);
   if (route === "/api/config") { const body = JSON.parse(text); assert.match(body.supabaseUrl, /ndeycwoyjwyntjkgbzlz/); assert.equal(response.headers.get("cache-control"), "no-store"); }
-  if (route === "/sw.js") assert.match(text, /pundi-shell-v8\.3\.4/);
+  if (route === "/sw.js") assert.match(text, /pundi-shell-v8\.3\.5/);
 }
 const home = (await fetchText("/")).text;
 const assets = [...home.matchAll(/(?:src|href)="(\/assets\/[^"]+)/g)].map(match => match[1]);
 let bundle = "";
 for (const asset of assets) bundle += (await fetchText(asset)).text;
-assert.ok(bundle.includes("Pundi v8.3.4 · build ${Br}"));
+assert.ok(bundle.includes("Pundi v8.3.5 · build ${Br}"));
 assert.ok(bundle.includes(`const Br="${expectedBuild}"`));
 assert.doesNotMatch(bundle, /SUPABASE_SERVICE_ROLE_KEY|service_role_key\s*[:=]|smoke password|cvfinance\.supabase\.co/i);
 const admin = await fetch(origin + "/api/admin", { cache: "no-store" });

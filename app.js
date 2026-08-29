@@ -78,7 +78,7 @@ const saveSettings=()=>save();
 const q=(s)=>document.querySelector(s);
 const qa=(s)=>[...document.querySelectorAll(s)];
 const releaseIdentity=q("#releaseIdentity");
-if(releaseIdentity)releaseIdentity.textContent=`Pundi v8.3.4 · build ${BUILD_ID}`;
+if(releaseIdentity) releaseIdentity.textContent = `Pundi v8.3.5 · build ${BUILD_ID}`;
 const onboardingCard=q("#onboardingCard");
 const onboardingDismiss=q("[data-onboarding-dismiss]");
 const onboardingAddAccount=q("#onboardingAddAccount");
