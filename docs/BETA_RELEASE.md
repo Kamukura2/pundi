@@ -2,7 +2,7 @@
 
 - Product version: `8.3.5`
 - Current production URL: `https://pundi-silk.vercel.app`
-- Current runtime build: `bf8de0a`
+- Current runtime build: verified by `npm run test:health-v4` against the production alias
 - Supabase project ref: `ndeycwoyjwyntjkgbzlz`
 - Repository: `https://github.com/Kamukura2/pundi`
 
