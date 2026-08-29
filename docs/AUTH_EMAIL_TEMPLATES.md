@@ -40,18 +40,9 @@ https://pundi-silk.vercel.app/
 
 ## Email-change / reauthentication email
 
-**Subject:** Confirm your Pundi email change
+**Status:** NOT APPLICABLE to the current Pundi v8.3.5 UI. Account Settings exposes password change and account lifecycle controls, but no email-change action was found in the current application flow. Do not apply or verify an email-change template until that flow is intentionally added.
 
-```text
-Confirm the requested email change for your Pundi account:
-{{ .ConfirmationURL }}
-
-If you did not request this change, secure your account by signing in to Pundi and reviewing Account settings.
-
-Pundi
-Private cloud finance workspace
-https://pundi-silk.vercel.app/
-```
+If a future Pundi release adds email changing, validate this template against the then-current flow before applying it. The variable `{{ .ConfirmationURL }}` is supported by Supabase Auth templates.
 
 ## SMTP readiness checklist
 
