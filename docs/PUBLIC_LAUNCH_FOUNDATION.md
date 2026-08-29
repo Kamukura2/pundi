@@ -14,19 +14,18 @@ Pundi v8.4.0 adds a public product entry point while preserving the existing aut
 | `auth.pundi.online` | Resend/Supabase sender only | **Unchanged** |
 | `pundi-silk.vercel.app` | Temporary compatibility hostname | Retained |
 
-## DNS gate
+## DNS gate — COMPLETE
 
-At registration, Vercel reported the Rumahweb nameservers were still active and supplied these records:
+Public DNS and Vercel domain verification are complete and were checked independently:
 
 ```text
-A | @   | 76.76.21.21
-A | www | 76.76.21.21
-A | app | 76.76.21.21
+pundi.online       A      216.198.79.1
+pundi.online       A      64.29.17.1
+www.pundi.online   CNAME  29cb29df359cdd66.vercel-dns-017.com.
+app.pundi.online   CNAME  29cb29df359cdd66.vercel-dns-017.com.
 ```
 
-The owner must add only these three web records in Rumahweb DNS/cPanel, after checking that no conflicting `A`/`CNAME` records exist. Do not change nameservers unless separately approved. Do not alter any `auth` record, DKIM, SPF, sending CNAME, DMARC, MX, or other Resend record.
-
-After propagation, verify with `nslookup` and `vercel domains inspect` before Auth URL migration.
+`auth.pundi.online` remains reserved for the Resend/Supabase transactional sender. Its Resend sending records were preserved and were not changed. No Rumahweb DNS, nameserver, Resend DNS, or runtime DNS mutation is part of this closeout.
 
 ## Routing
 
@@ -34,18 +33,18 @@ Vite builds separate public entries: `landing.html`, `privacy.html`, `terms.html
 
 The old Vercel alias is not disabled. It remains the rollback/fallback surface until DNS, app-domain smoke, and Auth migration are verified.
 
-## Auth migration gate
+## Auth migration gate — COMPLETE
 
-Only after `https://app.pundi.online` is HTTPS-ready:
+The owner configured Pundi Supabase Auth after the app host became HTTPS-ready:
 
-1. Set Pundi Supabase Site URL to `https://app.pundi.online`.
-2. Retain `https://pundi-silk.vercel.app` temporarily if active links require it.
-3. Add `https://app.pundi.online/auth/reset-password` to the redirect allowlist.
-4. Retain the old reset route temporarily during migration.
-5. Trigger controlled confirmation and recovery tests; verify links without exposing tokens.
-6. Keep sender `Pundi <no-reply@auth.pundi.online>` unchanged.
+1. Site URL: `https://app.pundi.online`.
+2. Recovery redirect: `https://app.pundi.online/auth/reset-password`.
+3. Legacy compatibility retained: `https://pundi-silk.vercel.app` and its recovery route.
+4. Sender retained: `Pundi <no-reply@auth.pundi.online>`.
+5. One fresh confirmation and one fresh recovery request were accepted by Auth.
+6. The owner visually verified sender, subject, Pundi branding, and app-domain destinations for both messages.
 
-The hosted Auth configuration was not mutated by this source release. The local authenticated Management API previously returned `403 insufficient privileges`; this remains an external owner-access gate.
+No further Auth, SMTP, DNS, or runtime changes are required for this cutover.
 
 ## Privacy/legal/support
 
@@ -76,4 +75,6 @@ The authenticated app has a visible, unobtrusive `Feedback` control that opens t
 
 ## Verification state
 
-Local source, build, responsive, accessibility, routing, metadata, and PWA contracts are verified. Vercel domain bindings are registered but DNS is not yet verified. Supabase hosted Auth URL migration and live custom-domain email-link verification remain pending until the external DNS/API gate is cleared.
+**Public Launch Foundation v1: COMPLETE**
+
+Verified evidence includes public DNS, Vercel domain bindings, Ready production deployment, HTTPS/TLS, apex/www/app routing, public legal/support routes, authenticated app-domain smoke, role authorization, PWA assets, security headers, Pundi Supabase HTTPS/WSS connectivity, and final production/check/build gates. The owner also verified fresh confirmation and recovery email sender, subject, branding, and app-domain destinations. A temporary local resolver fallback was not used; normal Windows/Node/Playwright resolution recovered before final smoke.

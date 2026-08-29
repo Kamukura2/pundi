@@ -6,7 +6,9 @@ Pundi is an isolated finance product. Keep all operations scoped to the Pundi re
 
 - Repository: `https://github.com/Kamukura2/pundi`
 - Workspace: `C:\JensenBot\Pundi`
-- Production: `https://pundi-silk.vercel.app`
+- Production app: `https://app.pundi.online`
+- Public site: `https://pundi.online`
+- Legacy compatibility: `https://pundi-silk.vercel.app`
 - Vercel project: `creativevista/pundi`
 - Supabase project/ref: `Pundi` / `ndeycwoyjwyntjkgbzlz`
 

@@ -1,7 +1,9 @@
 # Pundi Technical Beta Baseline
 
 - Product version: `8.4.0`
-- Current production URL: `https://pundi-silk.vercel.app`
+- Current production URL: `https://app.pundi.online`
+- Public site URL: `https://pundi.online`
+- Legacy compatibility URL: `https://pundi-silk.vercel.app`
 - Current runtime build: verified by `npm run test:health-v4` against the production alias
 - Supabase project ref: `ndeycwoyjwyntjkgbzlz`
 - Repository: `https://github.com/Kamukura2/pundi`
@@ -14,9 +16,23 @@ Core contracts cover backup/import security, sync/realtime race behavior, API co
 
 Ownership/RLS and Realtime isolation are preserved. Auth recovery and account lifecycle are preserved. Backup exports use new Pundi filenames while schema-based import compatibility remains for legacy files. No billing provider is configured; manual entitlement metadata is not provider-verified payment.
 
-## Known blocker
+## Public launch closeout
 
-Branded Auth Email + Custom SMTP: COMPLETE. Resend custom SMTP, Pundi sender identity, confirmation/recovery templates, and controlled confirmation/recovery mailbox verification passed.
+**Public Launch Foundation v1: COMPLETE**
+
+- Public: `https://pundi.online`
+- App: `https://app.pundi.online`
+- Auth email: `auth.pundi.online`
+- Confirmation app-domain flow: PASS — owner visually verified sender, subject, branding, and app-domain link.
+- Recovery app-domain flow: PASS — owner visually verified sender, subject, branding, and `app.pundi.online/auth/reset-password` destination.
+- Technical Beta: COMPLETE
+- Branded Auth Email: COMPLETE
+- Temporary local resolver fallback: not used; normal resolution recovered.
+- Disposable confirmation/recovery identities: deleted and cleanup verified.
+
+No version bump or runtime change is required for this docs-only closeout. Do not modify Rumahweb DNS, Resend DNS, Vercel domain bindings, Supabase Auth URLs, SMTP, CVFinance, or Jensen Research Hub.
+
+
 
 ## Rollback pointer
 
