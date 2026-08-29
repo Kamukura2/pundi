@@ -1,6 +1,6 @@
 # Pundi Auth Email Templates v1
 
-Status: **PREPARED**. Applying templates and enabling a branded sender require Supabase Auth configuration access and custom SMTP/domain verification.
+Status: **APPLIED — DELIVERY VERIFICATION PENDING**. The Pundi Supabase Auth project has the confirmation and recovery templates configured. Provider delivery-log confirmation and mailbox visual verification remain outstanding.
 
 These templates are Pundi-only and use the same-origin production URL. They do not claim payment, legal, or delivery guarantees.
 
@@ -64,9 +64,10 @@ If a future Pundi release adds email changing, validate this template against th
 - Provider: Resend.
 - Verified sender domain: `auth.pundi.online`.
 - Sender: `Pundi <no-reply@auth.pundi.online>`.
-- Branded templates: prepared in this document; confirmation and recovery application remains pending.
+- Branded templates: applied in the Pundi Supabase Auth project.
 - Mailbox verification: pending.
-- External blocker: apply the two templates and complete controlled mailbox verification.
+- Provider delivery-log confirmation: pending.
+- External blocker: confirm provider delivery and complete controlled mailbox verification.
 
 ## Rollback
 
