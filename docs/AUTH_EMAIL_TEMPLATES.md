@@ -46,10 +46,10 @@ If a future Pundi release adds email changing, validate this template against th
 
 ## SMTP readiness checklist
 
-- [ ] Choose an approved sender domain.
-- [ ] Verify the sender domain with the SMTP provider.
-- [ ] Configure provider host, port, username, and password in Supabase Auth SMTP settings.
-- [ ] Set the verified sender name to `Pundi` and sender address on the verified domain.
+- [x] Choose an approved sender domain: `auth.pundi.online`.
+- [x] Verify the sender domain with the SMTP provider.
+- [x] Configure Resend custom SMTP in Supabase Auth SMTP settings.
+- [x] Set the verified sender name to `Pundi` and sender address to `no-reply@auth.pundi.online`.
 - [ ] Confirm the Site URL is `https://pundi-silk.vercel.app`.
 - [ ] Keep the recovery redirect allowlist entry at `https://pundi-silk.vercel.app/auth/reset-password`.
 - [ ] Send one controlled confirmation and recovery test using a designated non-customer account.
@@ -58,10 +58,13 @@ If a future Pundi release adds email changing, validate this template against th
 
 ## Current truth
 
-- Current delivery: Supabase default SMTP/sender/template.
-- Branded templates: prepared in this document; not applied automatically.
-- Custom SMTP: not configured.
-- External blocker: Supabase Auth template/provider settings and sender-domain verification access.
+- Current delivery: Resend custom SMTP is enabled in Pundi Supabase Auth.
+- Provider: Resend.
+- Verified sender domain: `auth.pundi.online`.
+- Sender: `Pundi <no-reply@auth.pundi.online>`.
+- Branded templates: prepared in this document; confirmation and recovery application remains pending.
+- Mailbox verification: pending.
+- External blocker: apply the two templates and complete controlled mailbox verification.
 
 ## Rollback
 
