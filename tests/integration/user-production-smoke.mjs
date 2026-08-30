@@ -39,9 +39,10 @@ try {
   assert.equal(authz.status, 403);
   assert.doesNotMatch(authz.body, /user_id|total_users|overview|metrics/i);
   await page.locator("#dataModal .close-dialog").first().click();
-  await page.reload({ waitUntil: "networkidle" });
+    await page.reload({ waitUntil: "domcontentloaded" });
   await page.locator("#authGate").waitFor({ state: "hidden", timeout: 30000 });
-  assert.equal(await page.locator("#primarySidebar").isVisible(), true);
+    await page.locator("#primarySidebar").waitFor({ state: "visible", timeout: 30000 });
+    assert.equal(await page.locator("#primarySidebar").isVisible(), true);
   await page.locator("#dataBtn").click();
   await page.locator("#logoutBtn").click();
   await page.locator("#authGate").waitFor({ state: "visible", timeout: 30000 });
