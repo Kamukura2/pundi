@@ -69,7 +69,14 @@ The existing PWA service worker remains unchanged for browser/PWA use. The nativ
 
 Alpha builds use a dedicated local-only signing key at `android/keystore/pundi-alpha.jks` with ignored `android/alpha-signing.properties`. The password is generated locally and is never printed or committed. This is an internal sideload key, not the final Play App Signing/upload-key policy. The future AAB milestone must decide the final upload-key/App Signing strategy before publishing.
 
-## Known Alpha limitations
+## Headless runtime QA (Alpha closeout)
+
+A disposable AVD named `Pundi_Android_Alpha_Test` uses the Android 36 Google APIs x86_64 image and is started with `-no-window -no-audio -no-boot-anim -no-snapshot`. Hardware hypervisor support is present on the host. The canonical APK installed through ADB with `Success`; package `online.pundi.app` launched `MainActivity` in the headless emulator, and filtered logcat showed no Pundi crash, ANR, or fatal exception.
+
+The Android SDK emulator and image were installed with command-line tools only. ADB responsiveness and package/activity launch are verified. Credentialed login/session/navigation/keyboard/back/network/file-picker flows remain a separate authenticated runtime gate; this repository does not store credentials and the automated closeout does not type passwords. Those flows must not be represented as PASS without an authorized device operator or an approved secret-safe harness.
+
+The production normal-user smoke readiness contract no longer uses generic Playwright `networkidle`: it uses `domcontentloaded`, explicit visible auth controls, bounded authenticated dashboard markers, and retains the existing Auth, navigation, session, logout, and `401/403` assertions.
+
 
 - Email confirmation and password recovery intentionally complete in the browser; native deep links are deferred.
 - Play Install Referrer, Android App Links, store metadata, Data Safety, content rating, and Play testing tracks are deferred.

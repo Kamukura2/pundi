@@ -10,11 +10,12 @@ const context = await browser.newContext();
 const page = await context.newPage();
 const result = { status: "PASS", origin, financeMutations: 0 };
 try {
-  await page.goto(origin, { waitUntil: "networkidle" });
+  await page.goto(origin, { waitUntil: "domcontentloaded" });
   await page.locator("#authGate").waitFor({ state: "visible", timeout: 30000 });
   assert.match(await page.title(), /Pundi v8\.7\.0/);
   for (let attempt = 1; attempt <= 3 && await page.locator("#authGate").isVisible(); attempt++) {
-    if (attempt > 1) await page.reload({ waitUntil: "networkidle" });
+    await page.locator("#authEmail").waitFor({ state: "visible", timeout: 30000 });
+    await page.locator("#authPassword").waitFor({ state: "visible", timeout: 30000 });
     await page.locator("#authEmail").fill(email);
     await page.locator("#authPassword").fill(password);
     await page.locator("#authSubmit").click();
@@ -46,7 +47,7 @@ try {
   await page.locator("#dataBtn").click();
   await page.locator("#logoutBtn").click();
   await page.locator("#authGate").waitFor({ state: "visible", timeout: 30000 });
-  await page.reload({ waitUntil: "networkidle" });
+  await page.reload({ waitUntil: "domcontentloaded" });
   await page.locator("#authGate").waitFor({ state: "visible", timeout: 30000 });
   const unauth = await page.evaluate(async () => { const response = await fetch("/api/admin", { cache: "no-store" }); return response.status; });
   assert.equal(unauth, 401);
