@@ -51,3 +51,13 @@ Admin triage may show masked/safe identity reference, category, message, version
 ## Rollback boundary
 
 This run does not alter completed DNS, Vercel domain bindings, Auth URLs, SMTP, or payment systems. If beta runtime changes need rollback, use the normal Git/Vercel release procedure and preserve the existing legacy compatibility alias.
+
+## Release closeout
+
+**Controlled Beta Operations v1: COMPLETE**
+
+- Pundi `8.5.0` is deployed on the existing `creativevista/pundi` project.
+- Migration 018 and 019 effects were catalog-equivalent and their history entries were repaired without replaying SQL.
+- Migration 020 was applied as the sole forward schema change; live `beta_feedback` schema/RLS/policy checks passed.
+- Disposable A/B/admin feedback security tests, production submit/triage, authorization checks, and cleanup passed.
+- Invite controlled-beta users only after reviewing the current production health result.

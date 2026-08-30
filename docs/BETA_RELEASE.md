@@ -37,3 +37,13 @@ No version bump or runtime change is required for this docs-only closeout. Do no
 ## Rollback pointer
 
 Rollback is a Vercel deployment promotion/rollback operation only; do not run database rollback. Run 3 introduced no migration. Identify the current and previous READY Pundi deployments in Vercel before promotion and verify the alias plus public health checks afterward.
+
+## Controlled Beta Operations v1 closeout
+
+**COMPLETE — Pundi 8.5.0**
+
+- Repository `main` is merged and pushed at the verified release commit.
+- Existing Vercel project `creativevista/pundi` reached `Ready`; public and app aliases serve v8.5.0.
+- Remote migration history is synchronized through 020. 018/019 were proven equivalent from live catalog inspection and repaired as bookkeeping only; 020 was applied normally.
+- Feedback ownership/RLS, admin authorization, privacy, XSS-safe rendering, input limits, production triage, and zero finance mutation checks passed.
+- No beta invitation infrastructure or payment capability was added.

@@ -37,6 +37,7 @@ The admin smoke and isolation commands require local untracked files. Load them 
 
 - `.env.admin-smoke.local`: designated smoke email/password only.
 - `.env.pundi-test.local`: `PUNDI_TEST_PROJECT_REF`, `PUNDI_TEST_SUPABASE_URL`, `PUNDI_TEST_SUPABASE_ANON_KEY`, and `PUNDI_TEST_SUPABASE_SERVICE_ROLE_KEY` for disposable integration tests.
+- `.env.supabase-pundi.local`: ignored Pundi-only `SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD`, loaded by `scripts/pundi-supabase.ps1` only for its child process.
 - `.env.local`: local development/Vercel tooling configuration.
 
 All are covered by `.env*` in `.gitignore`. Never print contents, commit them, or copy server keys into source, `package.json`, logs, or client assets.
@@ -53,6 +54,8 @@ npm run supabase:pundi -- -WriteOperation migration repair --status applied <exa
 
 `scripts/pundi-supabase.ps1` reads the ignored `.env.supabase-pundi.local` file, verifies the exact `Pundi` / `ndeycwoyjwyntjkgbzlz` project before every invocation, rejects Nook and mismatched write targets, and restores the process environment after the child CLI exits. It never embeds or prints the token, changes global Windows environment variables, or changes Nook authentication. A write-capable operation must include the exact Pundi ref and the explicit `-WriteOperation` switch.
 
+The Pundi database password is not passed on command lines. Routine account switching, named profiles, and default Supabase CLI login are not required. If the CLI direct pooler route is unavailable, use the authenticated exact-Pundi Management API SQL path; never replay legacy migrations to compensate for an incomplete CLI history.
+
 ## Admin smoke
 
 The smoke harness is read-only against production. It verifies Pundi `/api/config`, real Auth login, `/api/admin`, aggregate metrics, pagination, privacy, and normalization. It must use only the designated non-customer smoke account. If credentials fail, rotate only that account password with authorized Pundi server tooling and update `.env.admin-smoke.local` without printing the password.
@@ -64,6 +67,10 @@ Do not create business rows, alter subscriptions, alter entitlements, or use the
 `npm run test:isolation` uses two disposable Auth users and a tagged dataset against the exact Pundi ref. It checks local cache/queue isolation, cross-user CRUD denial, owner-scoped child relationships, and Realtime filtering. Cleanup runs in `finally`; a successful run must report disposable rows and users removed.
 
 Never substitute a different Supabase URL or infer a project from a stale environment file.
+
+## Controlled Beta v1 release closeout
+
+Controlled Beta Operations v1 is **COMPLETE** for Pundi `8.5.0`. Live catalog inspection proved 018 and 019 equivalent before their history entries were repaired without SQL replay. Migration 020 was then applied as the sole forward change and verified with forced RLS, ownership policies, and admin-path tests. Production feedback and admin smoke passed with disposable cleanup and zero finance mutations.
 
 ## Auth and account lifecycle
 

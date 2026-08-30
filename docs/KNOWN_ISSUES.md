@@ -15,3 +15,9 @@ This file lists verified product limitations or owner decisions only. No confirm
 ## Confirmed defects
 
 None currently recorded.
+
+## Release verification
+
+- Controlled Beta Operations v1: **COMPLETE**.
+- The production smoke path is read-only except for one disposable feedback submission/triage verification; that row was deleted and cleanup was verified.
+- Routine Pundi Supabase operations use the isolated wrapper and do not require account switching.
