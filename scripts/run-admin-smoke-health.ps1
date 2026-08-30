@@ -22,8 +22,8 @@ function Sanitize([string]$Text) {
   return $safe
 }
 
-$exitCode = 1
-$status = 'FAIL'
+$smokeExitCode = 1
+$healthStatus = 'FAIL'
 $output = ''
 try {
   if (-not (Test-Path -LiteralPath $EnvFile)) { throw 'Smoke credential file is missing.' }
@@ -40,29 +40,37 @@ try {
   $stdoutFile = Join-Path $HealthDir (".stdout-{0}.tmp" -f [guid]::NewGuid())
   $stderrFile = Join-Path $HealthDir (".stderr-{0}.tmp" -f [guid]::NewGuid())
   try {
-    $process = Start-Process -FilePath 'npm.cmd' -ArgumentList @('run','test:production') -WorkingDirectory $Repo -WindowStyle Hidden -Wait -PassThru -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile
-    $exitCode = $process.ExitCode
-    $output = ((Get-Content -LiteralPath $stdoutFile -Raw -ErrorAction SilentlyContinue), (Get-Content -LiteralPath $stderrFile -Raw -ErrorAction SilentlyContinue) -join "`n")
+    $process = Start-Process -FilePath 'npm.cmd' -ArgumentList @('run','test:production') -WorkingDirectory $Repo -WindowStyle Hidden -PassThru -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile
+    if (-not $process.WaitForExit(300000)) {
+      $process.Kill($true)
+      $process.WaitForExit()
+      $smokeExitCode = 124
+      $output = 'Production smoke timed out after 300 seconds.'
+    } else {
+      $process.Refresh()
+      $smokeExitCode = [int]$process.ExitCode
+      $output = ((Get-Content -LiteralPath $stdoutFile -Raw -ErrorAction SilentlyContinue), (Get-Content -LiteralPath $stderrFile -Raw -ErrorAction SilentlyContinue) -join "`n")
+    }
   } finally {
     Remove-Item -LiteralPath $stdoutFile,$stderrFile -Force -ErrorAction SilentlyContinue
   }
-  if ($exitCode -eq 0) { $status = 'PASS' }
+  if ($smokeExitCode -eq 0) { $healthStatus = 'PASS' }
 } catch {
   $output = $_.Exception.Message
-  $exitCode = 1
+  $smokeExitCode = 1
 }
 
 $finished = Get-Date
 $duration = [math]::Round(($finished - $Started).TotalSeconds, 3)
 $runLog = Join-Path $LogDir ("run-{0}.log" -f $Started.ToUniversalTime().ToString('yyyyMMdd-HHmmss'))
 $sanitized = Sanitize $output
-@("timestamp=$timestamp", "status=$status", "exit_code=$exitCode", "duration_seconds=$duration", "target=https://app.pundi.online", "supabase_ref=ndeycwoyjwyntjkgbzlz", '', $sanitized.Trim()) | Set-Content -LiteralPath $runLog -Encoding UTF8
+@("timestamp=$timestamp", "status=$healthStatus", "exit_code=$smokeExitCode", "duration_seconds=$duration", "target=https://app.pundi.online", "supabase_ref=ndeycwoyjwyntjkgbzlz", '', $sanitized.Trim()) | Set-Content -LiteralPath $runLog -Encoding UTF8
 
 $version = ((Get-Content -LiteralPath (Join-Path $Repo 'package.json') -Raw | ConvertFrom-Json).version)
 $latest = [ordered]@{
   timestamp = $timestamp
-  status = $status
-  exit_code = [int]$exitCode
+  status = $healthStatus
+  exit_code = [int]$smokeExitCode
   duration_seconds = $duration
   target = 'https://app.pundi.online'
   version = $version
@@ -71,4 +79,4 @@ $latest = [ordered]@{
 $latest | ConvertTo-Json | Set-Content -LiteralPath $LatestFile -Encoding UTF8
 
 Get-ChildItem -LiteralPath $LogDir -File -Filter 'run-*.log' | Sort-Object LastWriteTime -Descending | Select-Object -Skip 30 | Remove-Item -Force -ErrorAction SilentlyContinue
-exit $exitCode
+exit $smokeExitCode
