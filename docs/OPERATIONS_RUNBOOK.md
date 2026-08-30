@@ -105,7 +105,7 @@ Inspect the actual migration sequence and production identity before any databas
 
 ## Scheduler and health
 
-Keep one existing Windows health scheduler if present; do not create duplicate tasks. Health checks should use sanitized logs, bounded retention, the dedicated smoke account, and read-only API assertions. A missing credential is an explicit blocked state, not a reason to skip silently.
+Keep one existing Windows health scheduler if present; do not create duplicate tasks. Health checks should use sanitized logs, bounded retention, the dedicated smoke account, and read-only API assertions. The production smoke readiness path must use bounded `domcontentloaded` plus explicit Pundi auth/dashboard markers rather than generic Playwright `networkidle`; a direct runner PASS is separate from the scheduler gate, which requires a fresh `Ready` / `Last Result: 0`. A missing credential is an explicit blocked state, not a reason to skip silently.
 
 ## Productization v2
 
