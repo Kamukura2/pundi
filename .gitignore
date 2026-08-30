@@ -1,4 +1,5 @@
 .vercel
+node_modules/
 .env*
 runtime/admin-smoke-health/
 supabase/.temp/
