@@ -42,7 +42,7 @@ try {
   try {
     $process = Start-Process -FilePath 'npm.cmd' -ArgumentList @('run','test:production') -WorkingDirectory $Repo -WindowStyle Hidden -PassThru -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile
     if (-not $process.WaitForExit(300000)) {
-      $process.Kill($true)
+      & taskkill.exe /PID $process.Id /T /F | Out-Null
       $process.WaitForExit()
       $smokeExitCode = 124
       $output = 'Production smoke timed out after 300 seconds.'
