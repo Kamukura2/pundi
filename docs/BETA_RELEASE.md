@@ -1,5 +1,10 @@
 # Pundi Technical Beta Baseline
 
+## Acquisition v1
+
+Pundi Acquisition v1: COMPLETE. Use `npm run growth:status` for aggregate first-party CTA and signup attribution metrics. The implementation uses only allowlisted ref sources, server-validated CTA events, and one immutable user attribution row. No finance data, calculator inputs, identities, tokens, or arbitrary referrers are measured. See `docs/ACQUISITION.md` for the operating boundary and manual distribution workflow.
+
+
 - Product version: `8.5.0`
 - Current production URL: `https://app.pundi.online`
 - Public site URL: `https://pundi.online`

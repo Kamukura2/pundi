@@ -24,6 +24,7 @@ export default defineConfig({
         networth: "net-worth.html",
         tradingJournal: "trading-journal.html",
         backup: "backup-keuangan.html",
+        calculator: "kalkulator-net-worth.html",
         admin: "admin/index.html"
       }
     }

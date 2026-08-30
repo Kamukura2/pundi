@@ -1,6 +1,8 @@
 .vercel
 node_modules/
 .env*
+dist/
 runtime/admin-smoke-health/
 runtime/beta/
+runtime/growth/
 supabase/.temp/

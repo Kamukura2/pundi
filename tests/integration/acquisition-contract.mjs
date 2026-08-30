@@ -1,0 +1,11 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+const api=await readFile("api/acquisition.js","utf8"), client=await readFile("public/acquisition.js","utf8"), calc=await readFile("kalkulator-net-worth.html","utf8"), migration=await readFile("supabase/migrations/021_acquisition.sql","utf8"), pkg=JSON.parse(await readFile("package.json","utf8")), vercel=await readFile("vercel.json","utf8"), sitemap=await readFile("public/sitemap.xml","utf8"), app=await readFile("app.html","utf8");
+assert.equal(pkg.version,"8.7.0");
+for(const source of ["google","reddit","facebook","linkedin","whatsapp","friend","community","organic","direct","other"])assert.match(api,new RegExp(source));
+assert.match(api,/normalizeSource/); assert.match(api,/return ACQUISITION_SOURCES.includes\(source\) \? source : "other"/); assert.match(api,/request\.method !== "POST"/); assert.doesNotMatch(api,/if \(request\.method === "GET"\)/); assert.match(api,/cta_click/); assert.match(api,/signup_attribution/); assert.match(api,/onConflict:"user_id",ignoreDuplicates:true/);
+assert.doesNotMatch(api,/balance|holding_value|expense_amount|password|refresh_token/); assert.match(client,/sendBeacon/); assert.match(client,/fetch\("\/api\/acquisition"/); assert.match(client,/app\.pundi\.online/); assert.match(client,/sessionStorage/);
+assert.match(calc,/kalkulator-net-worth/); assert.match(calc,/Net Worth|net worth/i); assert.match(calc,/n\(d\.get\('cash'\)\)/); assert.doesNotMatch(calc,/api\/acquisition|fetch\(|sendBeacon/);
+assert.match(migration,/create table if not exists public\.user_acquisition/); assert.match(migration,/create table if not exists public\.acquisition_events/); assert.match(migration,/enable row level security/); assert.match(migration,/user_acquisition_select_own/); assert.doesNotMatch(migration,/drop table|truncate/i);
+assert.match(vercel,/kalkulator-net-worth/); assert.match(sitemap,/https:\/\/pundi\.online\/kalkulator-net-worth/); assert.match(app,/noindex, nofollow, noarchive/);
+console.log("Acquisition contract PASS: allowlisted attribution, CTA tracking, signup ownership, calculator privacy, RLS schema, SEO route, and private app protection");

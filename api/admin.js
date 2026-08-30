@@ -73,6 +73,21 @@ async function feedbackMetadata(db, users, query = {}) {
   const search=String(query.feedback_search||"").trim().toLowerCase(), status=String(query.feedback_status||"").trim(), category=String(query.feedback_category||"").trim();
   return (data||[]).map(row => ({ ...row, user_email:emails.get(row.user_id)||"" })).filter(row => (!search || `${row.message} ${row.page} ${row.user_email}`.toLowerCase().includes(search)) && (!status || row.status===status) && (!category || row.category===category));
 }
+async function acquisitionMetadata(db) {
+  const since = new Date(Date.now() - 30 * 864e5).toISOString();
+  const [events, signups] = await Promise.all([
+    db.from("acquisition_events").select("source,landing_path,cta,created_at").gte("created_at", since).limit(10000),
+    db.from("user_acquisition").select("source,landing_path,created_at").gte("created_at", since).limit(10000)
+  ]);
+  if (events.error || signups.error) throw Object.assign(new Error("Acquisition metadata query failed."), { status:503, code:"acquisition_unavailable" });
+  const eventRows=events.data||[], signupRows=signups.data||[], since24=new Date(Date.now()-864e5).toISOString(), since7=new Date(Date.now()-7*864e5).toISOString();
+  const count=(rows,from)=>rows.filter(row=>row.created_at>=from).length;
+  const sources={}; for(const row of signupRows)sources[row.source]=(sources[row.source]||0)+1;
+  const pages={}; for(const row of eventRows)pages[row.landing_path]=(pages[row.landing_path]||0)+1;
+  const ctas={}; for(const row of eventRows){const key=`${row.cta}:${row.source}`;ctas[key]=(ctas[key]||0)+1;}
+  const top=object=>Object.entries(object).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([name,total])=>({name,total}));
+  return { cta_clicks:{today:count(eventRows,since24),days_7:count(eventRows,since7),days_30:eventRows.length}, attributable_signups:{days_7:count(signupRows,since7),days_30:signupRows.length}, signup_conversion:signupRows.length&&eventRows.length?Number((signupRows.length/eventRows.length*100).toFixed(1)):null, source_breakdown:sources, top_landing_pages:top(pages), top_cta_sources:top(ctas) };
+}
 export default async function handler(request, response) {
   response.setHeader("Cache-Control","private, no-store, no-cache, max-age=0, must-revalidate");
   response.setHeader("Pragma","no-cache");
@@ -90,7 +105,8 @@ export default async function handler(request, response) {
       const sort = request.query.sort === "oldest" ? 1 : -1;
       const filtered = records.filter(row => (!q || row.email.toLowerCase().includes(q) || row.user_id.toLowerCase().includes(q)) && (!plan || (plan === "paid" ? row.plan !== "free" : row.plan === plan)) && (!status || row.subscription_status === status)).sort((a,b) => (Date.parse(a.created_at)-Date.parse(b.created_at))*sort);
       const feedback = await feedbackMetadata(db, users, request.query || {});
-      return response.status(200).json({ overview:{ total_users:records.length, new_users_7_days:records.filter(row => Date.now()-Date.parse(row.created_at)<=7*864e5).length, new_users_30_days:records.filter(row => Date.now()-Date.parse(row.created_at)<=30*864e5).length, active_users_7_days:records.filter(row => row.last_active && Date.now()-Date.parse(row.last_active)<=7*864e5).length, free_users:records.filter(row => row.plan === "free").length, paid_users:records.filter(row => row.plan !== "free").length, feedback_total:feedback.length, feedback_new:feedback.filter(row=>row.status==="New").length, feedback_unresolved:feedback.filter(row=>!["Resolved","Closed"].includes(row.status)).length, feedback_last_7_days:feedback.filter(row=>Date.now()-Date.parse(row.created_at)<=7*864e5).length }, users:filtered, feedback, page:1, page_size:1000, total:filtered.length });
+      const acquisition = await acquisitionMetadata(db);
+      return response.status(200).json({ overview:{ total_users:records.length, new_users_7_days:records.filter(row => Date.now()-Date.parse(row.created_at)<=7*864e5).length, new_users_30_days:records.filter(row => Date.now()-Date.parse(row.created_at)<=30*864e5).length, active_users_7_days:records.filter(row => row.last_active && Date.now()-Date.parse(row.last_active)<=7*864e5).length, free_users:records.filter(row => row.plan === "free").length, paid_users:records.filter(row => row.plan !== "free").length, feedback_total:feedback.length, feedback_new:feedback.filter(row=>row.status==="New").length, feedback_unresolved:feedback.filter(row=>!["Resolved","Closed"].includes(row.status)).length, feedback_last_7_days:feedback.filter(row=>Date.now()-Date.parse(row.created_at)<=7*864e5).length }, acquisition, users:filtered, feedback, page:1, page_size:1000, total:filtered.length });
     }
     let body;
     try { body = typeof request.body === "string" ? JSON.parse(request.body || "{}") : (request.body || {}); }

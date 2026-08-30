@@ -15,6 +15,15 @@ function showError(message){
   error.hidden=!message;
 }
 function renderCards(overview){ $("cards").innerHTML=renderCardsHtml(overview); }
+function renderAcquisition(acquisition){
+  if(!acquisition)return; $("acquisitionPanel").hidden=false;
+  const clicks=acquisition.cta_clicks||{}, signups=acquisition.attributable_signups||{};
+  $("acquisitionMetrics").innerHTML=[['CTA clicks today',clicks.today||0],['CTA clicks · 7 days',clicks.days_7||0],['CTA clicks · 30 days',clicks.days_30||0],['Signups · 7 days',signups.days_7||0],['Signups · 30 days',signups.days_30||0],['CTA → signup',acquisition.signup_conversion==null?'—':`${acquisition.signup_conversion}%`]].map(([label,value])=>`<div class="card"><small>${esc(label)}</small><strong>${esc(value)}</strong></div>`).join('');
+  const sources=Object.entries(acquisition.source_breakdown||{}).map(([name,total])=>`${esc(name)}: ${total}`).join(' · ');
+  const pages=(acquisition.top_landing_pages||[]).map(row=>`${esc(row.name)} (${row.total})`).join(' · ')||'—';
+  const ctas=(acquisition.top_cta_sources||[]).map(row=>`${esc(row.name)} (${row.total})`).join(' · ')||'—';
+  $("acquisitionBreakdown").innerHTML=`<b>Sources:</b> ${sources||'—'}<br><b>Top pages:</b> ${pages}<br><b>Top CTA/source:</b> ${ctas}`;
+}
 function renderRows(){
   $("userRows").innerHTML=renderRowsHtml(records);
   const start=page*pageSize;
@@ -52,7 +61,7 @@ async function load(){
     return (!search||email.includes(search)||userId.includes(search)) && (!plan||(plan==="paid"?row.plan!=="free":row.plan===plan)) && (!status||row.subscription_status===status);
   });
   if($("sort").value==="oldest")records.reverse();
-  page=0; renderCards(data.overview); renderRows(); renderFeedback(); $("dashboard").hidden=false; $("notice").hidden=true;
+  page=0; renderCards(data.overview); renderAcquisition(data.acquisition); renderRows(); renderFeedback(); $("dashboard").hidden=false; $("notice").hidden=true;
 }
 function showDetail(row){
   if(!row)return;

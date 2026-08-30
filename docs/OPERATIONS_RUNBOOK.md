@@ -14,6 +14,10 @@ Pundi is an isolated finance product. Keep all operations scoped to the Pundi re
 
 Never use the CVFinance repository, CVFinance Supabase project, or Jensen Research Hub for Pundi work.
 
+## Acquisition v1
+
+`Pundi Acquisition v1: COMPLETE` on release `8.7.0`. Run `npm run growth:status` for first-party aggregate CTA clicks and one-row signup attribution. The source allowlist is `google`, `reddit`, `facebook`, `linkedin`, `whatsapp`, `friend`, `community`, `organic`, `direct`, `other`; unknown values become `other`. Acquisition events contain only event type, source, landing path, CTA, and timestamp. Calculator values stay client-side. No automatic community posting is permitted. Synthetic `ref=other` smoke data must be removed and excluded from real-growth totals. Search Console sitemap submission remains owner-manual and non-blocking.
+
 ## Standard verification
 
 From the workspace:

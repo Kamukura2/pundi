@@ -1,0 +1,22 @@
+import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+const exec=promisify(execFile), repo=path.resolve(path.dirname(fileURLToPath(import.meta.url)),".."), origin="https://app.pundi.online", ref="ndeycwoyjwyntjkgbzlz";
+const parse=text=>Object.fromEntries(text.split(/\r?\n/).map(line=>line.match(/^\s*([^=]+)=(.*)$/)).filter(Boolean).map(([,k,v])=>[k,v]));
+const env=async name=>parse(await readFile(path.join(repo,name),"utf8"));
+const json=async(url,options={})=>{const r=await fetch(url,{...options,cache:"no-store"});return {status:r.status,body:await r.json().catch(()=>null)}};
+const admin=await env(".env.admin-smoke.local");
+const config=await json(`${origin}/api/config`); if(config.status!==200||!config.body?.supabaseUrl||!config.body?.supabaseAnonKey)throw new Error("Production config health check failed.");
+if(new URL(config.body.supabaseUrl).hostname!==`${ref}.supabase.co`)throw new Error("Refusing status check: Supabase target mismatch.");
+const auth=await json(`${config.body.supabaseUrl}/auth/v1/token?grant_type=password`,{method:"POST",headers:{apikey:config.body.supabaseAnonKey,"content-type":"application/json"},body:JSON.stringify({email:admin.PUNDI_ADMIN_SMOKE_EMAIL,password:admin.PUNDI_ADMIN_SMOKE_PASSWORD})});
+if(auth.status!==200||!auth.body?.access_token)throw new Error("Growth status authentication failed.");
+const dashboard=await json(`${origin}/api/admin`,{headers:{Authorization:`Bearer ${auth.body.access_token}`,Accept:"application/json"}});
+if(dashboard.status!==200||!dashboard.body?.overview||!dashboard.body?.acquisition)throw new Error("Growth acquisition overview unavailable.");
+const healthFile=path.join(repo,"runtime","admin-smoke-health","latest.json"), health=existsSync(healthFile)?JSON.parse(await readFile(healthFile,"utf8")):{};
+let scheduler={status:"unavailable",last_result:"unknown"}; try { const {stdout}=await exec("schtasks",["/query","/tn","Pundi Admin Smoke Health","/fo","LIST","/v"],{windowsHide:true}); scheduler={status:stdout.match(/^Status:\s*(.+)$/m)?.[1]?.trim()||"unknown",last_result:stdout.match(/Last Result:\s*(\S+)/)?.[1]||"unknown"}; } catch {}
+const a=dashboard.body.acquisition, snapshot={version:JSON.parse(await readFile(path.join(repo,"package.json"),"utf8")).version,production_health:health.status||"UNKNOWN",acquisition_readiness:"READY",cta_clicks_24h:a.cta_clicks.today,cta_clicks_7d:a.cta_clicks.days_7,attributable_signups_7d:a.attributable_signups.days_7,source_breakdown:a.source_breakdown,top_landing_pages:a.top_landing_pages,beta_users:dashboard.body.users.length,unresolved_feedback:dashboard.body.overview.feedback_unresolved,critical_feedback:dashboard.body.feedback.filter(row=>row.priority==="Critical"&&!["Resolved","Closed"].includes(row.status)).length,scheduler,supabase_ref:ref};
+await mkdir(path.join(repo,"runtime","growth"),{recursive:true}); await writeFile(path.join(repo,"runtime","growth","latest.json"),`${JSON.stringify(snapshot,null,2)}\n`);
+console.log("# Pundi Growth Status"); console.log(`- version: ${snapshot.version}`); console.log(`- production health: ${snapshot.production_health}`); console.log(`- acquisition readiness: ${snapshot.acquisition_readiness}`); console.log(`- CTA clicks 24h: ${snapshot.cta_clicks_24h}`); console.log(`- CTA clicks 7d: ${snapshot.cta_clicks_7d}`); console.log(`- attributable signups 7d: ${snapshot.attributable_signups_7d}`); console.log(`- source breakdown: ${JSON.stringify(snapshot.source_breakdown)}`); console.log(`- top landing pages: ${JSON.stringify(snapshot.top_landing_pages)}`); console.log(`- beta users: ${snapshot.beta_users}`); console.log(`- unresolved feedback: ${snapshot.unresolved_feedback}`); console.log(`- Critical feedback: ${snapshot.critical_feedback}`); console.log(`- scheduler: ${scheduler.status}, Last Result ${scheduler.last_result}`);

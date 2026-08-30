@@ -1,5 +1,6 @@
 import { clearUserScopedState } from "../lib/idb.js";
 import { getSupabase } from "../lib/supabase.js";
+import { persistSignupAttribution } from "../acquisition/client.js";
 import { FinanceRepository, exportBackup, validateBackup } from "../data/repository.js";
 
 export class SyncManager {
@@ -27,6 +28,7 @@ export class SyncManager {
     const { data:{ session } } = await supabase.auth.getSession();
     if (!session?.user) return null;
     this.user = session.user;
+    persistSignupAttribution(this.user).catch(() => {});
     this.repository = new FinanceRepository(supabase, this.user);
     this.status("loading", "Loading cloud data…");
     let state;
@@ -55,6 +57,7 @@ export class SyncManager {
     const supabase = await getSupabase();
     const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin } });
     if (error) throw error;
+    if (data.session?.user) persistSignupAttribution(data.session.user).catch(() => {});
     return data;
   }
 
