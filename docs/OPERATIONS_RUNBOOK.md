@@ -41,6 +41,18 @@ The admin smoke and isolation commands require local untracked files. Load them 
 
 All are covered by `.env*` in `.gitignore`. Never print contents, commit them, or copy server keys into source, `package.json`, logs, or client assets.
 
+## Isolated Pundi Supabase automation
+
+All future Pundi Supabase CLI operations must use the repository wrapper, not the default Supabase CLI login or a named profile:
+
+```bash
+npm run supabase:pundi -- projects list --output-format json
+npm run supabase:pundi -- db push --dry-run --project-ref ndeycwoyjwyntjkgbzlz
+npm run supabase:pundi -- -WriteOperation migration repair --status applied <exact-version> --project-ref ndeycwoyjwyntjkgbzlz
+```
+
+`scripts/pundi-supabase.ps1` reads the ignored `.env.supabase-pundi.local` file, verifies the exact `Pundi` / `ndeycwoyjwyntjkgbzlz` project before every invocation, rejects Nook and mismatched write targets, and restores the process environment after the child CLI exits. It never embeds or prints the token, changes global Windows environment variables, or changes Nook authentication. A write-capable operation must include the exact Pundi ref and the explicit `-WriteOperation` switch.
+
 ## Admin smoke
 
 The smoke harness is read-only against production. It verifies Pundi `/api/config`, real Auth login, `/api/admin`, aggregate metrics, pagination, privacy, and normalization. It must use only the designated non-customer smoke account. If credentials fail, rotate only that account password with authorized Pundi server tooling and update `.env.admin-smoke.local` without printing the password.
