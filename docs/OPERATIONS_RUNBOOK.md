@@ -18,6 +18,8 @@ Never use the CVFinance repository, CVFinance Supabase project, or Jensen Resear
 
 `Pundi Acquisition v1: COMPLETE` on release `8.7.0`. Run `npm run growth:status` for first-party aggregate CTA clicks and one-row signup attribution. The source allowlist is `google`, `reddit`, `facebook`, `linkedin`, `whatsapp`, `friend`, `community`, `organic`, `direct`, `other`; unknown values become `other`. Acquisition events contain only event type, source, landing path, CTA, and timestamp. Calculator values stay client-side. No automatic community posting is permitted. Synthetic `ref=other` smoke data must be removed and excluded from real-growth totals. Search Console sitemap submission remains owner-manual and non-blocking.
 
+`npm run growth:status` and `npm run beta:status` use the same aggregate taxonomy: `total Auth users` is the admin API total, `operational/test identities excluded` counts the designated admin and normal-user smoke fixtures, `probable real users` is the remainder, and `attributable users` is the separate count from `user_acquisition`. “Beta users” is no longer used as an inferred population label. No emails, IDs, finance contents, passwords, tokens, or synthetic activity are emitted.
+
 ## Standard verification
 
 From the workspace:

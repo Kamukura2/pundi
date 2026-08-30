@@ -28,7 +28,7 @@ Run:
 npm run growth:status
 ```
 
-The command writes ignored `runtime/growth/latest.json` and prints aggregate metrics only: version, production health, readiness, CTA clicks, attributable signups, source breakdown, top landing pages, beta users, feedback totals, and scheduler state. Synthetic smoke fixtures using `ref=other` must be excluded from real-growth interpretation and cleaned after testing.
+The command writes ignored `runtime/growth/latest.json` and prints aggregate metrics only: version, production health, readiness, CTA clicks, attributable signups, source breakdown, top landing pages, total Auth users, operational/test identities excluded, probable real users, feedback totals, and scheduler state. `probable real users` means Auth users returned by the admin metadata endpoint after excluding the designated admin and normal-user smoke identities; it is not an explicit beta-membership count. Synthetic smoke fixtures using `ref=other` must be excluded from real-growth interpretation and cleaned after testing.
 
 ## Production verification closeout
 

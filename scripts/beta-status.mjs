@@ -68,7 +68,7 @@ if (dashboard.status !== 200 || !dashboard.body?.overview || !Array.isArray(dash
 failSafe(dashboard.body);
 
 const excluded = new Set([admin.PUNDI_ADMIN_SMOKE_EMAIL?.toLowerCase(), smoke.PUNDI_USER_SMOKE_EMAIL?.toLowerCase()].filter(Boolean));
-const probableBetaUsers = dashboard.body.users.filter(user => !excluded.has(String(user.email || "").toLowerCase())).length;
+const probableRealUsers = dashboard.body.users.filter(user => !excluded.has(String(user.email || "").toLowerCase())).length;
 const overview = dashboard.body.overview;
 const feedbackRows = Array.isArray(dashboard.body.feedback) ? dashboard.body.feedback : [];
 const feedback = {
@@ -88,7 +88,8 @@ const snapshot = {
   version,
   production_health: health.status === "PASS" ? "PASS" : "UNKNOWN",
   total_auth_users: Number(overview.total_users || 0),
-  probable_beta_users: probableBetaUsers,
+  operational_test_users: excluded.size,
+  probable_real_users: probableRealUsers,
   feedback_total: feedback.total,
   feedback_new: feedback.new,
   feedback_unresolved: feedback.unresolved,
@@ -103,7 +104,9 @@ await writeFile(path.join(runtimeDir, "latest.json"), `${JSON.stringify(snapshot
 console.log("Pundi Beta Status");
 console.log(`- version: ${version}`);
 console.log(`- production health: ${snapshot.production_health}`);
-console.log(`- beta users aggregate: ${probableBetaUsers}`);
+console.log(`- total Auth users: ${snapshot.total_auth_users}`);
+console.log(`- operational/test identities excluded: ${snapshot.operational_test_users}`);
+console.log(`- probable real users: ${snapshot.probable_real_users}`);
 console.log(`- new feedback: ${feedback.new}`);
 console.log(`- unresolved feedback: ${feedback.unresolved}`);
 console.log(`- critical issues: ${feedback.critical}`);

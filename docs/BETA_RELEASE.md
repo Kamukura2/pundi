@@ -2,7 +2,7 @@
 
 ## Acquisition v1
 
-Pundi Acquisition v1: COMPLETE. Use `npm run growth:status` for aggregate first-party CTA and signup attribution metrics. The implementation uses only allowlisted ref sources, server-validated CTA events, and one immutable user attribution row. No finance data, calculator inputs, identities, tokens, or arbitrary referrers are measured. See `docs/ACQUISITION.md` for the operating boundary and manual distribution workflow.
+Pundi Acquisition v1: COMPLETE. Use `npm run growth:status` for aggregate first-party CTA and signup attribution metrics. User-count semantics are explicit: both status commands report total Auth users, excluded operational/test identities, and the same probable-real-user remainder; `user_acquisition` attributable users remain separate. No finance data, calculator inputs, identities, tokens, or arbitrary referrers are measured. See `docs/ACQUISITION.md` for the operating boundary and manual distribution workflow.
 
 
 - Product version: `8.5.0`
