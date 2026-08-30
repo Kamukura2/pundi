@@ -58,12 +58,14 @@ $runLog = Join-Path $LogDir ("run-{0}.log" -f $Started.ToUniversalTime().ToStrin
 $sanitized = Sanitize $output
 @("timestamp=$timestamp", "status=$status", "exit_code=$exitCode", "duration_seconds=$duration", "target=https://app.pundi.online", "supabase_ref=ndeycwoyjwyntjkgbzlz", '', $sanitized.Trim()) | Set-Content -LiteralPath $runLog -Encoding UTF8
 
+$version = ((Get-Content -LiteralPath (Join-Path $Repo 'package.json') -Raw | ConvertFrom-Json).version)
 $latest = [ordered]@{
   timestamp = $timestamp
   status = $status
   exit_code = [int]$exitCode
   duration_seconds = $duration
   target = 'https://app.pundi.online'
+  version = $version
   supabase_ref = 'ndeycwoyjwyntjkgbzlz'
 }
 $latest | ConvertTo-Json | Set-Content -LiteralPath $LatestFile -Encoding UTF8
