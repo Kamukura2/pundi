@@ -35,11 +35,12 @@ git clean -fd -- dist
 git diff --check
 ```
 
-The admin smoke and isolation commands require local untracked files. Load them in the process environment; do not add dotenv loading to the browser bundle.
+The admin, normal-user, and isolation commands require local untracked files. `scripts/provision-user-smoke.mjs` safely reuses or creates only the designated `pundi-user-smoke@creativevista.dev` fixture, confirms it is not an admin, has no entitlement override, and has zero finance rows, then writes `.env.user-smoke.local`. Load ignored files in the process environment; do not add dotenv loading to the browser bundle. No owner credential switching is required.
 
 ## Local environment files
 
-- `.env.admin-smoke.local`: designated smoke email/password only.
+- `.env.admin-smoke.local`: designated admin smoke email/password only.
+- `.env.user-smoke.local`: designated normal-user smoke email/password only; Git-ignored and never committed.
 - `.env.pundi-test.local`: `PUNDI_TEST_PROJECT_REF`, `PUNDI_TEST_SUPABASE_URL`, `PUNDI_TEST_SUPABASE_ANON_KEY`, and `PUNDI_TEST_SUPABASE_SERVICE_ROLE_KEY` for disposable integration tests.
 - `.env.supabase-pundi.local`: ignored Pundi-only `SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD`, loaded by `scripts/pundi-supabase.ps1` only for its child process.
 - `.env.local`: local development/Vercel tooling configuration.
@@ -62,7 +63,7 @@ The Pundi database password is not passed on command lines. Routine account swit
 
 ## Admin smoke
 
-The smoke harness is read-only against production. It verifies Pundi `/api/config`, real Auth login, `/api/admin`, aggregate metrics, pagination, privacy, and normalization. It must use only the designated non-customer smoke account. If credentials fail, rotate only that account password with authorized Pundi server tooling and update `.env.admin-smoke.local` without printing the password.
+The admin and normal-user smoke harnesses are read-only against production. They verify Pundi `/api/config`, real Auth login, `/api/admin`, aggregate metrics, pagination, privacy, normalization, onboarding, session persistence, Settings, Feedback, and logout. They must use only the designated non-customer smoke accounts. `scripts/provision-user-smoke.mjs` safely reuses or creates only the dedicated normal fixture, confirms it is not admin/paid and has zero finance rows, rotates only that fixture password, and updates `.env.user-smoke.local` without printing secrets. If admin credentials fail, rotate only the designated admin fixture with authorized Pundi server tooling and update `.env.admin-smoke.local`.
 
 Do not create business rows, alter subscriptions, alter entitlements, or use the owner account for smoke authentication.
 

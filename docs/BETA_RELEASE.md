@@ -47,9 +47,12 @@ No version bump or runtime change is required for this docs-only closeout. Do no
 - Public sitemap: `https://pundi.online/sitemap.xml`.
 - Search Console sitemap submission: **OWNER ACTION / NON-BLOCKING**.
 - Authenticated app remains isolated at `https://app.pundi.online` and is excluded from indexing.
-- Previous admin regression response `503` was transient and non-reproducible in the settled production smoke; canonical production authorization remained `401 / 403 / 200`.
+- Previous isolated admin contract can intermittently return `503` for the normal-user probe; this remains non-blocking while canonical production authorization and production smoke remain `401 / 403 / 200`.
 - No runtime authorization fix was required for the 503. App cache routing was corrected to use the private `/app.html` entrypoint after the public homepage split.
-- Release version: `8.6.0`.
+- Release version: `8.7.0`.
+- Acquisition v1: COMPLETE; production signup attribution verification PASS with disposable cleanup.
+- Dedicated normal-user smoke identity is self-maintained locally through `scripts/provision-user-smoke.mjs`; `.env.user-smoke.local` is ignored and no owner credential switching is required.
+- Search Console submission remains **OWNER ACTION / NON-BLOCKING**.
 
 ## Rollback pointer
 

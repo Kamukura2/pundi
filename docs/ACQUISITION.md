@@ -30,6 +30,10 @@ npm run growth:status
 
 The command writes ignored `runtime/growth/latest.json` and prints aggregate metrics only: version, production health, readiness, CTA clicks, attributable signups, source breakdown, top landing pages, beta users, feedback totals, and scheduler state. Synthetic smoke fixtures using `ref=other` must be excluded from real-growth interpretation and cleaned after testing.
 
+## Production verification closeout
+
+Signup attribution was verified against production with one disposable Pundi Auth identity and synthetic source `other`: marketing CTA propagation, authenticated attribution persistence, ownership, and duplicate protection all passed. The disposable user, attribution row, and three CTA event rows were deleted and read-back cleanup passed. The dedicated normal-user smoke identity is self-maintained locally by `scripts/provision-user-smoke.mjs`; its credentials live only in ignored `.env.user-smoke.local`. No owner credential switching is required under routine operation.
+
 ## Free tool
 
 `/kalkulator-net-worth` is an Indonesian net-worth calculator. It computes `total assets - liabilities` entirely in the browser. Inputs are not persisted, sent to `/api/acquisition`, or included in any event. Its CTA is measured like other public CTAs.
