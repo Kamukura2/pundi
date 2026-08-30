@@ -16,6 +16,10 @@
   ],
   "rewrites": [
     {
+      "source": "/api/stocks/fx",
+      "destination": "/api/stocks/quote?__route=fx"
+    },
+    {
       "source": "/",
       "has": [{ "type": "host", "value": "pundi.online" }],
       "destination": "/landing.html"
