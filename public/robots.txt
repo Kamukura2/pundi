@@ -4,4 +4,5 @@ Disallow: /app
 Disallow: /admin
 Disallow: /auth/
 Disallow: /api/
+Disallow: /index.html
 Sitemap: https://pundi.online/sitemap.xml

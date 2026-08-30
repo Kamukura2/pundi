@@ -9,17 +9,17 @@ for (const file of files) assert.ok(existsSync(resolve(root, file)), `Missing pu
 
 const landing = read("landing.html");
 assert.match(landing, /<main\b/);
-assert.match(landing, /<h1[^>]*>[^<]*Your money/);
+assert.match(landing, /<h1[^>]*>[^<]*Keuanganmu/);
 assert.match(landing, /<title>Pundi/);
 assert.match(landing, /canonical.*https:\/\/pundi\.online/i);
 assert.match(landing, /https:\/\/app\.pundi\.online/);
-assert.match(landing, /Track accounts and cash flow/);
-assert.match(landing, /Record income and expenses/);
-assert.match(landing, /account-isolated data/i);
+assert.match(landing, /Catat/);
+assert.match(landing, /Pahami/);
+assert.match(landing, /Data terisolasi per akun/i);
 assert.match(landing, /backup/i);
-assert.match(landing, /Privacy/);
-assert.match(landing, /Terms/);
-assert.match(landing, /Support/);
+assert.match(landing, /Privasi/);
+assert.match(landing, /Ketentuan/);
+assert.match(landing, /Bantuan/);
 assert.doesNotMatch(landing, /testimonial|customers?\s*served|bank-grade|end-to-end encryption|automatic bank feeds/i);
 
 for (const page of ["privacy.html", "terms.html", "support.html"]) {

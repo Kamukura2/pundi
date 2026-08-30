@@ -17,6 +17,13 @@ export default defineConfig({
         terms: "terms.html",
         support: "support.html",
         updates: "updates.html",
+        catatan: "catatan-keuangan.html",
+        pengeluaran: "pencatat-pengeluaran.html",
+        budgeting: "budgeting.html",
+        aset: "aset-investasi.html",
+        networth: "net-worth.html",
+        tradingJournal: "trading-journal.html",
+        backup: "backup-keuangan.html",
         admin: "admin/index.html"
       }
     }

@@ -44,6 +44,13 @@
       "has": [{ "type": "host", "value": "pundi.online" }],
       "destination": "/updates.html"
     },
+    { "source": "/catatan-keuangan", "has": [{ "type": "host", "value": "pundi.online" }], "destination": "/catatan-keuangan.html" },
+    { "source": "/pencatat-pengeluaran", "has": [{ "type": "host", "value": "pundi.online" }], "destination": "/pencatat-pengeluaran.html" },
+    { "source": "/budgeting", "has": [{ "type": "host", "value": "pundi.online" }], "destination": "/budgeting.html" },
+    { "source": "/aset-investasi", "has": [{ "type": "host", "value": "pundi.online" }], "destination": "/aset-investasi.html" },
+    { "source": "/net-worth", "has": [{ "type": "host", "value": "pundi.online" }], "destination": "/net-worth.html" },
+    { "source": "/trading-journal", "has": [{ "type": "host", "value": "pundi.online" }], "destination": "/trading-journal.html" },
+    { "source": "/backup-keuangan", "has": [{ "type": "host", "value": "pundi.online" }], "destination": "/backup-keuangan.html" },
     { "source": "/auth/reset-password", "destination": "/index.html" },
     { "source": "/auth/reset-password/", "destination": "/index.html" }
   ],
