@@ -13,11 +13,28 @@ Pundi 8.5.0 is a controlled beta, not a payment or monetization release. Signup 
 
 ## Invitation message
 
-> Pundi is currently in beta. Use non-critical personal data initially. Send unclear or broken behavior through **Feedback** in the app. Never share your password, recovery link, access token, or sensitive finance data.
+> Hi — I’m inviting you to try Pundi as one of the first beta users. It is still a beta product, so some parts may be confusing or imperfect.
 >
 > Open Pundi: https://app.pundi.online
+>
+> Create an account normally, then try the personal-finance workflows that are useful to you. If something is confusing or broken, use **Feedback** inside Pundi and tell us what you expected and what happened.
+>
+> Please do not send passwords, recovery links, access tokens, or sensitive screenshots/finance details. For now, do not use Pundi as the sole record for critical financial information; keep your normal backup or source of truth.
 
 Do not ask beta users to upload sensitive screenshots or finance exports.
+
+## Beta status command
+
+Run `npm run beta:status` from the repository. It reads only the ignored designated smoke credentials in-process, authenticates to the exact Pundi project, queries the existing read-only admin endpoint, and writes aggregate-only state to `runtime/beta/latest.json`. Output contains no emails, IDs, finance rows, tokens, or passwords. The command does not create feedback rows or modify production data.
+
+## Week-one operating procedure
+
+- Invite no more than 3–5 people manually; do not mass-distribute the URL and do not send invitations automatically.
+- Before each invitation, confirm the latest `npm run beta:status` is `READY`, and confirm Auth signup, confirmation email, login, logout, Feedback, backup/export, and account deletion using owner-controlled or non-destructive checks. Mailbox delivery and destructive deletion remain owner/manual evidence gates; do not create test finance data.
+- Review `npm run beta:status` and the single `Pundi Admin Smoke Health` result daily. Do not create feedback rows from monitoring.
+- Triage new feedback in `/admin` using the smallest safe metadata. Assign status and priority without attaching transactions, balances, holdings, budgets, backups, tokens, passwords, or screenshots.
+- Reproduce meaningful reports with static/read-only checks or disposable identities. Do not auto-fix feedback or expand scope. Pause broader invitations immediately for an unresolved Critical issue.
+- At week one, record actual sessions, feedback, Auth blockers, isolation/security results, scheduler health, and any evidence of data corruption. Do not manufacture activity or declare success from signups alone.
 
 ## Feedback workflow
 
