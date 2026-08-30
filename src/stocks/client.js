@@ -1,10 +1,11 @@
 import { getSupabase } from "../lib/supabase.js";
+import { apiUrl } from "../lib/runtime.js";
 
 async function request(path, holdingId) {
   const supabase = await getSupabase();
   const { data:{ session } } = await supabase.auth.getSession();
   if (!session) throw new Error("Authentication required.");
-  const response = await fetch(`${path}?holdingId=${encodeURIComponent(holdingId)}`, {
+  const response = await fetch(apiUrl(`${path}?holdingId=${encodeURIComponent(holdingId)}`), {
     headers:{ Authorization:`Bearer ${session.access_token}` }, cache:"no-store"
   });
   const body = await response.json().catch(() => ({}));
@@ -16,7 +17,7 @@ async function authenticatedRequest(path) {
   const supabase = await getSupabase();
   const { data:{ session } } = await supabase.auth.getSession();
   if (!session) throw new Error("Authentication required.");
-  const response = await fetch(path, { headers:{ Authorization:`Bearer ${session.access_token}` }, cache:"no-store" });
+  const response = await fetch(apiUrl(path), { headers:{ Authorization:`Bearer ${session.access_token}` }, cache:"no-store" });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw Object.assign(new Error(body.error || "Market data request failed."), { code:body.code });
   return body;

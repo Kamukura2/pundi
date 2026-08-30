@@ -1,6 +1,7 @@
 export const BINANCE_REST_BASE = "https://data-api.binance.vision/api/v3";
 export const BINANCE_WS_BASE = "wss://data-stream.binance.vision/stream?streams=";
-export const CVFINANCE_CRYPTO_API = "/api/crypto/quote";
+export const PUNDI_CRYPTO_API = "/api/crypto/quote";
+import { apiUrl } from "../lib/runtime.js";
 export const DEFAULT_CRYPTO_QUOTE = "USD";
 export const CRYPTO_QUOTE_CURRENCIES = ["USD", "IDR", "USDT"];
 
@@ -111,7 +112,7 @@ async function requestCryptoQuote(baseSymbol, requestedQuote = DEFAULT_CRYPTO_QU
   let response;
   try {
     const fx = usdIdr ? `&usdIdr=${encodeURIComponent(usdIdr)}` : "";
-    response = await fetch(`${CVFINANCE_CRYPTO_API}?symbol=${encodeURIComponent(base)}&quote=${quote}${fx}`, { headers:{Accept:"application/json"}, cache:"no-store" });
+    response = await fetch(apiUrl(`${PUNDI_CRYPTO_API}?symbol=${encodeURIComponent(base)}&quote=${quote}${fx}`), { headers:{Accept:"application/json"}, cache:"no-store" });
   } catch { throw Object.assign(new Error("Unable to reach Crypto market data. Please try again."), { code:"crypto_network_error" }); }
   const body = await response.json().catch(() => ({}));
   if (!response.ok || body.ok !== true) {

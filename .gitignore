@@ -6,3 +6,16 @@ runtime/admin-smoke-health/
 runtime/beta/
 runtime/growth/
 supabase/.temp/
+
+# local/generated Android artifacts
+android/.gradle/
+android/build/
+android/app/build/
+android/capacitor-cordova-android-plugins/build/
+android/local.properties
+android/alpha-signing.properties
+android/keystore/
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+android/.idea/
+dist/android/

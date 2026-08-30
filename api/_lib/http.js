@@ -1,4 +1,23 @@
+export const NATIVE_ORIGIN = "https://localhost";
+
+export function nativeCors(request, response, allowed = ["GET"]) {
+  const origin = request.headers?.origin;
+  if (origin === NATIVE_ORIGIN) {
+    response.setHeader("Access-Control-Allow-Origin", NATIVE_ORIGIN);
+    response.setHeader("Access-Control-Allow-Headers", "Authorization, Cache-Control, Content-Type");
+    response.setHeader("Access-Control-Allow-Methods", allowed.join(", "));
+    response.setHeader("Vary", "Origin");
+  }
+  if (request.method === "OPTIONS") {
+    if (origin === NATIVE_ORIGIN) return response.status(204).end(), false;
+    response.status(405).end();
+    return false;
+  }
+  return true;
+}
+
 export function method(request, response, allowed = ["GET"]) {
+  if (!nativeCors(request, response, allowed)) return false;
   if (!allowed.includes(request.method)) {
     response.setHeader("Allow", allowed.join(", "));
     response.status(405).json({ error:"Method not allowed." });

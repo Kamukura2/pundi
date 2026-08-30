@@ -33,7 +33,7 @@ assert.match(index, /authModeToggle/);
 assert.match(authAppSource, /password must be at least 6 characters/i, "Sign-up must validate the Supabase password minimum");
 assert.match(authAppSource, /Passwords do not match/i, "Sign-up must reject password mismatches");
 assert.match(authAppSource, /Check your email to confirm your account\./, "Email confirmation must not be reported as an authenticated session");
-assert.match(authSyncSource, /auth\.signUp\(\{ email, password, options: \{ emailRedirectTo: window\.location\.origin \} \}\)/, "Sign-up must use the existing Pundi Supabase client with a Pundi redirect");
+assert.match(authSyncSource, /auth\.signUp\(\{ email, password, options: \{ emailRedirectTo: (?:window\.location\.origin|authRedirectOrigin\(\)) \} \}\)/, "Sign-up must use the existing Pundi Supabase client with a Pundi redirect");
 assert.match(authAppSource, /authModeToggle\.onclick/, "Sign-in and sign-up modes must be switchable");
 assert.match(authAppSource, /signUp\(authEmail\.value\.trim\(\),\s*authPassword\.value\)/, "Valid sign-up must call SyncManager.signUp");
 assert.match(index, /annualPerformanceDashboard/);
@@ -277,7 +277,7 @@ assert.equal(packageJson.scripts["test:password-recovery"],"node tests/integrati
 assert.match(accountLifecycleIntegration,/explicit Pundi test configuration/);
 assert.match(accountLifecycleIntegration,/admin\.auth\.admin\.createUser/);
 assert.match(accountLifecycleIntegration,/admin\.auth\.admin\.deleteUser/);
-for (const marker of ["resetPasswordForEmail","emailRedirectTo: window.location.origin","updateUser","changePassword","prompt","DELETE","Final confirmation"]) assert.match(accountLifecycle+authSyncSource,new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")),`Account lifecycle contract missing ${marker}`);
+for (const marker of ["resetPasswordForEmail","emailRedirectTo","updateUser","changePassword","prompt","DELETE","Final confirmation"]) assert.match(accountLifecycle+authSyncSource,new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")),`Account lifecycle contract missing ${marker}`);
 for (const marker of ["/auth/reset-password","PASSWORD_RECOVERY","recoveryMode","expectedUserId","Password updated successfully.","Request a new reset link"]) assert.match(authAppSource+authSyncSource,new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")),`Password recovery contract missing ${marker}`);
 for (const marker of ["auth.getUser","auth.admin.deleteUser","confirmation_required","admin_deletion_blocked","clearUserScopedState","scope:\"local\""]) assert.match(accountApi+accountLifecycle+authSyncSource,new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")),`Account lifecycle security missing ${marker}`);
 assert.doesNotMatch(accountApi,/body\.user_id|request\.body\.user_id/i,"Account deletion must use JWT identity, not client user ID");
@@ -560,7 +560,7 @@ assert.match(cryptoApi,/permissionSets/,"Binance SPOT validation must accept the
 assert.match(cryptoApi,/Crypto symbol not found/);
 assert.match(cryptoApi,/Crypto market data is temporarily unavailable/);
 const binanceSource = read("src/crypto/binance.js");
-assert.match(binanceSource,/CVFINANCE_CRYPTO_API/,"Browser Crypto REST must use the same-origin Vercel API route");
+assert.match(binanceSource,/PUNDI_CRYPTO_API/,"Browser Crypto REST must use the same-origin Vercel API route");
 assert.match(electricityIndex,/id="cryptoMarketStatus"/);
 assert.equal((appSource.match(/options:\["IDX","NASDAQ","NYSE","CRYPTO"\]/g)||[]).length,2,"Investment and Trading new-entry market selectors must match exactly");
 assert.equal((appSource.match(/options:\["USD","IDR","USDT"\]/g)||[]).length,2,"Investment and Trading Crypto quote selectors must match exactly");

@@ -2,6 +2,9 @@ import { clearUserScopedState } from "../lib/idb.js";
 import { getSupabase } from "../lib/supabase.js";
 import { persistSignupAttribution } from "../acquisition/client.js";
 import { FinanceRepository, exportBackup, validateBackup } from "../data/repository.js";
+import { apiUrl, authRedirectOrigin, isNativeRuntime } from "../lib/runtime.js";
+import { Directory, Encoding, Filesystem } from "@capacitor/filesystem";
+import { Share } from "@capacitor/share";
 
 export class SyncManager {
   constructor({ onState, onStatus }) {
@@ -55,7 +58,7 @@ export class SyncManager {
 
   async signUp(email, password) {
     const supabase = await getSupabase();
-    const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin } });
+    const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: authRedirectOrigin() } });
     if (error) throw error;
     if (data.session?.user) persistSignupAttribution(data.session.user).catch(() => {});
     return data;
@@ -129,12 +132,19 @@ export class SyncManager {
     this.status("saved", "Imported and synced", { lastSynced:new Date().toISOString(), pending:0 });
   }
 
-  downloadBackup(state) {
+  async downloadBackup(state) {
     const backup = exportBackup(state, this.user.id);
-    const blob = new Blob([JSON.stringify(backup, null, 2)], { type:"application/json" });
+    const content = JSON.stringify(backup, null, 2);
+    const filename = `pundi-backup-${new Date().toISOString().slice(0,10)}.json`;
+    if (isNativeRuntime()) {
+      const { uri } = await Filesystem.writeFile({ path:filename, data:content, directory:Directory.Cache, encoding:Encoding.UTF8 });
+      await Share.share({ title:"Pundi backup", text:"Pundi backup exported", url:uri, dialogTitle:"Export Pundi backup" });
+      return;
+    }
+    const blob = new Blob([content], { type:"application/json" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `pundi-backup-${new Date().toISOString().slice(0,10)}.json`;
+    link.download = filename;
     link.click();
     URL.revokeObjectURL(link.href);
   }
@@ -146,7 +156,7 @@ export class SyncManager {
 
   async requestPasswordReset(email) {
     const supabase = await getSupabase();
-    const redirectTo = `${window.location.origin}/auth/reset-password`;
+    const redirectTo = `${authRedirectOrigin()}/auth/reset-password`;
     const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
     if (error) throw error;
   }
@@ -165,7 +175,7 @@ export class SyncManager {
     const supabase = await getSupabase();
     const { data:{ session } } = await supabase.auth.getSession();
     if (!session?.access_token) throw new Error("Authentication required.");
-    const response = await fetch("/api/account", { cache:"no-store", headers:{ Authorization:`Bearer ${session.access_token}`, "Cache-Control":"no-cache" } });
+    const response = await fetch(apiUrl("/api/account"), { cache:"no-store", headers:{ Authorization:`Bearer ${session.access_token}`, "Cache-Control":"no-cache" } });
     const body = await response.json().catch(() => null);
     if (!response.ok) throw new Error(body?.error || "Account metadata unavailable.");
     return body;
@@ -178,7 +188,7 @@ export class SyncManager {
     if (!userId) throw new Error("Authentication required.");
     const { data:{ session } } = await supabase.auth.getSession();
     if (!session?.access_token) throw new Error("Authentication required.");
-    const response = await fetch("/api/account", { method:"DELETE", cache:"no-store", headers:{ Authorization:`Bearer ${session.access_token}`, "Content-Type":"application/json", "Cache-Control":"no-cache" }, body:JSON.stringify({confirmation}) });
+    const response = await fetch(apiUrl("/api/account"), { method:"DELETE", cache:"no-store", headers:{ Authorization:`Bearer ${session.access_token}`, "Content-Type":"application/json", "Cache-Control":"no-cache" }, body:JSON.stringify({confirmation}) });
     const body = await response.json().catch(() => null);
     if (!response.ok) throw new Error(body?.error || "Account deletion failed.");
     this.unsubscribe?.();

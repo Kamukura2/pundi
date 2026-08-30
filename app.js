@@ -12,6 +12,8 @@ import { getSupabase } from "./src/lib/supabase.js";
 import { applyOpeningPosition, applyTrade, archiveClosedTradingPositions, cashEvent, equityBenchmarkMetrics, performancePreview, performanceSeries, reconcileTradingPositions, removeTradingLedgerEntry, removeTradingPositionData, setTradingWalletBalance, tradingMetrics, tradingPositionCost, tradingPositionValue, tradingTargetSimulation, upsertDailySnapshot } from "./src/trading/model.js";
 import { historicalCryptoQuote } from "./src/trading/crypto-lifecycle.js";
 import { feedbackPayload } from "./src/feedback/contract.js";
+import { apiUrl, isNativeRuntime } from "./src/lib/runtime.js";
+import { initializeNativeShell } from "./src/lib/native-shell.js";
 
 const BUILD_ID = __PUNDI_BUILD_ID__;
 const APP_VERSION = "8.7.0";
@@ -1621,7 +1623,7 @@ feedbackForm.onsubmit=async event=>{
  try{
   const supabase=await getSupabase(),{data:{session}}=await supabase.auth.getSession();
   if(!session?.access_token)throw new Error("Authentication required.");
-  const response=await fetch("/api/feedback",{method:"POST",cache:"no-store",headers:{Authorization:`Bearer ${session.access_token}`,"Content-Type":"application/json","Cache-Control":"no-cache"},body:JSON.stringify(feedbackPayload({category,message},{version:APP_VERSION,buildId:BUILD_ID,page:location.pathname,userAgent:navigator.userAgent}))});
+  const response=await fetch(apiUrl("/api/feedback"),{method:"POST",cache:"no-store",headers:{Authorization:`Bearer ${session.access_token}`,"Content-Type":"application/json","Cache-Control":"no-cache"},body:JSON.stringify(feedbackPayload({category,message},{version:APP_VERSION,buildId:BUILD_ID,page:location.pathname,userAgent:navigator.userAgent}))});
   const body=await response.json().catch(()=>null);if(!response.ok)throw new Error(body?.error||"Feedback could not be sent. Please try again.");
   feedbackMessageStatus.className="form-success";feedbackMessageStatus.textContent="Thanks — your feedback has been sent.";feedbackMessage.value="";feedbackCounter.textContent="0 / 4000";
  }catch(error){feedbackMessageStatus.className="form-error";feedbackMessageStatus.textContent=error.message||"Feedback could not be sent. Please try again.";}
@@ -1909,7 +1911,8 @@ async function boot(){
  document.documentElement.dataset.theme=state.theme;themeBtn.textContent=state.theme==="dark"?"☀":"☾";
  privacyBtn.textContent="👁";txDate.value=todayISO();updateModeToggleLabels();
  baseGrowth.value=state.baseGrowth;optimisticGrowth.value=state.optimisticGrowth;renderAll();applyLanguage();
- if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{});
+ initializeNativeShell();
+ if(!isNativeRuntime() && "serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{});
  try{
    const hashParams=new URLSearchParams(location.hash.replace(/^#/,"?"));
    const queryParams=new URLSearchParams(location.search);

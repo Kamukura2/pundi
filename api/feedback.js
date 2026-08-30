@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { FEEDBACK_CATEGORIES, FEEDBACK_MAX_MESSAGE } from "../src/feedback/contract.js";
 import { acquisitionHandler } from "../src/acquisition/server.js";
+import { nativeCors } from "./_lib/http.js";
 
 function reply(response, status, body) { return response.status(status).json(body); }
 function serviceDb() {
@@ -24,6 +25,7 @@ function safeBody(body) {
   return { category, message, page:String(body?.page||"").slice(0,120), app_version:String(body?.app_version||"").slice(0,32), build_id:String(body?.build_id||"").slice(0,64), browser:String(body?.browser||"").slice(0,160) };
 }
 export default async function handler(request,response) {
+  if (!nativeCors(request, response, ["GET", "POST"])) return;
   response.setHeader("Cache-Control","private, no-store"); response.setHeader("Content-Type","application/json; charset=utf-8");
   if (!["GET","POST"].includes(request.method)) return reply(response,405,{error:"Method not allowed.",code:"method_not_allowed"});
   if (request.query?.__route === "acquisition") return acquisitionHandler(request,response);

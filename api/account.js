@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { nativeCors } from "./_lib/http.js";
 
 function reply(response, status, body) {
   response.setHeader("Cache-Control", "private, no-store, no-cache, max-age=0, must-revalidate");
@@ -22,6 +23,7 @@ function safeSubscription(row) {
   return { plan:row?.plan || "free", status:row?.status || "free" };
 }
 export default async function handler(request, response) {
+  if (!nativeCors(request, response, ["GET", "DELETE"])) return;
   if (request.method !== "GET" && request.method !== "DELETE") return reply(response,405,{ error:"Method not allowed.", code:"method_not_allowed" });
   try {
     const { user, db } = await authenticate(request);

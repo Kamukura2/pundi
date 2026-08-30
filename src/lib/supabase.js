@@ -1,11 +1,12 @@
 import { createClient } from "@supabase/supabase-js";
 import { cacheGet, cachePut } from "./idb.js";
+import { apiUrl } from "./runtime.js";
 
 let clientPromise;
 
 async function loadPublicConfig() {
   try {
-    const response = await fetch("/api/config", { cache: "no-store" });
+    const response = await fetch(apiUrl("/api/config"), { cache: "no-store" });
     if (!response.ok) throw new Error("Supabase public configuration is unavailable.");
     const config = await response.json();
     await cachePut("public-config", config);
