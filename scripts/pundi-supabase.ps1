@@ -26,7 +26,9 @@ if ($LASTEXITCODE -ne 0) {
     Stop-Safe 'Pundi secret file is not Git-ignored.'
 }
 
-$tokenLine = Get-Content -LiteralPath $SecretFile | Where-Object { $_ -match '^SUPABASE_ACCESS_TOKEN=' } | Select-Object -First 1
+$secretLines = Get-Content -LiteralPath $SecretFile
+$tokenLine = $secretLines | Where-Object { $_ -match '^SUPABASE_ACCESS_TOKEN=' } | Select-Object -First 1
+$passwordLine = $secretLines | Where-Object { $_ -match '^SUPABASE_DB_PASSWORD=' } | Select-Object -First 1
 if (-not $tokenLine -or $tokenLine -notmatch '^SUPABASE_ACCESS_TOKEN=(.+)$') {
     Stop-Safe 'Pundi access token is missing.'
 }
@@ -34,9 +36,16 @@ $token = $Matches[1].Trim()
 if ([string]::IsNullOrWhiteSpace($token)) {
     Stop-Safe 'Pundi access token is empty.'
 }
+if (-not $passwordLine -or $passwordLine -notmatch '^SUPABASE_DB_PASSWORD=(.+)$') {
+    Stop-Safe 'Pundi database password is missing.'
+}
+$dbPassword = $Matches[1].Trim()
+if ([string]::IsNullOrWhiteSpace($dbPassword)) {
+    Stop-Safe 'Pundi database password is empty.'
+}
 
 $argText = ($SupabaseArgs -join ' ')
-if ($argText -match [regex]::Escape($token) -or $argText -match 'SUPABASE_ACCESS_TOKEN=') {
+if ($argText -match [regex]::Escape($token) -or $argText -match [regex]::Escape($dbPassword) -or $argText -match 'SUPABASE_(ACCESS_TOKEN|DB_PASSWORD)=') {
     Stop-Safe 'Secret material was supplied as a command argument.'
 }
 if ($argText -match [regex]::Escape($ForbiddenRef)) {
@@ -48,8 +57,11 @@ if ($WriteOperation -and $argText -notmatch [regex]::Escape($ExpectedRef)) {
 
 $oldToken = $env:SUPABASE_ACCESS_TOKEN
 $hadOldToken = $null -ne $oldToken
+$oldDbPassword = $env:SUPABASE_DB_PASSWORD
+$hadOldDbPassword = $null -ne $oldDbPassword
 try {
     $env:SUPABASE_ACCESS_TOKEN = $token
+    $env:SUPABASE_DB_PASSWORD = $dbPassword
 
     $listing = & npx.cmd supabase projects list --output-format json 2>$null
     if ($LASTEXITCODE -ne 0) {
@@ -75,6 +87,9 @@ try {
 finally {
     if ($hadOldToken) { $env:SUPABASE_ACCESS_TOKEN = $oldToken }
     else { Remove-Item Env:SUPABASE_ACCESS_TOKEN -ErrorAction SilentlyContinue }
+    if ($hadOldDbPassword) { $env:SUPABASE_DB_PASSWORD = $oldDbPassword }
+    else { Remove-Item Env:SUPABASE_DB_PASSWORD -ErrorAction SilentlyContinue }
     $token = $null
+    $dbPassword = $null
 }
 exit $exitCode

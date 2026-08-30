@@ -8,6 +8,8 @@ const source = fs.readFileSync(path, 'utf8');
 assert.match(source, /\.env\.supabase-pundi\.local/);
 assert.match(source, /git[\s\S]*check-ignore/);
 assert.match(source, /SUPABASE_ACCESS_TOKEN/);
+assert.match(source, /SUPABASE_DB_PASSWORD/);
+assert.match(source, /oldDbPassword|hadOldDbPassword/);
 assert.match(source, /ndeycwoyjwyntjkgbzlz/);
 assert.match(source, /Pundi/);
 assert.match(source, /projects list/);
