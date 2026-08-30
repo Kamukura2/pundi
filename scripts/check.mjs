@@ -72,7 +72,7 @@ assert.match(serviceWorker, /pathname\.startsWith\("\/api\/"\)/);
 assert.match(serviceWorker, /const copy = response\.clone\(\);[\s\S]*?cache\.put\(request, copy\)/, "Service Worker must clone asset responses before asynchronous cache writes");
 assert.doesNotMatch(serviceWorker, /cache\.put\(request, response\.clone\(\)\)/, "Service Worker must not clone asset responses inside the cache callback");
 
-const jsFiles = ["app.js","api/config.js","api/_lib/rate-limit.js","api/_lib/dividends.js","api/stocks/dividends.js","api/stocks/fx.js","api/stocks/quote.js","api/stocks/validate.js","api/trading/quote.js","api/trading/benchmark.js","api/cron/refresh-stocks.js","api/crypto/quote.js","src/data/default-data.js","src/data/finance-model.js","src/data/electricity-model.js","src/data/currency-format.js","src/data/money-input.js","src/crypto/binance.js","src/data/repository.js","src/lib/idb.js","src/lib/supabase.js","src/stocks/client.js","src/stocks/dividends.js","src/stocks/holding.js","src/trading/model.js","src/trading/crypto-lifecycle.js","src/sync/sync-manager.js"];
+const jsFiles = ["app.js","api/config.js","api/_lib/rate-limit.js","api/_lib/dividends.js","api/stocks/dividends.js","api/stocks/quote.js","api/stocks/validate.js","api/trading/quote.js","api/trading/benchmark.js","api/cron/refresh-stocks.js","api/crypto/quote.js","src/data/default-data.js","src/data/finance-model.js","src/data/electricity-model.js","src/data/currency-format.js","src/data/money-input.js","src/crypto/binance.js","src/data/repository.js","src/lib/idb.js","src/lib/supabase.js","src/stocks/client.js","src/stocks/dividends.js","src/stocks/holding.js","src/trading/model.js","src/trading/crypto-lifecycle.js","src/sync/sync-manager.js"];
 for (const file of jsFiles) execFileSync(process.execPath, ["--check", resolve(root, file)], { stdio:"pipe" });
 
 for (const file of jsFiles.map(read)) {
@@ -533,11 +533,11 @@ assert.match(appSource, /tx-history-archive/, "Previous History months must rema
 
 const electricityIndex = read("index.html");
 const electricityCss = read("styles.css");
-assert.equal(JSON.parse(read("package.json")).version,"8.4.0","Package version must be v8.4.0");
-assert.match(electricityIndex,/<title>Pundi v8\.4\.0[^<]*<\/title>/,"Document title must be v8.4.0");
-assert.match(read("public/sw.js"),/pundi-shell-v8\.4\.0/,"Service-worker cache must invalidate for the v8.4.0 release");
+assert.equal(JSON.parse(read("package.json")).version,"8.5.0","Package version must be v8.5.0");
+assert.match(electricityIndex,/<title>Pundi v8\.5\.0[^<]*<\/title>/,"Document title must be v8.5.0");
+assert.match(read("public/sw.js"),/pundi-shell-v8\.5\.0/,"Service-worker cache must invalidate for the v8.5.0 release");
 assert.match(read("vite.config.js"),/__PUNDI_BUILD_ID__/,"Build identity must be injected automatically");
-assert.match(appSource,/Pundi v8\.4\.0 · build/,"Public release identity must include version and build marker");
+assert.match(appSource,/Pundi v8\.5\.0 · build/,"Public release identity must include version and build marker");
 assert.match(electricityIndex,/id="topUpElectricityBtn"[^>]*>\s*TOP UP\s*<\/button>/,"Electricity must expose a distinct TOP UP action");
 assert.match(electricityIndex,/id="addElectricityBtn"[^>]*>\s*＋ Reading\s*<\/button>/,"The existing Reading action must remain available");
 assert.match(electricityIndex,/id="electricityTopUpModal"/);

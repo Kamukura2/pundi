@@ -14,7 +14,7 @@ const styles = read("styles.css");
 assert.match(sync, /resetPasswordForEmail\(email, \{ redirectTo \}\)/);
 assert.match(sync, /window\.location\.origin\}\/auth\/reset-password/);
 assert.match(vercel, /\/auth\/reset-password/);
-assert.match(sw, /pundi-shell-v8\.4\.0/);
+assert.match(sw, /pundi-shell-v8\.5\.0/);
 assert.match(app, /onAuthStateChange\(\(event,session\)=>/);
 assert.match(app, /event!=="PASSWORD_RECOVERY"/);
 assert.match(app, /exchangeCodeForSession\(callbackCode\)/);

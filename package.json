@@ -1,6 +1,6 @@
 {
   "name": "pundi",
-  "version": "8.4.0",
+  "version": "8.5.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,10 +8,12 @@
     "build": "vite build",
     "preview": "vite preview",
     "check": "node scripts/check.mjs && node scripts/check-telegram.mjs",
+    "supabase:pundi": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File scripts/pundi-supabase.ps1",
     "test:isolation": "node tests/integration/supabase-isolation.mjs",
     "test:admin": "node tests/integration/admin-contract.mjs",
     "test:admin-loading": "node tests/integration/admin-loading-contract.mjs",
     "test:admin-render": "node tests/integration/admin-render-contract.mjs",
+    "test:feedback": "node tests/integration/feedback-contract.mjs",
     "test:admin-smoke": "node tests/integration/admin-production-smoke.mjs",
     "test:account-lifecycle": "node tests/integration/account-lifecycle-contract.mjs",
     "test:account-lifecycle-integration": "node tests/integration/account-lifecycle-integration.mjs",

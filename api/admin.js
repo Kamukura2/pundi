@@ -64,6 +64,15 @@ async function audit(db, adminId, targetId, action, beforeMetadata, afterMetadat
   const { error:auditError } = await db.from("admin_audit_log").insert({ admin_user_id:adminId, target_user_id:targetId, action, before_metadata:beforeMetadata, after_metadata:afterMetadata });
   if (auditError) throw Object.assign(new Error("Audit log write failed."), { status:503, code:"audit_unavailable" });
 }
+const FEEDBACK_STATUSES = ["New","Reviewing","Planned","Resolved","Closed"];
+const FEEDBACK_PRIORITIES = ["Low","Normal","High","Critical"];
+async function feedbackMetadata(db, users, query = {}) {
+  const { data, error } = await db.from("beta_feedback").select("id,user_id,category,message,page,app_version,build_id,status,priority,admin_note,created_at,updated_at").order("created_at", { ascending:false }).limit(500);
+  if (error) throw Object.assign(new Error("Feedback metadata query failed."), { status:503, code:"feedback_unavailable" });
+  const emails = new Map(users.map(user => [user.id, user.email || ""]));
+  const search=String(query.feedback_search||"").trim().toLowerCase(), status=String(query.feedback_status||"").trim(), category=String(query.feedback_category||"").trim();
+  return (data||[]).map(row => ({ ...row, user_email:emails.get(row.user_id)||"" })).filter(row => (!search || `${row.message} ${row.page} ${row.user_email}`.toLowerCase().includes(search)) && (!status || row.status===status) && (!category || row.category===category));
+}
 export default async function handler(request, response) {
   response.setHeader("Cache-Control","private, no-store, no-cache, max-age=0, must-revalidate");
   response.setHeader("Pragma","no-cache");
@@ -80,11 +89,20 @@ export default async function handler(request, response) {
       const status = String(request.query.status || "").trim();
       const sort = request.query.sort === "oldest" ? 1 : -1;
       const filtered = records.filter(row => (!q || row.email.toLowerCase().includes(q) || row.user_id.toLowerCase().includes(q)) && (!plan || (plan === "paid" ? row.plan !== "free" : row.plan === plan)) && (!status || row.subscription_status === status)).sort((a,b) => (Date.parse(a.created_at)-Date.parse(b.created_at))*sort);
-      return response.status(200).json({ overview:{ total_users:records.length, new_users_7_days:records.filter(row => Date.now()-Date.parse(row.created_at)<=7*864e5).length, new_users_30_days:records.filter(row => Date.now()-Date.parse(row.created_at)<=30*864e5).length, active_users_7_days:records.filter(row => row.last_active && Date.now()-Date.parse(row.last_active)<=7*864e5).length, free_users:records.filter(row => row.plan === "free").length, paid_users:records.filter(row => row.plan !== "free").length }, users:filtered, page:1, page_size:1000, total:filtered.length });
+      const feedback = await feedbackMetadata(db, users, request.query || {});
+      return response.status(200).json({ overview:{ total_users:records.length, new_users_7_days:records.filter(row => Date.now()-Date.parse(row.created_at)<=7*864e5).length, new_users_30_days:records.filter(row => Date.now()-Date.parse(row.created_at)<=30*864e5).length, active_users_7_days:records.filter(row => row.last_active && Date.now()-Date.parse(row.last_active)<=7*864e5).length, free_users:records.filter(row => row.plan === "free").length, paid_users:records.filter(row => row.plan !== "free").length, feedback_total:feedback.length, feedback_new:feedback.filter(row=>row.status==="New").length, feedback_unresolved:feedback.filter(row=>!["Resolved","Closed"].includes(row.status)).length, feedback_last_7_days:feedback.filter(row=>Date.now()-Date.parse(row.created_at)<=7*864e5).length }, users:filtered, feedback, page:1, page_size:1000, total:filtered.length });
     }
     let body;
     try { body = typeof request.body === "string" ? JSON.parse(request.body || "{}") : (request.body || {}); }
     catch { return error(response,400,"Malformed JSON request.","invalid_json"); }
+    if (body.action === "update_feedback") {
+      if (!body.id || !FEEDBACK_STATUSES.includes(body.status) || !FEEDBACK_PRIORITIES.includes(body.priority || "Normal") || String(body.admin_note||"").length>1000) return error(response,400,"Invalid feedback triage payload.","invalid_request");
+      const after={status:body.status,priority:body.priority||"Normal",admin_note:String(body.admin_note||"").trim().slice(0,1000),updated_at:new Date().toISOString()};
+      const {data,error:updateError}=await db.from("beta_feedback").update(after).eq("id",body.id).select("id,status,priority,admin_note,updated_at").maybeSingle();
+      if(updateError) throw Object.assign(new Error("Feedback update failed."),{status:503,code:"mutation_failed"});
+      if(!data) return error(response,404,"Feedback not found.","not_found");
+      return response.status(200).json({ok:true,feedback:data});
+    }
     const target = users.find(candidate => candidate.id === body.user_id);
     if (!target) return error(response,404,"User not found.","not_found");
     if (body.action === "set_plan") {

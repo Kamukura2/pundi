@@ -56,14 +56,14 @@ $finished = Get-Date
 $duration = [math]::Round(($finished - $Started).TotalSeconds, 3)
 $runLog = Join-Path $LogDir ("run-{0}.log" -f $Started.ToUniversalTime().ToString('yyyyMMdd-HHmmss'))
 $sanitized = Sanitize $output
-@("timestamp=$timestamp", "status=$status", "exit_code=$exitCode", "duration_seconds=$duration", "target=https://pundi-silk.vercel.app", "supabase_ref=ndeycwoyjwyntjkgbzlz", '', $sanitized.Trim()) | Set-Content -LiteralPath $runLog -Encoding UTF8
+@("timestamp=$timestamp", "status=$status", "exit_code=$exitCode", "duration_seconds=$duration", "target=https://app.pundi.online", "supabase_ref=ndeycwoyjwyntjkgbzlz", '', $sanitized.Trim()) | Set-Content -LiteralPath $runLog -Encoding UTF8
 
 $latest = [ordered]@{
   timestamp = $timestamp
   status = $status
   exit_code = [int]$exitCode
   duration_seconds = $duration
-  target = 'https://pundi-silk.vercel.app'
+  target = 'https://app.pundi.online'
   supabase_ref = 'ndeycwoyjwyntjkgbzlz'
 }
 $latest | ConvertTo-Json | Set-Content -LiteralPath $LatestFile -Encoding UTF8

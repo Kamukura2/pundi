@@ -11,8 +11,10 @@ import { advanceDividendLifecycle, creditDividendToWallet, dividendEventYear, di
 import { getSupabase } from "./src/lib/supabase.js";
 import { applyOpeningPosition, applyTrade, archiveClosedTradingPositions, cashEvent, equityBenchmarkMetrics, performancePreview, performanceSeries, reconcileTradingPositions, removeTradingLedgerEntry, removeTradingPositionData, setTradingWalletBalance, tradingMetrics, tradingPositionCost, tradingPositionValue, tradingTargetSimulation, upsertDailySnapshot } from "./src/trading/model.js";
 import { historicalCryptoQuote } from "./src/trading/crypto-lifecycle.js";
+import { feedbackPayload } from "./src/feedback/contract.js";
 
 const BUILD_ID = __PUNDI_BUILD_ID__;
+const APP_VERSION = "8.5.0";
 
 const COLORS=["#7F66FF","#39C3FF","#FF8F63","#36D695","#F4C24F","#FF6EA8","#62C8FF","#8D7AFF"];
 const COMPANY_EXPENSE_TAG="Expense Perusahaan";
@@ -78,12 +80,20 @@ const saveSettings=()=>save();
 const q=(s)=>document.querySelector(s);
 const qa=(s)=>[...document.querySelectorAll(s)];
 const releaseIdentity=q("#releaseIdentity");
-if(releaseIdentity) releaseIdentity.textContent = `Pundi v8.4.0 · build ${BUILD_ID}`;
+if(releaseIdentity) releaseIdentity.textContent = `Pundi v8.5.0 · build ${BUILD_ID} · Beta`;
 const onboardingCard=q("#onboardingCard");
 const onboardingDismiss=q("[data-onboarding-dismiss]");
 const onboardingAddAccount=q("#onboardingAddAccount");
 const onboardingAddTransaction=q("#onboardingAddTransaction");
 const onboardingExploreAssets=q("#onboardingExploreAssets");
+const feedbackModal=q("#feedbackModal");
+const feedbackForm=q("#feedbackForm");
+const feedbackCategory=q("#feedbackCategory");
+const feedbackMessage=q("#feedbackMessage");
+const feedbackSubmit=q("#feedbackSubmit");
+const feedbackMessageStatus=q("#feedbackMessageStatus");
+const feedbackCounter=q("#feedbackCounter");
+let feedbackSubmitting=false;
 const electricityTopUpModal=q("#electricityTopUpModal");
 const electricityTopUpForm=q("#electricityTopUpForm");
 const electricityTopUpAmount=q("#electricityTopUpAmount");
@@ -1600,7 +1610,23 @@ qa("[data-stock-workspace]").forEach(button=>button.onclick=()=>setStockWorkspac
 themeBtn.onclick=()=>setTheme(state.theme==="dark"?"light":"dark");
 languageBtn.onclick=()=>{state.language=state.language==="en"?"id":"en";applyLanguage();saveSettings();renderAll();switchPage(state.page);};
 privacyBtn.onclick=()=>{state.privacy=!state.privacy; document.body.classList.toggle("private-hidden",state.privacy); privacyBtn.textContent=state.privacy?"🙈":"👁"; renderAll();};
-feedbackBtn.onclick=()=>{ window.location.href="https://pundi.online/support"; };
+feedbackBtn.onclick=()=>{ feedbackMessageStatus.textContent="";feedbackCategory.value="";feedbackMessage.value="";feedbackCounter.textContent="0 / 4000";feedbackModal.showModal();feedbackCategory.focus(); };
+feedbackMessage.oninput=()=>{feedbackCounter.textContent=`${feedbackMessage.value.length} / 4000`;};
+feedbackForm.onsubmit=async event=>{
+ event.preventDefault(); if(feedbackSubmitting)return;
+ feedbackMessageStatus.className="form-error";feedbackMessageStatus.textContent="";
+ const message=feedbackMessage.value.trim(), category=feedbackCategory.value;
+ if(!category||!message){feedbackMessageStatus.textContent="Choose a category and enter a message.";return;}
+ feedbackSubmitting=true;feedbackSubmit.disabled=true;feedbackSubmit.textContent="Sending…";
+ try{
+  const supabase=await getSupabase(),{data:{session}}=await supabase.auth.getSession();
+  if(!session?.access_token)throw new Error("Authentication required.");
+  const response=await fetch("/api/feedback",{method:"POST",cache:"no-store",headers:{Authorization:`Bearer ${session.access_token}`,"Content-Type":"application/json","Cache-Control":"no-cache"},body:JSON.stringify(feedbackPayload({category,message},{version:APP_VERSION,buildId:BUILD_ID,page:location.pathname,userAgent:navigator.userAgent}))});
+  const body=await response.json().catch(()=>null);if(!response.ok)throw new Error(body?.error||"Feedback could not be sent. Please try again.");
+  feedbackMessageStatus.className="form-success";feedbackMessageStatus.textContent="Thanks — your feedback has been sent.";feedbackMessage.value="";feedbackCounter.textContent="0 / 4000";
+ }catch(error){feedbackMessageStatus.className="form-error";feedbackMessageStatus.textContent=error.message||"Feedback could not be sent. Please try again.";}
+ finally{feedbackSubmitting=false;feedbackSubmit.disabled=false;feedbackSubmit.textContent="Send feedback";}
+};
 qa("#cashFilter button").forEach(b=>b.onclick=()=>{qa("#cashFilter button").forEach(x=>x.classList.remove("active")); b.classList.add("active"); state.filter=b.dataset.filter; renderCashflow();});
 cashSort.onchange=()=>{state.sort=cashSort.value; renderCashflow();};
 txSearch.oninput=()=>renderCashflow();
