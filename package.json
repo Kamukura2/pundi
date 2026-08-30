@@ -42,9 +42,10 @@
     "android:sync": "npm run build && node scripts/prepare-android-web.mjs && npx cap sync android",
     "android:apk": "npm run android:sync && node scripts/android-signing.mjs && node scripts/run-android-gradle.mjs && node scripts/collect-android-apk.mjs",
     "test:backup-filename": "node tests/integration/backup-filename-contract.mjs",
+    "test:cvfinance-isolation": "node scripts/test-cvfinance-isolation.mjs",
     "test:health-v4": "node tests/integration/production-health-v3.mjs && npm run test:authz-production",
     "test:production": "npm run test:health-v4 && npm run test:user-smoke && npm run test:admin-smoke",
-    "test:core": "npm run test:productization-v2 && npm run test:entitlement && npm run test:backup-security && npm run test:backup-filename && npm run test:sync-races && npm run test:api-contract",
+    "test:core": "npm run test:productization-v2 && npm run test:entitlement && npm run test:backup-security && npm run test:backup-filename && npm run test:cvfinance-isolation && npm run test:sync-races && npm run test:api-contract",
     "test:browser": "npm run test:responsive && npm run test:a11y",
     "test:all": "npm run test:core && npm run test:browser && npm run test:identity && npm run test:regression && npm run check && npm run build",
     "test:regression": "npm run test:productization-v2 && npm run test:entitlement && npm run test:backup-security && npm run test:backup-filename && npm run test:sync-races && npm run test:api-contract && npm run test:empty-states && npm run test:double-submit && npm run test:build-identity && npm run test:password-recovery && npm run test:account-lifecycle && npm run test:admin && npm run test:admin-loading && npm run test:admin-render && npm run test:isolation"
