@@ -33,7 +33,7 @@ const support = read("support.html");
 assert.match(support, /SUPPORT_EMAIL_OWNER_DECISION/);
 assert.match(support, /Beta feedback|feedback/i);
 
-const index = read("index.html");
+const index = read("app.html");
 assert.match(index, /id="feedbackBtn"/);
 assert.match(read("app.js"), /feedbackBtn/);
 assert.match(read("src/sync/sync-manager.js"), /window\.location\.origin/);

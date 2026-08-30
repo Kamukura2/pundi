@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 const root=process.cwd();
 const read=file=>fs.readFileSync(path.join(root,file),"utf8");
-const html=read("index.html"), app=read("app.js"), sw=read("public/sw.js"), vercel=read("vercel.json"), pkg=JSON.parse(read("package.json"));
+const html=read("app.html"), app=read("app.js"), sw=read("public/sw.js"), vercel=read("vercel.json"), pkg=JSON.parse(read("package.json"));
 assert.match(html,/id="onboardingCard"/);
 assert.match(html,/Welcome to Pundi/);
 assert.match(html,/data-onboarding-dismiss/);

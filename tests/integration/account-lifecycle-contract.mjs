@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 const root = resolve(import.meta.dirname, "..", "..");
 const read = file => readFileSync(resolve(root, file), "utf8");
 const app = read("app.js");
-const html = read("index.html");
+const html = read("app.html");
 const sync = read("src/sync/sync-manager.js");
 const api = read("api/account.js");
 const schema = read("supabase/migrations/001_initial_schema.sql") + read("supabase/migrations/019_admin_dashboard.sql");

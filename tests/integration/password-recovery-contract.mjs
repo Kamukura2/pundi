@@ -6,7 +6,7 @@ const root = resolve(import.meta.dirname, "..", "..");
 const read = file => readFileSync(resolve(root, file), "utf8");
 const app = read("app.js");
 const sync = read("src/sync/sync-manager.js");
-const html = read("index.html");
+const html = read("app.html");
 const vercel = read("vercel.json");
 const sw = read("public/sw.js");
 const styles = read("styles.css");

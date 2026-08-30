@@ -21,6 +21,11 @@
     },
     {
       "source": "/",
+      "has": [{ "type": "host", "value": "app.pundi.online" }],
+      "destination": "/app.html"
+    },
+    {
+      "source": "/",
       "has": [{ "type": "host", "value": "pundi.online" }],
       "destination": "/landing.html"
     },
@@ -51,8 +56,8 @@
     { "source": "/net-worth", "has": [{ "type": "host", "value": "pundi.online" }], "destination": "/net-worth.html" },
     { "source": "/trading-journal", "has": [{ "type": "host", "value": "pundi.online" }], "destination": "/trading-journal.html" },
     { "source": "/backup-keuangan", "has": [{ "type": "host", "value": "pundi.online" }], "destination": "/backup-keuangan.html" },
-    { "source": "/auth/reset-password", "destination": "/index.html" },
-    { "source": "/auth/reset-password/", "destination": "/index.html" }
+    { "source": "/auth/reset-password", "destination": "/app.html" },
+    { "source": "/auth/reset-password/", "destination": "/app.html" }
   ],
   "headers": [
     {

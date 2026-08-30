@@ -8,7 +8,7 @@ const server = spawn(process.platform === "win32" ? (process.env.ComSpec || "cmd
 try {
   const browser = await chromium.launch({ headless:true });
   const page = await browser.newPage({ viewport:{width:390,height:844} });
-  await page.goto(`http://127.0.0.1:${port}/`, { waitUntil:"networkidle" });
+  await page.goto(`http://127.0.0.1:${port}/app.html`, { waitUntil:"networkidle" });
   await page.locator("#authGate").waitFor({ state:"visible", timeout:10000 });
   const axeSource = AxeBuilder.source;
   await page.addScriptTag({ content:axeSource });

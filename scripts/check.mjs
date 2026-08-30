@@ -10,7 +10,7 @@ assert.equal(manifest.name, "Pundi");
 assert.equal(manifest.display, "standalone");
 for (const icon of manifest.icons) assert.ok(existsSync(resolve(root, "public", icon.src.replace(/^\//, ""))), `Missing ${icon.src}`);
 
-const index = read("index.html");
+const index = read("app.html");
 const css = read("styles.css");
 for (const tab of ["accumulation","cashflow","expenses","clients","stocks","trading","electricity","prospect","insights"]) assert.match(index, new RegExp(`id="${tab}"`));
 assert.equal((index.match(/data-page="stocks"/g)||[]).length,2,"Sidebar and data menu must expose one Assets destination");
@@ -531,7 +531,7 @@ assert.match(appSource, /groupExpenses\("category"\).*groupExpenses\("channel"\)
 assert.match(appSource, /tx-current-month/, "The active History month must be visually separate from archives");
 assert.match(appSource, /tx-history-archive/, "Previous History months must remain available in Archive");
 
-const electricityIndex = read("index.html");
+const electricityIndex = read("app.html");
 const electricityCss = read("styles.css");
 assert.equal(JSON.parse(read("package.json")).version,"8.6.0","Package version must be v8.6.0");
 assert.match(electricityIndex,/<title>Pundi v8\.6\.0[^<]*<\/title>/,"Document title must be v8.6.0");
@@ -584,8 +584,8 @@ assert.match(app, /openTradingExecution/);
 assert.match(app, /Execution Price \/ Share[\s\S]*step:"any"/, "Sell execution price must accept a freely typed manual value");
 assert.match(app, /#resetTradingBtn[\s\S]*state\.tradingPositions=\[\];state\.tradingLedger=\[\];state\.tradingSnapshots=\[\]/, "Reset All must clear only the isolated Trading workspace");
 assert.match(app, /tradingTotalPl\.textContent=`\$\{metrics\.realized/, "Trading Total Gain\/Loss must use accumulated realized P\/L only");
-assert.match(read("index.html"), /STARTING FUNDS/, "Trading capital label must use Starting Funds");
-assert.doesNotMatch(read("index.html"), /NET CONTRIBUTIONS/, "The old Net Contributions label must be removed from Trading");
+assert.match(read("app.html"), /STARTING FUNDS/, "Trading capital label must use Starting Funds");
+assert.doesNotMatch(read("app.html"), /NET CONTRIBUTIONS/, "The old Net Contributions label must be removed from Trading");
 assert.match(app, /switchPage\(state\.page,\{preserveScroll:true\}\)/, "Realtime sync must not force mobile Trading back to the top");
 assert.match(app, /if\(!window\.matchMedia\("\(max-width:1024px\)"\)\.matches\)requestAnimationFrame/, "Mobile background sync must never fight touch scrolling with scrollTo");
 assert.match(app, /benchmarkSnapshots/, "Trading benchmark must use the equity-only benchmark snapshot component");
