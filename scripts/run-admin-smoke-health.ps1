@@ -37,6 +37,14 @@ try {
   if ([string]::IsNullOrWhiteSpace($env:PUNDI_ADMIN_SMOKE_EMAIL) -or [string]::IsNullOrWhiteSpace($env:PUNDI_ADMIN_SMOKE_PASSWORD) -or [string]::IsNullOrWhiteSpace($env:PUNDI_USER_SMOKE_EMAIL) -or [string]::IsNullOrWhiteSpace($env:PUNDI_USER_SMOKE_PASSWORD)) { throw 'Smoke credential variables are missing.' }
 
   $env:PUNDI_EXPECTED_BUILD = (& git -C $Repo rev-parse --short=7 HEAD).Trim()
+  $env:USERPROFILE = 'C:\Users\delly'
+  $env:HOME = $env:USERPROFILE
+  $env:APPDATA = Join-Path $env:USERPROFILE 'AppData\Roaming'
+  $env:LOCALAPPDATA = Join-Path $env:USERPROFILE 'AppData\Local'
+  $env:TEMP = Join-Path $env:LOCALAPPDATA 'Temp'
+  $env:TMP = $env:TEMP
+  $nodeDir = 'C:\Program Files\nodejs'
+  if (Test-Path (Join-Path $nodeDir 'npm.cmd')) { $env:PATH = "$nodeDir;$env:PATH" }
   $stdoutFile = Join-Path $HealthDir (".stdout-{0}.tmp" -f [guid]::NewGuid())
   $stderrFile = Join-Path $HealthDir (".stderr-{0}.tmp" -f [guid]::NewGuid())
   try {

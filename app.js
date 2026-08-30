@@ -30,6 +30,7 @@ const todayISO=()=>{
 };
 
 const state=createEmptyState();
+const pageHistory=[];
 state.theme=localStorage.getItem("pundi-theme-cache")||"dark";
 state.language=localStorage.getItem("pundi-language-cache")||"en";
 state.stockView=localStorage.getItem("pundi-stock-view-cache")==="trading"?"trading":"investment";
@@ -310,8 +311,9 @@ function setStockWorkspace(view,{refresh=true}={}){
  if(refresh&&next==="investment"&&stockRefreshStarted)queueMicrotask(()=>refreshInvestmentDividends({silent:true}));
  if(window.matchMedia("(max-width:1024px)").matches)window.scrollTo({top:0,left:0,behavior:"auto"});
 }
-function switchPage(p,{preserveScroll=false}={}){
+function switchPage(p,{preserveScroll=false,fromBack=false}={}){
  if(p==="trading"){state.stockView="trading";p="stocks";}
+ if(!fromBack&&state.page!==p){pageHistory.push(state.page);if(pageHistory.length>20)pageHistory.shift();}
  state.page=p;
  qa(".page").forEach(x=>x.classList.toggle("active",x.id===p));
  qa("[data-page]").forEach(x=>x.classList.toggle("active",x.dataset.page===p));
@@ -1600,6 +1602,14 @@ function setMobileMenu(open=false){
  q("#mobileMenuBtn")?.setAttribute("aria-expanded",String(active));
  q("#mobileMenuBackdrop")?.setAttribute("aria-hidden",String(!active));
 }
+
+window.__pundiHandleNativeBack=()=>{
+ const openDialog=document.querySelector("dialog[open]");
+ if(openDialog){openDialog.close();return true;}
+ if(document.body.classList.contains("mobile-menu-open")){setMobileMenu(false);return true;}
+ if(pageHistory.length){switchPage(pageHistory.pop(),{preserveScroll:true,fromBack:true});return true;}
+ return false;
+};
 
 q("#mobileMenuBtn")?.addEventListener("click",()=>setMobileMenu(!document.body.classList.contains("mobile-menu-open")));
 q("#mobileMenuBackdrop")?.addEventListener("click",()=>setMobileMenu(false));

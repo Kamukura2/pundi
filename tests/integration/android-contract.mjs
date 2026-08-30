@@ -39,7 +39,7 @@ for (const marker of [
 assert.doesNotMatch(capacitorConfig, /server\s*:\s*\{[^}]*url\s*:/s, "Native app must use bundled assets, not server.url");
 assert.match(androidGradle, /namespace\s*[=:]\s*["']online\.pundi\.app["']/);
 assert.match(androidGradle, /applicationId\s*["']online\.pundi\.app["']/);
-assert.match(androidGradle, /versionCode\s+80700/);
+assert.match(androidGradle, /versionCode\s+80701/);
 assert.match(androidGradle, /versionName\s+["']8\.7\.0["']/);
 assert.match(strings, /<string name="app_name">Pundi<\/string>/);
 assert.match(manifest, /android:theme="@style\/AppTheme"/);
@@ -50,6 +50,7 @@ for (const source of [app, sync, stocks, crypto, supabase]) assert.match(source,
 assert.match(nativeShell, /Browser\.open/);
 assert.match(nativeShell, /StatusBar/);
 assert.match(nativeShell, /App\.addListener/);
+assert.match(nativeShell, /__pundiHandleNativeBack/);
 assert.match(http, /https:\/\/localhost/);
 assert.match(configApi, /nativeCors/);
 assert.match(app, /!isNativeRuntime\(\).*serviceWorker/);
@@ -69,7 +70,7 @@ assert.equal(dump, "online.pundi.app");
 const versionName = runBat(analyzer, ["manifest", "version-name", apkPath]).trim();
 assert.equal(versionName, "8.7.0");
 const versionCode = runBat(analyzer, ["manifest", "version-code", apkPath]).trim();
-assert.equal(versionCode, "80700");
+assert.equal(versionCode, "80701");
 const minSdk = runBat(analyzer, ["manifest", "min-sdk", apkPath]).trim();
 const targetSdk = runBat(analyzer, ["manifest", "target-sdk", apkPath]).trim();
 assert.equal(minSdk, "24");

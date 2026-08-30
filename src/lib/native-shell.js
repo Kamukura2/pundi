@@ -15,6 +15,7 @@ export async function initializeNativeShell() {
   ]);
 
   App.addListener("backButton", ({ canGoBack }) => {
+    if (window.__pundiHandleNativeBack?.()) return;
     if (canGoBack && window.history.length > 1) {
       window.history.back();
       return;

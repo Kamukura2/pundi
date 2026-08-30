@@ -12,7 +12,7 @@ The APK is **bundled**. `npm run build` produces the normal multi-page Vite outp
 - Application/package ID: `online.pundi.app` (permanent)
 - Web/runtime version: `8.7.0`
 - Android `versionName`: `8.7.0`
-- Android `versionCode`: `80700`
+- Android `versionCode`: `80701`
 - Internal milestone: `Android Alpha 1`
 - Minimum SDK: `24`
 - Compile/target SDK: `36`
@@ -52,7 +52,7 @@ The existing PWA service worker remains unchanged for browser/PWA use. The nativ
 
 - Status bar: non-overlay layout with dark style; HTML is inset below system bars.
 - Keyboard: Capacitor native resize mode plus Android `adjustResize`.
-- Back: navigates browser history when available; otherwise exits the app through the Capacitor App plugin.
+- Back: in native runtime, closes the topmost open dialog/menu first, then returns through bounded Pundi SPA page history; at the SPA root it allows normal Android exit. Browser navigation is unchanged.
 - External HTTP(S) links: opened with the system browser through Capacitor Browser.
 - Splash: Pundi-branded dark launch treatment using the existing Pundi icon.
 - Launcher: Pundi icon, adaptive and round-compatible resources; no Nook assets.
@@ -75,7 +75,7 @@ A disposable AVD named `Pundi_Android_Alpha_Test` uses the Android 36 Google API
 
 Runtime evidence from this closeout: the bundled Pundi sign-in gate rendered; the designated normal-user smoke identity signed in and reached the authenticated Accumulation dashboard; a force-stop/relaunch preserved the authenticated session; Assets / Investment loaded with Investment and Trading tabs; the account/data modal exposed Settings, export, import, and logout; native export opened the Android share chooser; JSON import opened Android DocumentsUI; offline Wi-Fi/data disable left the app alive and usable, and connectivity restoration plus relaunch recovered normally; logout returned to the sign-in gate. The keyboard opened on the login field while the primary action remained visible. The emulator viewport was `1080x2340` at density `440`.
 
-The Android back action from the authenticated Assets view returned to the launcher rather than an in-app prior SPA view. This is recorded as a runtime limitation; no product behavior was changed. Compact/standard/large viewport permutations, a numeric-field keyboard interaction, external-link handoff, valid/invalid fixture selection, and actual export-file cleanup were not independently completed in this run and remain unverified.
+The Android back fix was verified on the rebuilt APK: authenticated Accumulation dashboard -> Assets / Investment -> Android system Back returned to Accumulation without exiting to the launcher. The native handler closes an open dialog first, then consumes bounded SPA page history, and leaves root exit behavior unchanged. The rebuilt artifact uses Android `versionCode 80701`; web/runtime and Android `versionName` remain `8.7.0`. Compact/large viewport permutations, a numeric-field keyboard interaction, external-link handoff, valid/invalid fixture selection, and actual export-file cleanup were not independently completed in this run and remain unverified.
 
 The Android SDK emulator and image were installed with command-line tools only. ADB responsiveness, package/activity launch, authenticated login, session persistence, logout, core navigation, keyboard, export/share, import-picker, and offline recovery are verified above. The production normal-user smoke readiness contract no longer uses generic Playwright `networkidle`: it uses `domcontentloaded`, explicit visible auth controls, bounded authenticated dashboard markers, and retains the existing Auth, navigation, session, logout, and `401/403` assertions. The Windows scheduled task still requires separate fresh `Last Result: 0` evidence; direct runner PASS does not substitute for scheduled-task PASS.
 
