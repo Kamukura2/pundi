@@ -34,6 +34,18 @@ No version bump or runtime change is required for this docs-only closeout. Do no
 
 
 
+## Growth Website v1 closeout
+
+**Pundi Growth Website v1: COMPLETE**
+
+- Indonesian-first homepage and seven focused SEO pages are live at `https://pundi.online`.
+- Public sitemap: `https://pundi.online/sitemap.xml`.
+- Search Console sitemap submission: **OWNER ACTION / NON-BLOCKING**.
+- Authenticated app remains isolated at `https://app.pundi.online` and is excluded from indexing.
+- Previous admin regression response `503` was transient and non-reproducible in the settled production smoke; canonical production authorization remained `401 / 403 / 200`.
+- No runtime authorization fix was required for the 503. App cache routing was corrected to use the private `/app.html` entrypoint after the public homepage split.
+- Release version: `8.6.0`.
+
 ## Rollback pointer
 
 Rollback is a Vercel deployment promotion/rollback operation only; do not run database rollback. Run 3 introduced no migration. Identify the current and previous READY Pundi deployments in Vercel before promotion and verify the alias plus public health checks afterward.
