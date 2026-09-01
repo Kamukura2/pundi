@@ -30,3 +30,14 @@ export function getSupabase() {
   }
   return clientPromise;
 }
+
+export async function getAuthenticatedSession({ refresh = true } = {}) {
+  const supabase = await getSupabase();
+  let { data:{ session }, error } = await supabase.auth.getSession();
+  if (!session?.access_token && refresh) {
+    const refreshed = await supabase.auth.refreshSession();
+    session = refreshed.data?.session || null;
+    error = refreshed.error || error;
+  }
+  return { supabase, session, error };
+}

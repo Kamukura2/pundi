@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { exportBackup, validateBackup } from "../../src/data/repository.js";
 
 const empty = {
@@ -41,4 +42,8 @@ assert.equal(serialized.includes("secret"), false);
 assert.equal(serialized.includes("admin_role"), false);
 assert.equal(exported.userId, "owner-a", "format metadata may retain the exporting user id");
 
-console.log("Backup security contract PASS: invalid schema, ownership, secrets, duplicate IDs, numeric safety, and export privacy");
+const app = await readFile(new URL("../../app.js", import.meta.url), "utf8");
+const importHandler = app.slice(app.indexOf("backupFile.onchange"), app.indexOf("legacyImportBtn.onclick"));
+assert(importHandler.indexOf("validateBackup") < importHandler.indexOf("confirm("), "invalid backups must be validated before replacement confirmation");
+
+console.log("Backup security contract PASS: invalid schema, ownership, secrets, duplicate IDs, numeric safety, export privacy, and import validation ordering");

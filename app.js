@@ -2,13 +2,14 @@ import { createEmptyState, createId, createMvpSeed, readLegacyLocalStorage, YEAR
 import { annualExpenseBreakdown, annualOperatingPerformance, buildMonthlyTimeline, buildProjection, getBudgetProgress, getClientOutstanding, getClientPaidThisMonth, getCurrentNetWorth, getEndingClients, getEntrustedDeduction, getFixedIncome, getReceivableClients, getRecurringClients, getTotalOutstanding, getTotalPaid, getYearlyProjectionTotal, monthKey, monthlyBudgetRemaining, recordedExpenseForBudget, remainingYearExpenseBreakdown, remainingYearIncomeBreakdown } from "./src/data/finance-model.js";
 import { electricityHistoryEvents, electricityPeriods as calculateElectricityPeriods, latestElectricityBalance, parseTopUpAmount } from "./src/data/electricity-model.js";
 import { formatCryptoQuote, formatFiatCurrency } from "./src/data/currency-format.js";
+import { validateBackup } from "./src/data/repository.js";
 import { formatMoneyInput, isMoneyField, parseMoneyInput } from "./src/data/money-input.js";
 import { CryptoMarketStream, convertCryptoPrice, fetchBinanceTicker, isCryptoAsset, normalizeCryptoSymbol, normalizeQuoteValueToIdr, parseCryptoPairInput, providerQuoteCurrency, resolveCryptoPair } from "./src/crypto/binance.js";
 import { SyncManager } from "./src/sync/sync-manager.js";
 import { fetchHoldingDividends, fetchHoldingQuote, fetchTradingBenchmark, fetchTradingQuote, fetchUsdIdrRate, isPriceStale, validateHoldingSymbol } from "./src/stocks/client.js";
 import { normalizeStockMapping, quantityForDisplay, quantityForStorage, quantityUnit } from "./src/stocks/holding.js";
 import { advanceDividendLifecycle, creditDividendToWallet, dividendEventYear, dividendGross, dividendNativeGross, dividendReceivables, mergeDividendEvents, projectedDividendForMonth, reconcileDividendState, reverseDividendCredit, summarizeDividends } from "./src/stocks/dividends.js";
-import { getSupabase } from "./src/lib/supabase.js";
+import { getAuthenticatedSession, getSupabase } from "./src/lib/supabase.js";
 import { applyOpeningPosition, applyTrade, archiveClosedTradingPositions, cashEvent, equityBenchmarkMetrics, performancePreview, performanceSeries, reconcileTradingPositions, removeTradingLedgerEntry, removeTradingPositionData, setTradingWalletBalance, tradingMetrics, tradingPositionCost, tradingPositionValue, tradingTargetSimulation, upsertDailySnapshot } from "./src/trading/model.js";
 import { historicalCryptoQuote } from "./src/trading/crypto-lifecycle.js";
 import { feedbackPayload } from "./src/feedback/contract.js";
@@ -16,7 +17,7 @@ import { apiUrl, isNativeRuntime } from "./src/lib/runtime.js";
 import { initializeNativeShell } from "./src/lib/native-shell.js";
 
 const BUILD_ID = __PUNDI_BUILD_ID__;
-const APP_VERSION = "8.7.0";
+const APP_VERSION = "8.7.1";
 
 const COLORS=["#7F66FF","#39C3FF","#FF8F63","#36D695","#F4C24F","#FF6EA8","#62C8FF","#8D7AFF"];
 const COMPANY_EXPENSE_TAG="Expense Perusahaan";
@@ -83,7 +84,7 @@ const saveSettings=()=>save();
 const q=(s)=>document.querySelector(s);
 const qa=(s)=>[...document.querySelectorAll(s)];
 const releaseIdentity=q("#releaseIdentity");
-if(releaseIdentity) releaseIdentity.textContent = `Pundi v8.7.0 · build ${BUILD_ID} · Beta`;
+if(releaseIdentity) releaseIdentity.textContent = `Pundi v8.7.1 · build ${BUILD_ID} · Beta`;
 const onboardingCard=q("#onboardingCard");
 const onboardingDismiss=q("[data-onboarding-dismiss]");
 const onboardingAddAccount=q("#onboardingAddAccount");
@@ -1631,7 +1632,7 @@ feedbackForm.onsubmit=async event=>{
  if(!category||!message){feedbackMessageStatus.textContent="Choose a category and enter a message.";return;}
  feedbackSubmitting=true;feedbackSubmit.disabled=true;feedbackSubmit.textContent="Sending…";
  try{
-  const supabase=await getSupabase(),{data:{session}}=await supabase.auth.getSession();
+  const {session}=await getAuthenticatedSession();
   if(!session?.access_token)throw new Error("Authentication required.");
   const response=await fetch(apiUrl("/api/feedback"),{method:"POST",cache:"no-store",headers:{Authorization:`Bearer ${session.access_token}`,"Content-Type":"application/json","Cache-Control":"no-cache"},body:JSON.stringify(feedbackPayload({category,message},{version:APP_VERSION,buildId:BUILD_ID,page:location.pathname,userAgent:navigator.userAgent}))});
   const body=await response.json().catch(()=>null);if(!response.ok)throw new Error(body?.error||"Feedback could not be sent. Please try again.");
@@ -2084,9 +2085,11 @@ exportBackupBtn.onclick=()=>syncManager.downloadBackup(state);
 importBackupBtn.onclick=()=>backupFile.click();
 backupFile.onchange=async()=>{
  const file=backupFile.files[0];if(!file)return;
- if(!confirm("Replace all cloud data with this backup?"))return;
- try{await syncManager.importBackup(file);dataModal.close();toastMsg("Backup imported")}
- catch(error){alert(error.message)}finally{backupFile.value="";}
+ try{
+  const parsed=JSON.parse(await file.text());validateBackup(parsed);
+  if(!confirm("Replace all cloud data with this backup?"))return;
+  await syncManager.importBackup(file);dataModal.close();toastMsg("Backup imported");
+ }catch(error){alert(error.message)}finally{backupFile.value="";}
 };
 legacyImportBtn.onclick=async()=>{
  const legacy=readLegacyLocalStorage();if(!legacy)return alert("No v6 local data found on this device.");

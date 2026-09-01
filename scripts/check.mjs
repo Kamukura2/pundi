@@ -533,11 +533,11 @@ assert.match(appSource, /tx-history-archive/, "Previous History months must rema
 
 const electricityIndex = read("app.html");
 const electricityCss = read("styles.css");
-assert.equal(JSON.parse(read("package.json")).version,"8.7.0","Package version must be v8.7.0");
-assert.match(electricityIndex,/<title>Pundi v8\.7\.0[^<]*<\/title>/,"Document title must be v8.7.0");
-assert.match(read("public/sw.js"),/pundi-shell-v8\.7\.0/,"Service-worker cache must invalidate for the v8.7.0 release");
+assert.equal(JSON.parse(read("package.json")).version,"8.7.1","Package version must be v8.7.1");
+assert.match(electricityIndex,/<title>Pundi v8\.7\.1[^<]*<\/title>/,"Document title must be v8.7.1");
+assert.match(read("public/sw.js"),/pundi-shell-v8\.7\.1/,"Service-worker cache must invalidate for the v8.7.1 release");
 assert.match(read("vite.config.js"),/__PUNDI_BUILD_ID__/,"Build identity must be injected automatically");
-assert.match(appSource,/Pundi v8\.7\.0 · build/,"Public release identity must include version and build marker");
+assert.match(appSource,/Pundi v8\.7\.1 · build/,"Public release identity must include version and build marker");
 assert.match(electricityIndex,/id="topUpElectricityBtn"[^>]*>\s*TOP UP\s*<\/button>/,"Electricity must expose a distinct TOP UP action");
 assert.match(electricityIndex,/id="addElectricityBtn"[^>]*>\s*＋ Reading\s*<\/button>/,"The existing Reading action must remain available");
 assert.match(electricityIndex,/id="electricityTopUpModal"/);

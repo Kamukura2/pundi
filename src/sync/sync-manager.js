@@ -1,5 +1,5 @@
 import { clearUserScopedState } from "../lib/idb.js";
-import { getSupabase } from "../lib/supabase.js";
+import { getAuthenticatedSession, getSupabase } from "../lib/supabase.js";
 import { persistSignupAttribution } from "../acquisition/client.js";
 import { FinanceRepository, exportBackup, validateBackup } from "../data/repository.js";
 import { apiUrl, authRedirectOrigin, isNativeRuntime } from "../lib/runtime.js";
@@ -28,7 +28,7 @@ export class SyncManager {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
     }
-    const { data:{ session } } = await supabase.auth.getSession();
+    const { session } = await getAuthenticatedSession();
     if (!session?.user) return null;
     this.user = session.user;
     persistSignupAttribution(this.user).catch(() => {});

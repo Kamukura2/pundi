@@ -1,4 +1,4 @@
-const SHELL_CACHE = "pundi-shell-v8.7.0";
+const SHELL_CACHE = "pundi-shell-v8.7.1";
 const SHELL = ["/", "/app.html", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", event => {
