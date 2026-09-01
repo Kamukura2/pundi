@@ -10,9 +10,9 @@ The APK is **bundled**. `npm run build` produces the normal multi-page Vite outp
 
 - App name: `Pundi`
 - Application/package ID: `online.pundi.app` (permanent)
-- Web/runtime version: `8.7.1`
-- Android `versionName`: `8.7.1`
-- Android `versionCode`: `80702`
+- Web/runtime version: `8.7.2`
+- Android `versionName`: `8.7.2`
+- Android `versionCode`: `80703`
 - Internal milestone: `Android Alpha 1`
 - Minimum SDK: `24`
 - Compile/target SDK: `36`
@@ -53,7 +53,7 @@ The existing PWA service worker remains unchanged for browser/PWA use. The nativ
 - Status bar: non-overlay layout with dark style; HTML is inset below system bars.
 - Keyboard: Capacitor native resize mode plus Android `adjustResize`.
 - Back: in native runtime, closes the topmost open dialog/menu first, then returns through bounded Pundi SPA page history; at the SPA root it allows normal Android exit. Browser navigation is unchanged.
-- External HTTP(S) links: opened with the system browser through Capacitor Browser.
+- External HTTP(S) links: opened with the system browser through Capacitor Browser. The authenticated Data & Sync surface exposes fixed public Pundi controls: Privacy (`https://pundi.online/privacy`), Terms (`https://pundi.online/terms`), and Support (`https://pundi.online/support`).
 - Splash: Pundi-branded dark launch treatment using the existing Pundi icon.
 - Launcher: Pundi icon, adaptive and round-compatible resources; no Nook assets.
 - Network failure: existing Supabase/repository offline cache and error/status states remain canonical.
@@ -73,7 +73,7 @@ Alpha builds use a dedicated local-only signing key at `android/keystore/pundi-a
 
 A disposable AVD named `Pundi_Android_Alpha_Test` uses the Android 36 Google APIs x86_64 image and is started with `-no-window -no-audio -no-boot-anim -no-snapshot`. Hardware hypervisor support is present on the host. The canonical APK installed through ADB with `Success`; package `online.pundi.app` launched `MainActivity` in the headless emulator, and filtered logcat showed no Pundi crash, ANR, or fatal exception.
 
-Runtime evidence from this closeout: the bundled Pundi sign-in gate rendered; the designated normal-user smoke identity signed in and reached the authenticated Accumulation dashboard; a force-stop/relaunch preserved the authenticated session; Assets / Investment loaded with Investment and Trading tabs; the account/data modal exposed Settings, export, import, and logout; JSON import opened Android DocumentsUI; offline/recovery and relaunch remained functional; logout returned to the sign-in gate and a post-logout relaunch did not restore the session. The keyboard opened on the login field while the primary action remained visible. Final APK evidence also covered authenticated Feedback ownership/cleanup, valid backup import through confirmation and cloud persistence, invalid backup rejection before confirmation, and cleanup to zero accounts/files. External handoff is not exposed by a native control in the current shell; the native menu contains no public/legal/support URL action, so no APK-triggered browser intent can be truthfully claimed. Android `versionName 8.7.1`, `versionCode 80702`; Android Alpha is complete except for that unavailable in-app handoff control.
+Runtime evidence from the prior closeout covered the bundled Pundi sign-in gate, authenticated dashboard, session persistence, navigation, account/data surface, import/export, offline/recovery, logout, Feedback ownership/cleanup, valid/invalid backup handling, and zero residue. This release adds the authenticated Data & Sync `Bantuan & Legal` section with fixed Privacy, Terms, and Support HTTPS links; the existing native shell routes cross-origin anchors through Capacitor Browser and does not append session credentials. The rebuilt `8.7.2` APK installed and launched on `Pundi_Android_Alpha_Test`; the current headless AVD returned to the sign-in gate after the prior smoke session expired, so an authenticated Privacy tap, external browser target, and return-to-app session assertion were not recorded in this run.
 
 The Android SDK emulator and image were installed with command-line tools only. ADB responsiveness, package/activity launch, authenticated login, session persistence, logout, core navigation, keyboard, export/share, import-picker, and offline recovery are verified above. The production normal-user smoke readiness contract no longer uses generic Playwright `networkidle`: it uses `domcontentloaded`, explicit visible auth controls, bounded authenticated dashboard markers, and retains the existing Auth, navigation, session, logout, and `401/403` assertions. The Windows scheduled task still requires separate fresh `Last Result: 0` evidence; direct runner PASS does not substitute for scheduled-task PASS.
 

@@ -17,7 +17,7 @@ import { apiUrl, isNativeRuntime } from "./src/lib/runtime.js";
 import { initializeNativeShell } from "./src/lib/native-shell.js";
 
 const BUILD_ID = __PUNDI_BUILD_ID__;
-const APP_VERSION = "8.7.1";
+const APP_VERSION = "8.7.2";
 
 const COLORS=["#7F66FF","#39C3FF","#FF8F63","#36D695","#F4C24F","#FF6EA8","#62C8FF","#8D7AFF"];
 const COMPANY_EXPENSE_TAG="Expense Perusahaan";
@@ -84,7 +84,7 @@ const saveSettings=()=>save();
 const q=(s)=>document.querySelector(s);
 const qa=(s)=>[...document.querySelectorAll(s)];
 const releaseIdentity=q("#releaseIdentity");
-if(releaseIdentity) releaseIdentity.textContent = `Pundi v8.7.1 · build ${BUILD_ID} · Beta`;
+if(releaseIdentity) releaseIdentity.textContent = `Pundi v8.7.2 · build ${BUILD_ID} · Beta`;
 const onboardingCard=q("#onboardingCard");
 const onboardingDismiss=q("[data-onboarding-dismiss]");
 const onboardingAddAccount=q("#onboardingAddAccount");

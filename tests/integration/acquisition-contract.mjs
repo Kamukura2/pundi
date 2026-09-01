@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 const server=await readFile("src/acquisition/server.js","utf8"), client=await readFile("public/acquisition.js","utf8"), calc=await readFile("kalkulator-net-worth.html","utf8"), migration=await readFile("supabase/migrations/021_acquisition.sql","utf8"), pkg=JSON.parse(await readFile("package.json","utf8")), vercel=await readFile("vercel.json","utf8"), sitemap=await readFile("public/sitemap.xml","utf8"), app=await readFile("app.html","utf8"), feedback=await readFile("api/feedback.js","utf8");
-assert.equal(pkg.version,"8.7.1");
+assert.equal(pkg.version,"8.7.2");
 for(const source of ["google","reddit","facebook","linkedin","whatsapp","friend","community","organic","direct","other"])assert.match(server,new RegExp(source));
 assert.match(server,/normalizeSource/); assert.match(server,/ACQUISITION_SOURCES.includes\(source\)\?source:"other"/); assert.match(server,/request\.method!=="POST"/); assert.doesNotMatch(server,/request\.method===\"GET\"/); assert.match(server,/cta_click/); assert.match(server,/signup_attribution/); assert.match(server,/onConflict:"user_id",ignoreDuplicates:true/); assert.doesNotMatch(server,/password|refresh_token|balance|holdings/i);
 assert.match(client,/sendBeacon/); assert.match(client,/searchParams\.set\("ref"/); assert.match(client,/api\/acquisition/); assert.match(client,/location\.pathname/); assert.doesNotMatch(client,/document\.referrer/);

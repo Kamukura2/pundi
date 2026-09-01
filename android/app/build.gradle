@@ -13,8 +13,8 @@ android {
         applicationId "online.pundi.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 80702
-        versionName "8.7.1"
+        versionCode 80703
+        versionName "8.7.2"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

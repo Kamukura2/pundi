@@ -1,6 +1,6 @@
 {
   "name": "pundi",
-  "version": "8.7.1",
+  "version": "8.7.2",
   "private": true,
   "type": "module",
   "scripts": {
@@ -39,6 +39,7 @@
     "test:authz-production": "node tests/integration/authz-production.mjs",
     "test:identity": "node tests/integration/identity-drift-contract.mjs",
     "test:android": "node tests/integration/android-contract.mjs",
+    "test:legal-support": "node tests/integration/legal-support-contract.mjs",
     "android:sync": "npm run build && node scripts/prepare-android-web.mjs && npx cap sync android",
     "android:apk": "npm run android:sync && node scripts/android-signing.mjs && node scripts/run-android-gradle.mjs && node scripts/collect-android-apk.mjs",
     "test:backup-filename": "node tests/integration/backup-filename-contract.mjs",
