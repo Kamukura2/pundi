@@ -43,6 +43,7 @@ try {
   $env:LOCALAPPDATA = Join-Path $env:USERPROFILE 'AppData\Local'
   $env:TEMP = Join-Path $env:LOCALAPPDATA 'Temp'
   $env:TMP = $env:TEMP
+  $env:NODE_OPTIONS = '--dns-result-order=ipv4first'
   $nodeDir = 'C:\Program Files\nodejs'
   if (Test-Path (Join-Path $nodeDir 'npm.cmd')) { $env:PATH = "$nodeDir;$env:PATH" }
   $stdoutFile = Join-Path $HealthDir (".stdout-{0}.tmp" -f [guid]::NewGuid())
