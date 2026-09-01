@@ -7,7 +7,7 @@ assert.match(vite,/rev-parse/);
 assert.match(vite,/__PUNDI_BUILD_ID__/);
 assert.match(app,/__PUNDI_BUILD_ID__/);
 assert.match(html,/id="releaseIdentity"/);
-assert.match(html,/Pundi v8\.7\.0/);
+assert.match(html,/Pundi v8\.7\.1/);
 assert.doesNotMatch(html,/googletagmanager|ga4\.js/);
 assert.match(app,/releaseIdentity\.textContent/);
 console.log("Build identity contract PASS: automatic short SHA injection and public release marker");
