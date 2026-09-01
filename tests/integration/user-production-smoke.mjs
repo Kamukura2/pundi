@@ -12,7 +12,7 @@ const result = { status: "PASS", origin, financeMutations: 0 };
 try {
   await page.goto(origin, { waitUntil: "domcontentloaded" });
   await page.locator("#authGate").waitFor({ state: "visible", timeout: 30000 });
-  assert.match(await page.title(), /Pundi v8\.7\.1/);
+  assert.match(await page.title(), /Pundi v8\.7\.2/);
   for (let attempt = 1; attempt <= 3 && await page.locator("#authGate").isVisible(); attempt++) {
     await page.locator("#authEmail").waitFor({ state: "visible", timeout: 30000 });
     await page.locator("#authPassword").waitFor({ state: "visible", timeout: 30000 });
