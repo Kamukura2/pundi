@@ -51,7 +51,7 @@ function assertPagination(payload) {
 }
 
 async function fetchJson(url, options = {}) {
-  const response = await fetch(url, { ...options, redirect: "error" });
+  const response = await fetch(url, { ...options, redirect: "error", signal: AbortSignal.timeout(20000) });
   const body = await response.json().catch(() => null);
   return { response, body };
 }
@@ -60,7 +60,7 @@ async function run() {
   const { response: configResponse, body: config } = await fetchJson(`${PRODUCTION_ORIGIN}/api/config`, { cache: "no-store", headers: { Accept: "application/json" } });
   assert.equal(configResponse.status, 200, "Production /api/config must return 200.");
   assertPublicConfig(config);
-  const supabase = createClient(config.supabaseUrl, config.supabaseAnonKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  const supabase = createClient(config.supabaseUrl, config.supabaseAnonKey, { auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: (url, options = {}) => fetch(url, { ...options, signal: AbortSignal.timeout(20000) }) } });
 
   if (!email || !password) {
     console.log("ACTION REQUIRED: set PUNDI_ADMIN_SMOKE_EMAIL and PUNDI_ADMIN_SMOKE_PASSWORD as untracked local secrets, then rerun npm run test:admin-smoke.");

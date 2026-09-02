@@ -36,7 +36,7 @@ try {
     return null;
   });
   assert.ok(token, "authenticated browser session token unavailable");
-  const authz = await page.evaluate(async token => { const response = await fetch("/api/admin", { headers: { Authorization: `Bearer ${token}`, Accept: "application/json" }, cache: "no-store" }); return { status: response.status, body: await response.text() }; }, token);
+  const authz = await page.evaluate(async token => { const response = await fetch("/api/admin", { headers: { Authorization: `Bearer ${token}`, Accept: "application/json" }, cache: "no-store", signal: AbortSignal.timeout(20000) }); return { status: response.status, body: await response.text() }; }, token);
   assert.equal(authz.status, 403);
   assert.doesNotMatch(authz.body, /user_id|total_users|overview|metrics/i);
   await page.locator("#dataModal .close-dialog").first().click();
@@ -49,7 +49,7 @@ try {
   await page.locator("#authGate").waitFor({ state: "visible", timeout: 30000 });
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.locator("#authGate").waitFor({ state: "visible", timeout: 30000 });
-  const unauth = await page.evaluate(async () => { const response = await fetch("/api/admin", { cache: "no-store" }); return response.status; });
+  const unauth = await page.evaluate(async () => { const response = await fetch("/api/admin", { cache: "no-store", signal: AbortSignal.timeout(20000) }); return response.status; });
   assert.equal(unauth, 401);
   console.log(JSON.stringify(result));
 } finally { await browser.close(); }
