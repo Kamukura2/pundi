@@ -8,9 +8,11 @@ if (!email || !password) throw new Error("ACTION REQUIRED: local user-smoke cred
 const browser = await chromium.launch({ headless: true });
 const context = await browser.newContext();
 const page = await context.newPage();
+page.setDefaultTimeout(15000);
+page.setDefaultNavigationTimeout(20000);
 const result = { status: "PASS", origin, financeMutations: 0 };
 try {
-  await page.goto(origin, { waitUntil: "domcontentloaded" });
+  await page.goto(origin, { waitUntil: "domcontentloaded", timeout: 20000 });
   await page.locator("#authGate").waitFor({ state: "visible", timeout: 30000 });
   assert.match(await page.title(), /Pundi v8\.7\.2/);
   for (let attempt = 1; attempt <= 3 && await page.locator("#authGate").isVisible(); attempt++) {
@@ -40,14 +42,14 @@ try {
   assert.equal(authz.status, 403);
   assert.doesNotMatch(authz.body, /user_id|total_users|overview|metrics/i);
   await page.locator("#dataModal .close-dialog").first().click();
-    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.reload({ waitUntil: "domcontentloaded", timeout: 20000 });
   await page.locator("#authGate").waitFor({ state: "hidden", timeout: 30000 });
     await page.locator("#primarySidebar").waitFor({ state: "visible", timeout: 30000 });
     assert.equal(await page.locator("#primarySidebar").isVisible(), true);
   await page.locator("#dataBtn").click();
   await page.locator("#logoutBtn").click();
   await page.locator("#authGate").waitFor({ state: "visible", timeout: 30000 });
-  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.reload({ waitUntil: "domcontentloaded", timeout: 20000 });
   await page.locator("#authGate").waitFor({ state: "visible", timeout: 30000 });
   const unauth = await page.evaluate(async () => { const response = await fetch("/api/admin", { cache: "no-store", signal: AbortSignal.timeout(20000) }); return response.status; });
   assert.equal(unauth, 401);
