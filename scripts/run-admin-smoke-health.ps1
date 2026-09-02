@@ -25,8 +25,8 @@ function Sanitize([string]$Text) {
 function Invoke-Smoke([string]$StdoutFile, [string]$StderrFile) {
   for ($attempt = 1; $attempt -le 2; $attempt++) {
     Remove-Item -LiteralPath $StdoutFile,$StderrFile -Force -ErrorAction SilentlyContinue
-    # The scheduled path is HTTP/authz-only; full browser smoke runs separately.
-    $process = Start-Process -FilePath 'npm.cmd' -ArgumentList @('run','test:health-v4') -WorkingDirectory $Repo -WindowStyle Hidden -PassThru -RedirectStandardOutput $StdoutFile -RedirectStandardError $StderrFile
+    # The scheduled path is direct bounded HTTP health; full auth/browser smoke runs separately.
+    $process = Start-Process -FilePath (Join-Path $nodeDir 'node.exe') -ArgumentList @('tests/integration/production-health-v3.mjs') -WorkingDirectory $Repo -WindowStyle Hidden -PassThru -RedirectStandardOutput $StdoutFile -RedirectStandardError $StderrFile
     if ($process.WaitForExit($(if ($attempt -eq 1) { 120000 } else { 180000 }))) {
       $process.Refresh()
       return [pscustomobject]@{
