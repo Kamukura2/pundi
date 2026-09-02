@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 
 const origin = process.env.PUNDI_PRODUCTION_URL || "https://app.pundi.online";
 const expectedBuild = process.env.PUNDI_EXPECTED_BUILD || execFileSync("git", ["rev-parse", "--short=7", "HEAD"], { encoding: "utf8" }).trim();
-const fetchText = async route => { const response = await fetch(origin + route, { cache: "no-store" }); return { response, text: await response.text() }; };
+const fetchText = async route => { const response = await fetch(origin + route, { cache: "no-store", signal: AbortSignal.timeout(20000) }); return { response, text: await response.text() }; };
 const routes = ["/", "/auth/reset-password", "/api/config", "/sw.js", "/admin"];
 const results = {};
 for (const route of routes) {
@@ -22,6 +22,6 @@ for (const asset of assets) bundle += (await fetchText(asset)).text;
 assert.match(bundle, /Pundi v8\.7\.2 · build \$\{[A-Za-z_$][\w$]*\} · Beta/);
 assert.match(bundle, new RegExp(`const [A-Za-z_$][\\w$]*="${expectedBuild}"`));
 assert.doesNotMatch(bundle, /SUPABASE_SERVICE_ROLE_KEY|service_role_key\s*[:=]|smoke password|cvfinance\.supabase\.co/i);
-const admin = await fetch(origin + "/api/admin", { cache: "no-store" });
+const admin = await fetch(origin + "/api/admin", { cache: "no-store", signal: AbortSignal.timeout(20000) });
 assert.equal(admin.status, 401);
 console.log(JSON.stringify({ status: "PASS", origin, expectedBuild, routes, assetCount: assets.length, unauthAdmin: admin.status, authenticatedAdmin: "delegated to test:admin-smoke" }));
