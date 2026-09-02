@@ -22,6 +22,26 @@ function Sanitize([string]$Text) {
   return $safe
 }
 
+function Invoke-Smoke([string]$StdoutFile, [string]$StderrFile) {
+  for ($attempt = 1; $attempt -le 2; $attempt++) {
+    Remove-Item -LiteralPath $StdoutFile,$StderrFile -Force -ErrorAction SilentlyContinue
+    $process = Start-Process -FilePath 'npm.cmd' -ArgumentList @('run','test:production') -WorkingDirectory $Repo -WindowStyle Hidden -PassThru -RedirectStandardOutput $StdoutFile -RedirectStandardError $StderrFile
+    if ($process.WaitForExit($(if ($attempt -eq 1) { 120000 } else { 180000 }))) {
+      $process.Refresh()
+      return [pscustomobject]@{
+        ExitCode = [int]$process.ExitCode
+        Output = ((Get-Content -LiteralPath $StdoutFile -Raw -ErrorAction SilentlyContinue), (Get-Content -LiteralPath $StderrFile -Raw -ErrorAction SilentlyContinue) -join "`n")
+      }
+    }
+    $partialOutput = ((Get-Content -LiteralPath $StdoutFile -Raw -ErrorAction SilentlyContinue), (Get-Content -LiteralPath $StderrFile -Raw -ErrorAction SilentlyContinue) -join "`n")
+    & taskkill.exe /PID $process.Id /T /F | Out-Null
+    $process.WaitForExit()
+    if ($attempt -eq 2) {
+      return [pscustomobject]@{ ExitCode = 124; Output = "Production smoke timed out after two bounded attempts.`n$partialOutput" }
+    }
+  }
+}
+
 $smokeExitCode = 1
 $healthStatus = 'FAIL'
 $output = ''
@@ -48,26 +68,15 @@ try {
   if (Test-Path (Join-Path $nodeDir 'npm.cmd')) { $env:PATH = "$nodeDir;$env:PATH" }
   $stdoutFile = Join-Path $HealthDir (".stdout-{0}.tmp" -f [guid]::NewGuid())
   $stderrFile = Join-Path $HealthDir (".stderr-{0}.tmp" -f [guid]::NewGuid())
-  try {
-    $process = Start-Process -FilePath 'npm.cmd' -ArgumentList @('run','test:production') -WorkingDirectory $Repo -WindowStyle Hidden -PassThru -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile
-    if (-not $process.WaitForExit(300000)) {
-      $partialOutput = ((Get-Content -LiteralPath $stdoutFile -Raw -ErrorAction SilentlyContinue), (Get-Content -LiteralPath $stderrFile -Raw -ErrorAction SilentlyContinue) -join "`n")
-      & taskkill.exe /PID $process.Id /T /F | Out-Null
-      $process.WaitForExit()
-      $smokeExitCode = 124
-      $output = "Production smoke timed out after 300 seconds.`n$partialOutput"
-    } else {
-      $process.Refresh()
-      $smokeExitCode = [int]$process.ExitCode
-      $output = ((Get-Content -LiteralPath $stdoutFile -Raw -ErrorAction SilentlyContinue), (Get-Content -LiteralPath $stderrFile -Raw -ErrorAction SilentlyContinue) -join "`n")
-    }
-  } finally {
-    Remove-Item -LiteralPath $stdoutFile,$stderrFile -Force -ErrorAction SilentlyContinue
-  }
+  $smoke = Invoke-Smoke $stdoutFile $stderrFile
+  $smokeExitCode = $smoke.ExitCode
+  $output = $smoke.Output
   if ($smokeExitCode -eq 0) { $healthStatus = 'PASS' }
 } catch {
   $output = $_.Exception.Message
   $smokeExitCode = 1
+} finally {
+  Remove-Item -LiteralPath $stdoutFile,$stderrFile -Force -ErrorAction SilentlyContinue
 }
 
 $finished = Get-Date
