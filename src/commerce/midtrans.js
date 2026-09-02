@@ -88,6 +88,10 @@ export function snapScriptUrl(environment) {
   return `${base}/snap/snap.js`;
 }
 
+export function midtransApiBaseUrl(environment) {
+  return environment === "production" ? "https://api.midtrans.com" : "https://api.sandbox.midtrans.com";
+}
+
 function providerHeaders(serverKey, extra = {}) {
   const auth = Buffer.from(`${serverKey}:`, "utf8").toString("base64");
   return { Authorization: `Basic ${auth}`, Accept: "application/json", "Content-Type": "application/json", ...extra };
@@ -119,7 +123,7 @@ export async function createSnapTransaction({ environment, serverKey, merchantId
 }
 
 export async function getMidtransStatus({ environment, serverKey, orderId, fetchImpl = fetch }) {
-  const response = await fetchImpl(`${midtransBaseUrl(environment)}/v2/${encodeURIComponent(orderId)}/status`, {
+  const response = await fetchImpl(`${midtransApiBaseUrl(environment)}/v2/${encodeURIComponent(orderId)}/status`, {
     method: "GET",
     headers: providerHeaders(serverKey),
   });

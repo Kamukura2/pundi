@@ -48,8 +48,18 @@ export function parsePundiCatalog(raw) {
 }
 
 export function environmentFrom(env = process.env) {
-  const value = clean(env.MIDTRANS_ENV || env.PUNDI_COMMERCE_ENV).toLowerCase();
-  return ENVIRONMENTS.has(value) ? value : "sandbox";
+  return environmentState(env).environment;
+}
+
+function environmentState(env = process.env) {
+  const base = clean(env.MIDTRANS_ENV).toLowerCase();
+  const override = clean(env.PUNDI_COMMERCE_ENV).toLowerCase();
+  const baseValid = !base || ENVIRONMENTS.has(base);
+  const overrideValid = !override || ENVIRONMENTS.has(override);
+  return {
+    environment: overrideValid && override ? override : baseValid && base ? base : "sandbox",
+    valid: baseValid && overrideValid,
+  };
 }
 
 export function configuredNotificationUrl(env = process.env) {
@@ -61,20 +71,46 @@ export function configuredNotificationUrl(env = process.env) {
   } catch { return ""; }
 }
 
+function isLocalRuntime(env) {
+  return !clean(env.VERCEL) && !clean(env.DENO_DEPLOYMENT_ID);
+}
+
+function allowLocalSandboxFallback(env, environment) {
+  return environment === "sandbox" && isLocalRuntime(env) && !clean(env.PUNDI_COMMERCE_ENV) && clean(env.MIDTRANS_ENV).toLowerCase() === "sandbox";
+}
+
+export function providerCredentials(env = process.env) {
+  const environment = environmentFrom(env);
+  const suffix = environment === "sandbox" ? "_SANDBOX" : "";
+  const value = name => clean(env[`${name}${suffix}`]) || (suffix && allowLocalSandboxFallback(env, environment) ? clean(env[name]) : "");
+  return {
+    merchantId: value("MIDTRANS_MERCHANT_ID"),
+    clientKey: value("MIDTRANS_CLIENT_KEY"),
+    serverKey: value("MIDTRANS_SERVER_KEY"),
+  };
+}
+
 export function readPundiCatalog(env = process.env) {
-  return parsePundiCatalog(env[PUNDI_CATALOG_ENV]);
+  const environment = environmentFrom(env);
+  const suffix = environment === "sandbox" ? "_SANDBOX" : "";
+  const raw = env[`${PUNDI_CATALOG_ENV}${suffix}`] || (suffix && allowLocalSandboxFallback(env, environment) ? env[PUNDI_CATALOG_ENV] : "");
+  return parsePundiCatalog(raw);
 }
 
 export function commerceConfiguration(env = process.env) {
-  const environment = environmentFrom(env);
+  const state = environmentState(env);
+  const environment = state.environment;
   const catalog = readPundiCatalog(env).filter(item => item.active);
-  const hasProviderKeys = Boolean(clean(env.MIDTRANS_SERVER_KEY) && clean(env.MIDTRANS_CLIENT_KEY) && clean(env.MIDTRANS_MERCHANT_ID));
+  const provider = providerCredentials(env);
+  const hasProviderKeys = Boolean(provider.serverKey && provider.clientKey && provider.merchantId);
   const enabled = String(env.PUNDI_COMMERCE_ENABLED || "").toLowerCase() === "true";
   const notificationUrl = configuredNotificationUrl(env);
-  const configured = enabled && hasProviderKeys && Boolean(notificationUrl) && catalog.length > 0;
+  const configured = state.valid && enabled && hasProviderKeys && Boolean(notificationUrl) && catalog.length > 0;
   return {
     environment,
+    environmentValid: state.valid,
     catalog,
+    provider,
     notificationUrl,
     enabled,
     hasProviderKeys,

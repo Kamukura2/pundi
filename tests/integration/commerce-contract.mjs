@@ -20,6 +20,23 @@ assert.equal(parsePundiCatalog(JSON.stringify([{ sku: 'PUNDI-BAD', name: 'bad', 
 assert.equal(commerceConfiguration({}).configured, false, 'empty environment must not enable checkout');
 assert.equal(commerceConfiguration(configuredEnv).productionReady, true);
 assert.equal(publicPundiCatalog({ ...configuredEnv, PUNDI_COMMERCE_ENABLED: 'false' }).products.length, 0);
+const sandboxEnv = {
+  VERCEL: '1',
+  MIDTRANS_ENV: 'production',
+  PUNDI_COMMERCE_ENV: 'sandbox',
+  MIDTRANS_SERVER_KEY_SANDBOX: 'sandbox-provider-marker',
+  MIDTRANS_CLIENT_KEY_SANDBOX: 'sandbox-client-key',
+  MIDTRANS_MERCHANT_ID_SANDBOX: 'sandbox-merchant',
+  PUNDI_COMMERCE_ENABLED: 'true',
+  PUNDI_COMMERCE_CATALOG_JSON_SANDBOX: JSON.stringify([{ sku: 'PUNDI_PRO_LIFETIME', name: 'Pundi Pro Lifetime', entitlement: 'pundi_pro_lifetime', amount: 49000, currency: 'IDR', purchase_type: 'lifetime' }]),
+};
+assert.equal(commerceConfiguration(sandboxEnv).environment, 'sandbox');
+assert.equal(commerceConfiguration(sandboxEnv).configured, true);
+assert.equal(commerceConfiguration({ ...sandboxEnv, MIDTRANS_SERVER_KEY: 'prod-x' }).provider.serverKey, 'sandbox-provider-marker');
+const invalidOverrideEnv = { ...sandboxEnv, MIDTRANS_ENV: 'sandbox', PUNDI_COMMERCE_ENV: 'invalid' };
+assert.equal(commerceConfiguration(invalidOverrideEnv).environment, 'sandbox');
+assert.equal(commerceConfiguration(invalidOverrideEnv).environmentValid, false);
+assert.equal(commerceConfiguration(invalidOverrideEnv).configured, false);
 
 const orderId = orderIdFor('PUNDI');
 assert.match(orderId, /^PUNDI-[A-Z0-9-]+$/);

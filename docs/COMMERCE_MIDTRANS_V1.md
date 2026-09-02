@@ -8,10 +8,11 @@ Supabase project.
 
 - Target Supabase: `Pundi` / `ndeycwoyjwyntjkgbzlz`.
 - Migration `022_commerce.sql` is applied and recorded remotely.
-- Pundi checkout is fail-closed until an approved server catalog and Midtrans
-  production environment are configured.
-- No price, SKU, payment method, merchant approval, or secret is assumed by
-  source code.
+- Sandbox checkout is configured for E2E with the owner-approved Pundi catalog;
+  Production checkout remains fail-closed (`production = false`).
+- Approved launch product: `PUNDI_PRO_LIFETIME`, Pundi Pro Lifetime, IDR
+  49,000, one-time, permanent account entitlement subject to provider/admin
+  revocation.
 
 ## Boundary
 
@@ -31,12 +32,15 @@ order ID. There is no shared user/content/finance table or cross-product FK.
 
 1. An authenticated Pundi account requests a SKU only.
 2. `api/commerce.js` resolves the SKU, amount, currency, plan, and entitlement
-   from `PUNDI_COMMERCE_CATALOG_JSON` on the server.
+   from the server-side catalog. Sandbox uses the scoped
+   `PUNDI_COMMERCE_CATALOG_JSON_SANDBOX`; clients never submit an amount.
 3. The server creates the Midtrans Snap transaction and returns only a Snap
    token, public client key, environment, and order ID.
 4. Browser Snap callbacks are display signals only. They never grant access.
 5. The fixed webhook and the authenticated status endpoint verify the provider
    order, namespace, amount, currency, merchant, signature, and provider state.
+   Snap creation uses `app.sandbox.midtrans.com`/`app.midtrans.com`; status
+   verification uses `api.sandbox.midtrans.com`/`api.midtrans.com`.
 6. Only `settlement` or accepted `capture` activates the account entitlement.
    Duplicate events are deduplicated. Refund, partial refund, and chargeback
    revoke the affected entitlement without deleting order history.
@@ -48,17 +52,21 @@ order ID. There is no shared user/content/finance table or cross-product FK.
 Keep these in Vercel encrypted environment variables, never in Git or client
 bundles:
 
-- `MIDTRANS_ENV`: exactly `sandbox` or `production`.
-- `MIDTRANS_MERCHANT_ID`.
-- `MIDTRANS_CLIENT_KEY` (safe to send to Snap only after server validation).
-- `MIDTRANS_SERVER_KEY` (server-side only).
+- `MIDTRANS_ENV`: exactly `sandbox` or `production`; `PUNDI_COMMERCE_ENV`
+  may override it for a project-local Sandbox deployment.
+- `MIDTRANS_MERCHANT_ID`, `MIDTRANS_CLIENT_KEY`, and `MIDTRANS_SERVER_KEY`
+  are the Production-scope names; the Server Key is server-side only.
+- `MIDTRANS_MERCHANT_ID_SANDBOX`, `MIDTRANS_CLIENT_KEY_SANDBOX`, and
+  `MIDTRANS_SERVER_KEY_SANDBOX` are encrypted Sandbox-scope names.
+- Invalid environment values fail closed; they never select Production as a
+  fallback.
 - `PUNDI_COMMERCE_ENABLED`: `true` only after all gates pass.
-- `PUNDI_COMMERCE_CATALOG_JSON`: an approved JSON catalog, for example the
-  following shape with owner-approved values substituted; placeholders are not
-  live products:
+- `PUNDI_COMMERCE_CATALOG_JSON` (Production) or
+  `PUNDI_COMMERCE_CATALOG_JSON_SANDBOX` (Sandbox): an approved JSON catalog.
+  The current approved Sandbox entry is:
 
 ```json
-[{"sku":"<approved-sku>","name":"<approved-name>","description":"<approved-description>","amount":<approved-idr-amount>,"currency":"IDR","entitlement":"paid","purchase_type":"lifetime","active":true}]
+[{"sku":"PUNDI_PRO_LIFETIME","name":"Pundi Pro Lifetime","amount":49000,"currency":"IDR","entitlement":"pundi_pro_lifetime","purchase_type":"lifetime","active":true}]
 ```
 
 For `expiring` or `recurring` products, `duration_days` is required. Amounts

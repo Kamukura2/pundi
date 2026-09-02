@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { createClient } from "@supabase/supabase-js";
 import { getMidtransStatus, amountsMatch, providerState } from "../src/commerce/midtrans.js";
+import { commerceConfiguration } from "../src/commerce/catalog.js";
 import { reconcileOrder } from "../api/_lib/commerce-handler.js";
 
 const args = new Set(process.argv.slice(2));
@@ -16,14 +17,18 @@ if (apply && !/^PUNDI-[A-Z0-9-]+$/i.test(requestedOrder)) {
 const env = process.env;
 const supabaseUrl = String(env.PUNDI_SUPABASE_URL || "").trim();
 const serviceKey = String(env.PUNDI_SUPABASE_SERVICE_ROLE_KEY || "").trim();
-const serverKey = String(env.MIDTRANS_SERVER_KEY || "").trim();
-const merchantId = String(env.MIDTRANS_MERCHANT_ID || "").trim();
+const config = commerceConfiguration(env);
+const { serverKey, merchantId } = config.provider;
+assert(config.environmentValid, "Pundi commerce environment is invalid");
 assert(supabaseUrl.includes("ndeycwoyjwyntjkgbzlz"), "PUNDI_SUPABASE_URL must target ndeycwoyjwyntjkgbzlz");
 assert(serviceKey && serverKey && merchantId, "Pundi service/provider environment is incomplete");
 
 const db = createClient(supabaseUrl, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
 const statusFilter = ["created", "pending", "unknown", "refund", "partial_refund", "chargeback"];
-const { data: orders, error } = await db.from("commerce_orders").select("*").eq("product_code", "PUNDI").in("status", statusFilter).order("created_at", { ascending: true }).limit(100);
+const orderQuery = requestedOrder
+  ? db.from("commerce_orders").select("*").eq("product_code", "PUNDI").eq("provider_order_id", requestedOrder)
+  : db.from("commerce_orders").select("*").eq("product_code", "PUNDI").in("status", statusFilter).order("created_at", { ascending: true }).limit(100);
+const { data: orders, error } = await orderQuery;
 if (error) throw new Error("Pundi order report query failed.");
 
 const summary = { product: "PUNDI", inspected: 0, remotely_successful: 0, remotely_revoked: 0, pending: 0, mismatches: 0, errors: 0, applied_order: null, orders: [] };
@@ -32,7 +37,7 @@ for (const order of orders || []) {
   summary.inspected += 1;
   const item = { order_id: order.provider_order_id, local_status: order.status, remote_state: "unknown", action: "dry_run" };
   try {
-    const provider = await getMidtransStatus({ environment: env.MIDTRANS_ENV === "sandbox" ? "sandbox" : "production", serverKey, orderId: order.provider_order_id });
+    const provider = await getMidtransStatus({ environment: config.environment, serverKey, orderId: order.provider_order_id });
     const matches = provider.order_id === order.provider_order_id && amountsMatch(order.expected_amount, provider.gross_amount) && (!provider.merchant_id || provider.merchant_id === merchantId) && (!provider.currency || provider.currency === order.currency);
     if (!matches) {
       item.action = "provider_mismatch";

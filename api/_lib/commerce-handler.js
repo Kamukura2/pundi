@@ -205,24 +205,24 @@ async function handleWebhook(request, response) {
   const notification = bodyOf(request);
   const orderId = clean(notification.order_id);
   if (!namespaceMatches(orderId, "PUNDI")) return reply(response, 422, { error: "Pundi order namespace required.", code: "wrong_order_namespace" });
-  if (!config.hasProviderKeys || !verifyNotificationSignature(notification, process.env.MIDTRANS_SERVER_KEY)) return reply(response, 401, { error: "Invalid provider notification.", code: "invalid_signature" });
-  if (config.environment === "production" && !config.productionReady) return reply(response, 503, { error: "Production commerce is not configured.", code: "not_configured" });
+  if (!config.hasProviderKeys || !verifyNotificationSignature(notification, config.provider.serverKey)) return reply(response, 401, { error: "Invalid provider notification.", code: "invalid_signature" });
+  if (!config.configured) return reply(response, 503, { error: "Pundi commerce is not configured.", code: "not_configured" });
   const db = serviceClient();
   const { data: order, error: orderError } = await db.from("commerce_orders").select("*").eq("provider_order_id", orderId).eq("product_code", "PUNDI").maybeSingle();
   if (orderError) return reply(response, 503, { error: "Order lookup failed.", code: "order_lookup_failed" });
   if (!order) return reply(response, 404, { error: "Pundi order not found.", code: "order_not_found" });
   if (!amountsMatch(order.expected_amount, notification.gross_amount)) return reply(response, 422, { error: "Provider amount does not match the order.", code: "amount_mismatch" });
   if (notification.currency && clean(notification.currency).toUpperCase() !== order.currency) return reply(response, 422, { error: "Provider currency does not match the order.", code: "currency_mismatch" });
-  if (process.env.MIDTRANS_MERCHANT_ID && notification.merchant_id && clean(notification.merchant_id) !== clean(process.env.MIDTRANS_MERCHANT_ID)) return reply(response, 422, { error: "Provider merchant does not match the order.", code: "merchant_mismatch" });
+  if (config.provider.merchantId && notification.merchant_id && clean(notification.merchant_id) !== clean(config.provider.merchantId)) return reply(response, 422, { error: "Provider merchant does not match the order.", code: "merchant_mismatch" });
   const key = eventKey(notification);
   const event = await recordEvent(db, notification, key);
   if (event.duplicate) return reply(response, 200, { ok: true, duplicate: true });
   try {
     let provider = safeProviderStatus(notification);
     if (statusIsSuccessful(provider.transaction_status, provider.fraud_status)) {
-      provider = await getMidtransStatus({ environment: config.environment, serverKey: process.env.MIDTRANS_SERVER_KEY, orderId });
+      provider = await getMidtransStatus({ environment: config.environment, serverKey: config.provider.serverKey, orderId });
       if (!amountsMatch(order.expected_amount, provider.gross_amount)) throw Object.assign(new Error("Provider amount does not match the order."), { status: 422, code: "amount_mismatch" });
-      if (provider.order_id !== orderId || !amountsMatch(order.expected_amount, provider.gross_amount) || (provider.currency && clean(provider.currency).toUpperCase() !== order.currency) || (provider.merchant_id && clean(provider.merchant_id) !== clean(process.env.MIDTRANS_MERCHANT_ID))) throw Object.assign(new Error("Provider status does not match the order."), { status: 422, code: "provider_mismatch" });
+      if (provider.order_id !== orderId || !amountsMatch(order.expected_amount, provider.gross_amount) || (provider.currency && clean(provider.currency).toUpperCase() !== order.currency) || (provider.merchant_id && clean(provider.merchant_id) !== clean(config.provider.merchantId))) throw Object.assign(new Error("Provider status does not match the order."), { status: 422, code: "provider_mismatch" });
     }
     const result = await reconcileOrder(db, orderRow(order), provider);
     await finishEvent(db, event.id, result);
@@ -255,9 +255,9 @@ async function statusResponse(request, response, url) {
   if (error) throw Object.assign(new Error("Order lookup failed."), { status: 503, code: "order_lookup_failed" });
   if (!order) return reply(response, 404, { error: "Order not found.", code: "order_not_found" });
   const config = commerceConfiguration();
-  if (!config.configured || !process.env.MIDTRANS_SERVER_KEY) return reply(response, 200, { order: safeOrder(order), verification: "pending_configuration" });
-  const provider = await getMidtransStatus({ environment: config.environment, serverKey: process.env.MIDTRANS_SERVER_KEY, orderId });
-  if (provider.order_id !== orderId || !amountsMatch(order.expected_amount, provider.gross_amount) || (provider.currency && clean(provider.currency).toUpperCase() !== order.currency) || (provider.merchant_id && clean(provider.merchant_id) !== clean(process.env.MIDTRANS_MERCHANT_ID))) return reply(response, 422, { error: "Provider status does not match the order.", code: "provider_mismatch" });
+  if (!config.configured || !config.provider.serverKey) return reply(response, 200, { order: safeOrder(order), verification: "pending_configuration" });
+  const provider = await getMidtransStatus({ environment: config.environment, serverKey: config.provider.serverKey, orderId });
+  if (provider.order_id !== orderId || !amountsMatch(order.expected_amount, provider.gross_amount) || (provider.currency && clean(provider.currency).toUpperCase() !== order.currency) || (provider.merchant_id && clean(provider.merchant_id) !== clean(config.provider.merchantId))) return reply(response, 422, { error: "Provider status does not match the order.", code: "provider_mismatch" });
   const state = await reconcileOrder(db, orderRow(order), provider);
   return reply(response, 200, { order: safeOrder({ ...order, status: provider.transaction_status, provider_transaction_id: provider.transaction_id, payment_type: provider.payment_type }), state });
 }
@@ -290,8 +290,8 @@ async function createCheckout(request, response) {
   try {
     const checkout = await createSnapTransaction({
       environment: config.environment,
-      serverKey: process.env.MIDTRANS_SERVER_KEY,
-      merchantId: process.env.MIDTRANS_MERCHANT_ID,
+      serverKey: config.provider.serverKey,
+      merchantId: config.provider.merchantId,
       orderId,
       amount: item.amount,
       item,
@@ -299,7 +299,7 @@ async function createCheckout(request, response) {
       notificationUrl: config.notificationUrl,
     });
     await db.from("commerce_orders").update({ status: "pending" }).eq("provider_order_id", orderId);
-    return reply(response, 201, { order_id: orderId, token: checkout.token, redirect_url: checkout.redirect_url, client_key: process.env.MIDTRANS_CLIENT_KEY, environment: config.environment });
+    return reply(response, 201, { order_id: orderId, token: checkout.token, redirect_url: checkout.redirect_url, client_key: config.provider.clientKey, environment: config.environment });
   } catch (error) {
     await db.from("commerce_orders").update({ status: "provider_error" }).eq("provider_order_id", orderId);
     throw error;

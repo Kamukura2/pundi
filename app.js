@@ -112,6 +112,7 @@ const commerceEntitlements=q("#commerceEntitlements");
 const commerceOrders=q("#commerceOrders");
 let commerceCatalogState=null;
 let commerceRefreshBusy=false;
+const PUNDI_FALLBACK_CATALOG=[{product:"PUNDI",sku:"PUNDI_PRO_LIFETIME",name:"Pundi Pro Lifetime",description:"One-time account-owned Pro access. The same Pundi account restores it on supported clients; no recurring charge.",entitlement:"pundi_pro_lifetime",purchase_type:"lifetime",duration_days:null,amount:49000,currency:"IDR",active:true}];
 const hasActiveEditor=()=>{
  const active=document.activeElement;
  return Boolean(active&&active.matches("input,select,textarea,[contenteditable=true]")&&!active.closest("#authGate"));
@@ -1898,7 +1899,7 @@ function updateSyncStatus(info){
 
 syncManager=new SyncManager({onState:applyCloudState,onStatus:updateSyncStatus});
 
-const commerceMoney=(amount,currency="IDR")=>new Intl.NumberFormat("id-ID",{style:"currency",currency,maximumFractionDigits:0}).format(Number(amount||0));
+const commerceMoney=(amount,currency="IDR")=>new Intl.NumberFormat("id-ID",{style:"currency",currency,maximumFractionDigits:0}).format(Number(amount||0)).replace(/\u00a0/g,"");
 const commerceDate=value=>value?new Date(value).toLocaleString(state.language==="id"?"id-ID":"en-GB",{dateStyle:"medium",timeStyle:"short"}):"—";
 function renderCommerceAccount(account){
  const entitlements=(account?.entitlements||[]).filter(item=>item.status==="active");
@@ -1912,14 +1913,10 @@ function renderCommerceAccount(account){
  commerceOrders.innerHTML=orders.length?`<h4>Purchase history</h4>${orderRows}`:"<p class=\"account-commerce-muted\">No purchases yet.</p>";
 }
 function renderCommerceCatalog(catalog){
- commerceCatalogState=catalog;
- if(!catalog?.configured||!(catalog.products||[]).length){
-  commerceStatus.textContent="Paid offers are not configured yet. Your account remains available on the free plan.";
-  commerceCatalog.innerHTML="";
-  return;
- }
- commerceStatus.textContent=catalog.production?"Production checkout is available. Payment is verified server-side before access is granted.":"Sandbox checkout is available for testing only.";
- commerceCatalog.innerHTML=catalog.products.map(item=>`<div class="commerce-product"><div><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.description||"Account entitlement")}</small></div><div><b>${escapeHtml(commerceMoney(item.amount,item.currency))}</b><button class="primary-btn commerce-buy" type="button" data-commerce-sku="${escapeHtml(item.sku)}">Buy</button></div></div>`).join("");
+ const checkoutAvailable=Boolean(catalog?.configured&&(catalog.products||[]).length);
+ commerceCatalogState=checkoutAvailable?catalog:{...(catalog||{}),configured:false,products:PUNDI_FALLBACK_CATALOG};
+ commerceStatus.textContent=checkoutAvailable?(catalog.production?"Production checkout is available. Payment is verified server-side before access is granted.":"Sandbox checkout is available for testing only."):"Pundi Pro Lifetime · Rp49.000 · one-time account purchase. Checkout is unavailable until provider activation; your free account remains available.";
+ commerceCatalog.innerHTML=commerceCatalogState.products.map(item=>`<div class="commerce-product"><div><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.description||"Account entitlement")}</small></div><div><b>${escapeHtml(commerceMoney(item.amount,item.currency))}</b><button class="primary-btn commerce-buy" type="button" data-commerce-sku="${escapeHtml(item.sku)}" ${checkoutAvailable?"":"disabled"}>${checkoutAvailable?"Buy":"Coming soon"}</button></div></div>`).join("");
  qa("[data-commerce-sku]").forEach(button=>button.onclick=()=>startCommerceCheckout(button.dataset.commerceSku,button));
 }
 async function refreshCommerce(){
