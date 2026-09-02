@@ -1177,3 +1177,15 @@ select,input,.search{width:100%;min-width:0;height:46px;padding:0 12px;border-ra
  .dividend-events{padding:0 10px 10px}.dividend-event{grid-template-columns:1fr 1fr;gap:7px;padding:10px;border-radius:12px}.dividend-event-cell b{font-size:10px}.dividend-event-main small,.dividend-event-cell small{font-size:7px}.dividend-status{font-size:6px}.dividend-event-actions button{height:31px;font-size:8px}
  .dividend-history{margin-top:13px;padding-top:13px}.dividend-history-head h4{font-size:16px}.dividend-history-row{grid-template-columns:1fr 1fr;gap:8px;padding:10px}.dividend-history-row>div:first-child,.dividend-history-row .danger-btn{grid-column:1/-1}.dividend-history-row small{font-size:7px}.dividend-history-row b{font-size:11px}.dividend-history-row .danger-btn{min-height:34px;font-size:9px}
 }
+
+.commerce-account{margin-top:18px;padding-top:16px;border-top:1px solid var(--border)}
+.commerce-account>p{font-weight:700;margin:0 0 8px}
+.account-commerce-status,.account-commerce-muted{display:block;color:var(--muted);font-size:12px;line-height:1.45}
+.commerce-catalog,.commerce-entitlements,.commerce-orders{display:grid;gap:8px;margin-top:10px}
+.commerce-product,.commerce-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:var(--surface2)}
+.commerce-product>div:first-child,.commerce-row>span{min-width:0;display:grid;gap:3px}
+.commerce-product strong,.commerce-row b{font-size:12px}
+.commerce-product small,.commerce-row small{display:block;color:var(--muted);font-size:10px;overflow-wrap:anywhere}
+.commerce-product>div:last-child,.commerce-row>b{display:grid;gap:5px;justify-items:end;white-space:nowrap}
+.commerce-buy{min-height:30px;padding:5px 10px;font-size:11px}
+.commerce-entitlements h4,.commerce-orders h4{margin:8px 0 0;font-size:12px}

@@ -13,6 +13,7 @@ import { getAuthenticatedSession, getSupabase } from "./src/lib/supabase.js";
 import { applyOpeningPosition, applyTrade, archiveClosedTradingPositions, cashEvent, equityBenchmarkMetrics, performancePreview, performanceSeries, reconcileTradingPositions, removeTradingLedgerEntry, removeTradingPositionData, setTradingWalletBalance, tradingMetrics, tradingPositionCost, tradingPositionValue, tradingTargetSimulation, upsertDailySnapshot } from "./src/trading/model.js";
 import { historicalCryptoQuote } from "./src/trading/crypto-lifecycle.js";
 import { feedbackPayload } from "./src/feedback/contract.js";
+import { fetchCommerceAccount, fetchCommerceCatalog, fetchCommerceStatus, createCommerceCheckout, loadMidtransSnap } from "./src/commerce/client.js";
 import { apiUrl, isNativeRuntime } from "./src/lib/runtime.js";
 import { initializeNativeShell } from "./src/lib/native-shell.js";
 
@@ -105,6 +106,12 @@ const electricityTopUpError=q("#electricityTopUpError");
 const electricityTopUpSubmit=q("#electricityTopUpSubmit");
 const electricityTopUpCancel=q("#electricityTopUpCancel");
 let electricityTopUpSubmitting=false;
+const commerceStatus=q("#commerceStatus");
+const commerceCatalog=q("#commerceCatalog");
+const commerceEntitlements=q("#commerceEntitlements");
+const commerceOrders=q("#commerceOrders");
+let commerceCatalogState=null;
+let commerceRefreshBusy=false;
 const hasActiveEditor=()=>{
  const active=document.activeElement;
  return Boolean(active&&active.matches("input,select,textarea,[contenteditable=true]")&&!active.closest("#authGate"));
@@ -1891,6 +1898,64 @@ function updateSyncStatus(info){
 
 syncManager=new SyncManager({onState:applyCloudState,onStatus:updateSyncStatus});
 
+const commerceMoney=(amount,currency="IDR")=>new Intl.NumberFormat("id-ID",{style:"currency",currency,maximumFractionDigits:0}).format(Number(amount||0));
+const commerceDate=value=>value?new Date(value).toLocaleString(state.language==="id"?"id-ID":"en-GB",{dateStyle:"medium",timeStyle:"short"}):"—";
+function renderCommerceAccount(account){
+ const entitlements=(account?.entitlements||[]).filter(item=>item.status==="active");
+ const orders=account?.orders||[];
+ const entitlementRows=entitlements.map(item=>{
+  const expiry=item.expires_at?` · until ${escapeHtml(commerceDate(item.expires_at))}`:"";
+  return `<div class="commerce-row"><span>${escapeHtml(item.sku||item.plan||"Pundi")}</span><b>${escapeHtml(item.status)}${expiry}</b></div>`;
+ }).join("");
+ const orderRows=orders.slice(0,10).map(item=>`<div class="commerce-row"><span>${escapeHtml(item.sku||"Pundi")} · ${escapeHtml(item.order_id||"—")}<small>${escapeHtml(commerceDate(item.created_at))}</small></span><b>${escapeHtml(item.status)}<small>${escapeHtml(commerceMoney(item.amount,item.currency))}</small></b></div>`).join("");
+ commerceEntitlements.innerHTML=entitlements.length?`<h4>Active access</h4>${entitlementRows}`:"<p class=\"account-commerce-muted\">No active paid entitlement on this account.</p>";
+ commerceOrders.innerHTML=orders.length?`<h4>Purchase history</h4>${orderRows}`:"<p class=\"account-commerce-muted\">No purchases yet.</p>";
+}
+function renderCommerceCatalog(catalog){
+ commerceCatalogState=catalog;
+ if(!catalog?.configured||!(catalog.products||[]).length){
+  commerceStatus.textContent="Paid offers are not configured yet. Your account remains available on the free plan.";
+  commerceCatalog.innerHTML="";
+  return;
+ }
+ commerceStatus.textContent=catalog.production?"Production checkout is available. Payment is verified server-side before access is granted.":"Sandbox checkout is available for testing only.";
+ commerceCatalog.innerHTML=catalog.products.map(item=>`<div class="commerce-product"><div><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.description||"Account entitlement")}</small></div><div><b>${escapeHtml(commerceMoney(item.amount,item.currency))}</b><button class="primary-btn commerce-buy" type="button" data-commerce-sku="${escapeHtml(item.sku)}">Buy</button></div></div>`).join("");
+ qa("[data-commerce-sku]").forEach(button=>button.onclick=()=>startCommerceCheckout(button.dataset.commerceSku,button));
+}
+async function refreshCommerce(){
+ if(commerceRefreshBusy)return;
+ commerceRefreshBusy=true;
+ try{
+  const catalog=await fetchCommerceCatalog();
+  renderCommerceCatalog(catalog);
+  const account=await fetchCommerceAccount();
+  renderCommerceAccount(account);
+ }catch(error){
+  commerceStatus.textContent=error.message||"Purchase status unavailable.";
+ }finally{commerceRefreshBusy=false;}
+}
+const wait=(ms)=>new Promise(resolve=>setTimeout(resolve,ms));
+async function verifyCommerceOrder(orderId){
+ for(let attempt=0;attempt<8;attempt++){
+  try{
+   const result=await fetchCommerceStatus(orderId);
+   if(["successful","revoked","failed"].includes(result.state))return result;
+  }catch{}
+  await wait(2000);
+ }
+ return null;
+}
+async function startCommerceCheckout(sku,button){
+ if(!sku||!commerceCatalogState?.configured)return;
+ button.disabled=true;commerceStatus.textContent="Creating secure checkout…";
+ try{
+  const checkout=await createCommerceCheckout(sku);
+  const snap=await loadMidtransSnap(checkout.client_key,checkout.environment);
+  snap.pay(checkout.token,{onSuccess:async()=>{commerceStatus.textContent="Payment submitted. Verifying with Midtrans…";await verifyCommerceOrder(checkout.order_id);await refreshCommerce();},onPending:async()=>{commerceStatus.textContent="Payment is pending. Access activates after provider verification.";await verifyCommerceOrder(checkout.order_id);await refreshCommerce();},onError:async()=>{commerceStatus.textContent="Payment was not completed.";await verifyCommerceOrder(checkout.order_id);await refreshCommerce();},onClose:async()=>{commerceStatus.textContent="Checkout closed. No access is granted until payment is verified.";await refreshCommerce();}});
+ }catch(error){commerceStatus.textContent=error.message||"Checkout unavailable.";}
+ finally{button.disabled=false;}
+}
+
 async function showSignedIn(user){
  if(recoveryMode) return;
  authGate.hidden=true;document.body.classList.remove("auth-locked");
@@ -1916,7 +1981,8 @@ async function showSignedIn(user){
   tradingRefreshTimer=setInterval(()=>{if(state.page==="stocks"&&state.stockView==="trading"&&!document.hidden)refreshTradingPrices({silent:true});},2*60*1000);
   }
   syncCryptoMarketData();
-  }
+  refreshCommerce().catch(()=>{});
+ }
 
 async function boot(){
  document.documentElement.dataset.theme=state.theme;themeBtn.textContent=state.theme==="dark"?"☀":"☾";
@@ -2061,7 +2127,7 @@ authForm.onsubmit=async event=>{
  finally{authSubmit.disabled=false;if(authMode==="signup")authSubmit.textContent="Create account";else if(authMode==="forgot")authSubmit.textContent="Send reset link";else if(authMode==="recovery")authSubmit.textContent="Update password";else authSubmit.textContent="Sign in";}
 };
 
-dataBtn.onclick=async()=>{dataModal.showModal();try{const account=await syncManager.accountMetadata();accountCreatedAt.textContent=account.created_at?new Date(account.created_at).toLocaleDateString():"—";accountPlan.textContent=account.subscription?.plan||"free";accountStatus.textContent=account.account_status||"active";}catch(error){accountSettingsMessage.textContent="Account settings unavailable.";}};
+dataBtn.onclick=async()=>{dataModal.showModal();try{const account=await syncManager.accountMetadata();accountCreatedAt.textContent=account.created_at?new Date(account.created_at).toLocaleDateString():"—";accountPlan.textContent=account.subscription?.plan||"free";accountStatus.textContent=account.account_status||"active";await refreshCommerce();}catch(error){accountSettingsMessage.textContent="Account settings unavailable.";}};
 syncStatus.onclick=()=>dataModal.showModal();
 changePasswordForm.onsubmit=async event=>{
  event.preventDefault();passwordChangeMessage.textContent="";

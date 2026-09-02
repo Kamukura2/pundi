@@ -38,6 +38,8 @@
     "test:user-smoke": "node tests/integration/user-production-smoke.mjs",
     "test:authz-production": "node tests/integration/authz-production.mjs",
     "test:identity": "node tests/integration/identity-drift-contract.mjs",
+    "test:commerce": "node tests/integration/commerce-contract.mjs",
+    "commerce:reconcile": "node scripts/commerce-reconcile.mjs",
     "test:android": "node tests/integration/android-contract.mjs",
     "test:legal-support": "node tests/integration/legal-support-contract.mjs",
     "android:sync": "npm run build && node scripts/prepare-android-web.mjs && npx cap sync android",

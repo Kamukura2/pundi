@@ -684,6 +684,13 @@
     <section class="account-settings" aria-labelledby="accountSettingsTitle">
       <p id="accountSettingsTitle">Account settings</p>
       <div class="account-summary"><span>Created</span><b id="accountCreatedAt">—</b><span>Plan</span><b id="accountPlan">Free</b><span>Status</span><b id="accountStatus">Active</b></div>
+      <section class="commerce-account" aria-labelledby="commerceAccountTitle">
+        <p id="commerceAccountTitle">Purchase &amp; access</p>
+        <div id="commerceStatus" class="account-commerce-status" role="status">Checking available offers…</div>
+        <div id="commerceCatalog" class="commerce-catalog"></div>
+        <div id="commerceEntitlements" class="commerce-entitlements"></div>
+        <div id="commerceOrders" class="commerce-orders"></div>
+      </section>
       <h4>Security</h4>
       <form id="changePasswordForm" class="form-grid">
         <label>New password<input id="newPassword" type="password" autocomplete="new-password" minlength="6" required></label>
