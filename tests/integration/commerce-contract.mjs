@@ -37,6 +37,10 @@ const invalidOverrideEnv = { ...sandboxEnv, MIDTRANS_ENV: 'sandbox', PUNDI_COMME
 assert.equal(commerceConfiguration(invalidOverrideEnv).environment, 'sandbox');
 assert.equal(commerceConfiguration(invalidOverrideEnv).environmentValid, false);
 assert.equal(commerceConfiguration(invalidOverrideEnv).configured, false);
+const missingEnvironmentEnv = { ...sandboxEnv, MIDTRANS_ENV: undefined, PUNDI_COMMERCE_ENV: undefined };
+assert.equal(commerceConfiguration(missingEnvironmentEnv).environment, 'sandbox');
+assert.equal(commerceConfiguration(missingEnvironmentEnv).environmentValid, false);
+assert.equal(commerceConfiguration(missingEnvironmentEnv).configured, false);
 
 const orderId = orderIdFor('PUNDI');
 assert.match(orderId, /^PUNDI-[A-Z0-9-]+$/);

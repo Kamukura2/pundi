@@ -58,7 +58,7 @@ function environmentState(env = process.env) {
   const overrideValid = !override || ENVIRONMENTS.has(override);
   return {
     environment: overrideValid && override ? override : baseValid && base ? base : "sandbox",
-    valid: baseValid && overrideValid,
+    valid: Boolean(base || override) && baseValid && overrideValid,
   };
 }
 
