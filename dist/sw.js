@@ -1,5 +1,5 @@
-const SHELL_CACHE = "pundi-shell-v8.3.2-admin-bootstrap";
-const SHELL = ["/", "/index.html", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
+const SHELL_CACHE = "pundi-shell-v8.7.2";
+const SHELL = ["/", "/app.html", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(SHELL_CACHE).then(cache => cache.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -18,9 +18,9 @@ self.addEventListener("fetch", event => {
   if (request.mode === "navigate") {
     event.respondWith(fetch(request).then(response => {
       const copy = response.clone();
-      caches.open(SHELL_CACHE).then(cache => cache.put("/index.html", copy));
+      caches.open(SHELL_CACHE).then(cache => cache.put("/app.html", copy));
       return response;
-    }).catch(() => caches.match("/index.html")));
+    }).catch(() => caches.match("/app.html")));
     return;
   }
 

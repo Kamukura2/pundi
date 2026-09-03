@@ -3,9 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-  <title>Pundi v8.3.2</title>
-  <meta name="theme-color" content="#d6249f">
-  <meta name="description" content="Private synchronized personal finance dashboard">
+  <title>Pundi v8.7.2 · Private finance workspace</title>
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <meta name="theme-color" content="#0D1B3D">
+  <meta name="description" content="Private synchronized personal finance workspace for your accounts, cash flow, assets, and plans.">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -13,18 +14,17 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
   <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
-  <link rel="apple-touch-icon" href="/icons/icon-192.png">
-
-
-  <script type="module" crossorigin src="/assets/index-DM2YiCvv.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-Bk2gYKip.css">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <script type="module" crossorigin src="/assets/main-BLHVfiya.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/contract-DmXluizO.js">
+  <link rel="stylesheet" crossorigin href="/assets/main-SJq4nIWK.css">
 </head>
 <body class="auth-locked">
 <div class="app">
   <aside id="primarySidebar" class="sidebar" aria-label="Primary navigation">
     <div class="brand">
-      <div class="logo">C</div>
-      <div><b>Pundi</b><small>Personal Finance OS</small></div>
+      <div class="logo"><img src="/icons/pundi-approved-mark-light.png" alt=""></div>
+      <div><b>Pundi <span class="beta-badge">Beta</span></b><small>Personal Finance OS</small></div>
     </div>
 
     <nav class="nav-list">
@@ -74,9 +74,24 @@
         <button id="privacyBtn" class="icon-btn" title="Hide values">👁</button>
         <button id="themeBtn" class="icon-btn" title="Toggle theme">☾</button>
         <button id="dataBtn" class="avatar" title="Data & account">DA</button>
+        <button id="feedbackBtn" class="ghost-btn" type="button" title="Beta feedback">Feedback</button>
         <button id="languageBtn" class="language-btn" title="Switch language"><span>US</span><span>ID</span></button>
       </div>
     </header>
+
+    <section id="onboardingCard" class="onboarding-card" hidden aria-labelledby="onboardingTitle">
+      <div>
+        <small class="eyebrow">GET STARTED</small>
+        <h2 id="onboardingTitle">Welcome to Pundi</h2>
+        <p>Start with your first account or transaction. Pundi keeps your finance data private and synced to this account.</p>
+      </div>
+      <div class="onboarding-actions">
+        <button class="primary-btn" id="onboardingAddAccount" type="button">＋ Create account</button>
+        <button class="ghost-btn" id="onboardingAddTransaction" type="button">＋ Record transaction</button>
+        <button class="text-link" id="onboardingExploreAssets" type="button">Explore Assets</button>
+        <button class="text-link" data-onboarding-dismiss type="button">Dismiss</button>
+      </div>
+    </section>
 
     <section id="accumulation" class="page active">
       <div class="hero-grid">
@@ -621,6 +636,7 @@
   </main>
 
   <button class="mobile-add-transaction" data-open-tx type="button" aria-label="Add transaction" title="Add transaction">＋</button>
+  <footer id="releaseIdentity" class="release-identity" aria-label="Release identity">Pundi v8.7.2 · Beta</footer>
 </div>
 
 <dialog id="txModal">
@@ -666,6 +682,26 @@
       <button type="button" class="ghost-btn close-dialog">×</button>
     </div>
     <div class="account-line"><span>Signed in as</span><b id="accountEmail">—</b></div>
+    <section class="account-settings" aria-labelledby="accountSettingsTitle">
+      <p id="accountSettingsTitle">Account settings</p>
+      <div class="account-summary"><span>Created</span><b id="accountCreatedAt">—</b><span>Plan</span><b id="accountPlan">Free</b><span>Status</span><b id="accountStatus">Active</b></div>
+      <section class="commerce-account" aria-labelledby="commerceAccountTitle">
+        <p id="commerceAccountTitle">Purchase &amp; access</p>
+        <div id="commerceStatus" class="account-commerce-status" role="status">Checking available offers…</div>
+        <div id="commerceCatalog" class="commerce-catalog"></div>
+        <div id="commerceEntitlements" class="commerce-entitlements"></div>
+        <div id="commerceOrders" class="commerce-orders"></div>
+      </section>
+      <h4>Security</h4>
+      <form id="changePasswordForm" class="form-grid">
+        <label>New password<input id="newPassword" type="password" autocomplete="new-password" minlength="6" required></label>
+        <label>Confirm new password<input id="confirmNewPassword" type="password" autocomplete="new-password" minlength="6" required></label>
+        <small id="passwordChangeMessage" class="form-error" role="status"></small>
+        <button id="changePasswordBtn" class="primary-btn" type="submit">Change password</button>
+      </form>
+      <button id="deleteAccountBtn" class="danger-btn" type="button">Delete my account</button>
+      <small id="accountSettingsMessage" class="form-error" role="status"></small>
+    </section>
     <div class="mobile-more">
       <p>More sections</p>
       <div class="mobile-more-grid">
@@ -676,6 +712,14 @@
         <button class="ghost-btn" type="button" data-page="insights"><span>✨</span>Insights</button>
       </div>
     </div>
+    <section class="account-settings" aria-labelledby="legalSupportTitle">
+      <p id="legalSupportTitle">Bantuan &amp; Legal</p>
+      <div class="account-links">
+        <a class="text-link" href="https://pundi.online/privacy" target="_blank" rel="noopener noreferrer">Privasi</a>
+        <a class="text-link" href="https://pundi.online/terms" target="_blank" rel="noopener noreferrer">Ketentuan</a>
+        <a class="text-link" href="https://pundi.online/support" target="_blank" rel="noopener noreferrer">Bantuan</a>
+      </div>
+    </section>
     <div class="data-actions">
       <button id="exportBackupBtn" class="ghost-btn" type="button">Export JSON backup</button>
       <button id="importBackupBtn" class="ghost-btn" type="button">Import JSON backup</button>
@@ -688,17 +732,31 @@
   </div>
 </dialog>
 
+<dialog id="feedbackModal">
+  <form id="feedbackForm" class="modal" novalidate>
+    <div class="panel-head"><div><p>Controlled beta</p><h3>Send feedback</h3></div><button type="button" class="ghost-btn close-dialog" aria-label="Close">×</button></div>
+    <p class="feedback-intro">Pundi is currently in beta. Some features may change as we improve the product.</p>
+    <label for="feedbackCategory">Category<select id="feedbackCategory" required><option value="">Choose a category</option><option>Bug</option><option>Feature request</option><option>Usability</option><option>Data / calculation issue</option><option>Other</option></select></label>
+    <label for="feedbackMessage">Message<textarea id="feedbackMessage" rows="7" maxlength="4000" required placeholder="What were you trying to do, and what happened?"></textarea></label>
+    <small id="feedbackCounter" class="form-help">0 / 4000</small>
+    <small id="feedbackMessageStatus" class="form-error" role="status" aria-live="polite"></small>
+    <div class="modal-actions"><button id="feedbackCancel" class="ghost-btn close-dialog" type="button">Cancel</button><button id="feedbackSubmit" class="primary-btn" type="submit">Send feedback</button></div>
+  </form>
+</dialog>
+
 <section id="authGate" class="auth-gate" hidden>
   <form id="authForm" class="auth-card">
-    <div class="brand auth-brand"><div class="logo">C</div><div><b>Pundi</b><small>Private cloud access</small></div></div>
+    <div class="brand auth-brand"><div class="logo"><img src="/icons/pundi-approved-mark-light.png" alt=""></div><div><b>Pundi</b><small>Private cloud access</small></div></div>
     <h2 id="authTitle">Sign in</h2>
     <p id="authDescription">Use a private account created in Supabase. Each account has isolated data.</p>
     <label>Email<input id="authEmail" type="email" autocomplete="username" required></label>
     <label>Password<input id="authPassword" type="password" autocomplete="current-password" minlength="6" required></label>
     <label id="authConfirmField" hidden>Confirm Password<input id="authConfirm" type="password" autocomplete="new-password" minlength="6"></label>
     <button id="authSubmit" class="primary-btn" type="submit">Sign in</button>
+    <button id="authForgotPassword" class="text-link" type="button">Forgot password?</button>
+    <button id="authRecoveryCancel" class="text-link" type="button" hidden>Cancel password reset</button>
     <button id="authModeToggle" class="text-link" type="button">Don't have an account? Sign up</button>
-    <small id="authError" class="auth-error"></small>
+    <small id="authError" class="auth-message error" role="status"></small>
   </form>
 </section>
 
@@ -742,7 +800,6 @@
 
 <div id="tooltip" class="chart-tooltip"></div>
 <div id="toast">Saved</div>
-
-
+
 </body>
 </html>
