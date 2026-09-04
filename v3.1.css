@@ -154,6 +154,10 @@ input:focus,select:focus,textarea:focus,button:focus-visible{outline:3px solid c
   .mobile-nav{display:grid!important;position:fixed;left:50%;bottom:calc(10px + env(safe-area-inset-bottom));width:min(760px,calc(100% - 16px));height:68px;transform:translateX(-50%);grid-template-columns:repeat(4,minmax(0,1fr)) 1.14fr repeat(4,minmax(0,1fr));gap:3px;padding:6px;background:color-mix(in srgb,var(--surface) 88%,transparent);border:1px solid var(--pundi-border);border-radius:22px;box-shadow:0 20px 52px rgba(13,27,61,.22);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);z-index:120}
   .mobile-nav-item{display:grid!important;place-items:center!important;align-content:center;gap:3px;min-width:0;min-height:54px;padding:3px;border:0;border-radius:15px;background:transparent;color:var(--muted)}
   .mobile-nav-item.active{background:color-mix(in srgb,var(--surface2) 90%,transparent)}
+  .mobile-nav button.mobile-nav-item{background:transparent;color:var(--muted)}
+  .mobile-nav button.mobile-nav-item.active{background:color-mix(in srgb,var(--surface2) 90%,transparent);color:var(--text)}
+  .mobile-nav button.mobile-nav-add{background:linear-gradient(145deg,#142F63,#1092FF 70%,#45C5F6)!important;color:#fff!important}
+  .mobile-nav button.mobile-nav-add .pundi-icon{color:#fff!important}
   .sidebar{z-index:122}
   .mobile-menu-backdrop{z-index:118}
 }
