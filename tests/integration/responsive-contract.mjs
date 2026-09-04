@@ -10,6 +10,7 @@ try {
   const page = await browser.newPage({ viewport:{width:390,height:844} });
   await page.goto(`http://127.0.0.1:${port}/app.html`, { waitUntil:"networkidle" });
   await page.locator("#authGate").waitFor({ state:"visible", timeout:10000 });
+  assert.equal(await page.locator("#authConfirmField").isHidden(), true, "sign-in must not show confirmation field");
   const viewports = [[360,800],[390,844],[768,1024],[1366,768],[1920,1080]];
   for (const [width,height] of viewports) {
     await page.setViewportSize({width,height});

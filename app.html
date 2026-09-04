@@ -17,6 +17,7 @@
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="mobile-drawer.css">
+  <link rel="stylesheet" href="v3.1.css">
 </head>
 <body class="auth-locked">
 <div class="app">
@@ -27,14 +28,14 @@
     </div>
 
     <nav class="nav-list">
-      <button class="nav active" data-page="accumulation"><span class="nav-ic i-money">💰</span><span>Accumulation</span></button>
-      <button class="nav" data-page="cashflow"><span class="nav-ic i-chart">📊</span><span>History</span></button>
-      <button class="nav" data-page="expenses"><span class="nav-ic i-bill">🧾</span><span>Expenses</span></button>
-      <button class="nav" data-page="clients"><span class="nav-ic i-client">🤝</span><span>Income</span></button>
-      <button class="nav" data-page="stocks"><span class="nav-ic i-stock">📈</span><span>Assets</span></button>
-      <button class="nav" data-page="electricity"><span class="nav-ic i-electric">⚡</span><span>Electricity</span></button>
-      <button class="nav" data-page="prospect"><span class="nav-ic i-rocket">🚀</span><span>Prospect</span></button>
-      <button class="nav" data-page="insights"><span class="nav-ic i-insight">✨</span><span>Insights</span></button>
+      <button class="nav active" data-page="accumulation"><span class="nav-ic i-money" data-icon="overview"></span><span>Accumulation</span></button>
+      <button class="nav" data-page="cashflow"><span class="nav-ic i-chart" data-icon="transactions"></span><span>History</span></button>
+      <button class="nav" data-page="expenses"><span class="nav-ic i-bill" data-icon="expenses"></span><span>Expenses</span></button>
+      <button class="nav" data-page="clients"><span class="nav-ic i-client" data-icon="income"></span><span>Income</span></button>
+      <button class="nav" data-page="stocks"><span class="nav-ic i-stock" data-icon="assets"></span><span>Assets</span></button>
+      <button class="nav" data-page="electricity"><span class="nav-ic i-electric" data-icon="electricity"></span><span>Electricity</span></button>
+      <button class="nav" data-page="prospect"><span class="nav-ic i-rocket" data-icon="prospect"></span><span>Prospect</span></button>
+      <button class="nav" data-page="insights"><span class="nav-ic i-insight" data-icon="insights"></span><span>Insights</span></button>
     </nav>
 
     <div class="side-projection">
@@ -57,6 +58,18 @@
   </aside>
   <button id="mobileMenuBackdrop" class="mobile-menu-backdrop" type="button" aria-label="Close navigation" aria-hidden="true"></button>
 
+  <nav class="mobile-nav" aria-label="Mobile navigation">
+    <button type="button" class="mobile-nav-item active" data-page="accumulation" aria-label="Open Accumulation"><span class="nav-ic i-money" data-icon="overview"></span><small>Home</small></button>
+    <button type="button" class="mobile-nav-item" data-page="cashflow" aria-label="Open History"><span class="nav-ic i-chart" data-icon="transactions"></span><small>History</small></button>
+    <button type="button" class="mobile-nav-item" data-page="clients" aria-label="Open Income"><span class="nav-ic i-client" data-icon="income"></span><small>Income</small></button>
+    <button type="button" class="mobile-nav-item" data-page="stocks" aria-label="Open Assets"><span class="nav-ic i-stock" data-icon="assets"></span><small>Assets</small></button>
+    <button type="button" class="mobile-nav-add" data-open-tx aria-label="Record transaction" title="Record transaction"><span data-icon="plus"></span></button>
+    <button type="button" class="mobile-nav-item" data-page="expenses" aria-label="Open Expenses"><span class="nav-ic i-bill" data-icon="expenses"></span><small>Spend</small></button>
+    <button type="button" class="mobile-nav-item" data-page="electricity" aria-label="Open Electricity"><span class="nav-ic i-electric" data-icon="electricity"></span><small>Power</small></button>
+    <button type="button" class="mobile-nav-item" data-page="prospect" aria-label="Open Prospect"><span class="nav-ic i-rocket" data-icon="prospect"></span><small>Plan</small></button>
+    <button type="button" class="mobile-nav-item" data-page="insights" aria-label="Open Insights"><span class="nav-ic i-insight" data-icon="insights"></span><small>Read</small></button>
+  </nav>
+
   <main>
     <header class="topbar">
       <button id="mobileMenuBtn" class="mobile-menu-btn" type="button" aria-controls="primarySidebar" aria-expanded="false" aria-label="Open navigation menu">
@@ -70,8 +83,8 @@
         <button id="syncStatus" class="sync-status loading" type="button" title="Synchronization status">
           <span class="sync-dot"></span><span><b id="syncStatusText">Loading…</b><small id="lastSynced">Not synced</small></span><em id="unsyncedCount"></em>
         </button>
-        <button id="privacyBtn" class="icon-btn" title="Hide values">👁</button>
-        <button id="themeBtn" class="icon-btn" title="Toggle theme">☾</button>
+        <button id="privacyBtn" class="icon-btn" title="Hide values" aria-label="Hide values" data-icon="eye"></button>
+        <button id="themeBtn" class="icon-btn" title="Toggle theme" aria-label="Toggle theme" data-icon="moon"></button>
         <button id="dataBtn" class="avatar" title="Data & account">DA</button>
         <button id="feedbackBtn" class="ghost-btn" type="button" title="Beta feedback">Feedback</button>
         <button id="languageBtn" class="language-btn" title="Switch language"><span>US</span><span>ID</span></button>
@@ -122,8 +135,8 @@
           <div class="panel-head">
             <div><p>Balances</p><h3>Cash, Bank & Wallets</h3></div>
             <div class="head-actions">
-              <button class="ghost-btn" id="manageAccountsBtn" title="Manage">⚙</button>
-              <button class="ghost-btn" id="addAccountBtn" title="Add">＋</button>
+              <button class="ghost-btn icon-only" id="manageAccountsBtn" title="Manage" aria-label="Manage accounts" data-icon="settings"></button>
+              <button class="ghost-btn icon-only" id="addAccountBtn" title="Add" aria-label="Add account" data-icon="plus"></button>
             </div>
           </div>
           <div id="accountList" class="list"></div>
@@ -132,7 +145,7 @@
         <article class="panel">
           <div class="panel-head">
             <div><p>Clients</p><h3>Payment Status</h3></div>
-            <button class="ghost-btn" data-go="clients" title="Open">↗</button>
+            <button class="ghost-btn icon-only" data-go="clients" title="Open" aria-label="Open income" data-icon="arrow-up-right"></button>
           </div>
           <div id="paymentSummary" class="list"></div>
         </article>
@@ -140,7 +153,7 @@
         <article class="panel">
           <div class="panel-head">
             <div><p>Upcoming</p><h3>Pending Expenses</h3></div>
-            <button class="ghost-btn" id="addEventBtnTop" title="Add">＋</button>
+            <button class="ghost-btn icon-only" id="addEventBtnTop" title="Add" aria-label="Add event" data-icon="plus"></button>
           </div>
           <div id="pendingSummary" class="list"></div>
         </article>
@@ -177,7 +190,7 @@
             <option value="category">Category</option>
             <option value="amount">Amount</option>
           </select>
-          <button class="primary-btn" data-open-tx>＋ Transaction</button>
+          <button class="primary-btn" data-open-tx><span class="button-icon" data-icon="plus"></span>Transaction</button>
         </div>
       </div>
 
@@ -211,7 +224,7 @@
         <article class="panel history-budget-panel">
           <div class="panel-head">
             <div><p>Budget Pace</p><h3>Budget</h3></div>
-            <button class="ghost-btn" data-go="expenses" title="Open">↗</button>
+            <button class="ghost-btn icon-only" data-go="expenses" title="Open" aria-label="Open expenses" data-icon="arrow-up-right"></button>
           </div>
           <div id="budgetPace"></div>
         </article>
@@ -246,7 +259,7 @@
         <article class="panel">
           <div class="panel-head">
             <div><p>Monthly</p><h3>Budget</h3></div>
-            <button class="ghost-btn" id="addMonthlyBtn" title="Add">＋</button>
+            <button class="ghost-btn icon-only" id="addMonthlyBtn" title="Add" aria-label="Add monthly budget" data-icon="plus"></button>
           </div>
           <div id="budgetRows"></div>
         </article>
@@ -265,7 +278,7 @@
         <article class="panel expense-feature-panel">
           <div class="panel-head">
             <div><p>Yearly</p><h3>Yearly Expense</h3></div>
-            <button class="ghost-btn" id="addYearlyBtn" title="Add">＋</button>
+            <button class="ghost-btn icon-only" id="addYearlyBtn" title="Add" aria-label="Add yearly expense" data-icon="plus"></button>
           </div>
           <div id="yearlyExpenseGrid" class="tile-grid"></div>
         </article>
@@ -276,7 +289,7 @@
         <article class="panel expense-feature-panel">
           <div class="panel-head">
             <div><p>Future spending</p><h3>Events</h3></div>
-            <button class="ghost-btn" id="addEventBtn" title="Add">＋</button>
+            <button class="ghost-btn icon-only" id="addEventBtn" title="Add" aria-label="Add event" data-icon="plus"></button>
           </div>
           <p class="section-note">Events and unpaid credit reduce only the month and year in which they are due.</p>
           <div id="eventGrid" class="tile-grid"></div>
@@ -284,14 +297,14 @@
         <article class="panel credit-events-panel">
           <div class="panel-head">
             <div><p>Credit</p><h3>Credit Card & PayLater</h3></div>
-            <button class="ghost-btn" id="addCreditBtn" title="Add">＋</button>
+            <button class="ghost-btn icon-only" id="addCreditBtn" title="Add" aria-label="Add credit item" data-icon="plus"></button>
           </div>
           <div id="creditSummary" class="grid-3 compact"></div>
           <div id="creditItems" class="credit-list"></div>
           <div class="entrusted-box">
             <div class="panel-head">
               <div><p>Non-recurring liability</p><h3>Entrusted Funds</h3></div>
-              <button class="ghost-btn" id="addEntrustedBtn" title="Add">＋</button>
+              <button class="ghost-btn icon-only" id="addEntrustedBtn" title="Add" aria-label="Add entrusted funds" data-icon="plus"></button>
             </div>
             <p class="section-note">Active entries reduce either Cash Balance or Stocks once. They never enter recurring expenses or History.</p>
             <div id="entrustedSummary" class="entrusted-summary"></div>
@@ -311,7 +324,7 @@
       </div>
       <div class="toolbar">
         <span class="pill">Drag clients between recurring and ending sections</span>
-        <button class="primary-btn" id="addClientBtn">＋ Client</button>
+        <button class="primary-btn" id="addClientBtn"><span class="button-icon" data-icon="plus"></span>Client</button>
       </div>
 
       <div class="client-metrics compact">
@@ -375,9 +388,9 @@
           <div class="head-actions stock-rate-pills">
             <span id="usdIdrRate" class="pill fx-rate" title="Last saved exchange rate">USD/IDR loading…</span>
             <span id="cryptoMarketStatus" class="crypto-market-status crypto-status-offline" title="Binance public market data">CRYPTO OFFLINE</span>
-            <button id="editFxBtn" class="ghost-btn fx-refresh-btn" type="button" title="Set USD/IDR manually" aria-label="Set USD to IDR manually">✎</button>
-            <button id="refreshFxBtn" class="ghost-btn fx-refresh-btn" type="button" title="Refresh USD/IDR now" aria-label="Refresh USD to IDR exchange rate">↻</button>
-            <button id="investmentDepositBtn" class="primary-btn" type="button">＋ Add Funds</button>
+            <button id="editFxBtn" class="ghost-btn fx-refresh-btn icon-only" type="button" title="Set USD/IDR manually" aria-label="Set USD to IDR manually" data-icon="edit"></button>
+            <button id="refreshFxBtn" class="ghost-btn fx-refresh-btn icon-only" type="button" title="Refresh USD/IDR now" aria-label="Refresh USD to IDR exchange rate" data-icon="refresh"></button>
+            <button id="investmentDepositBtn" class="primary-btn" type="button"><span class="button-icon" data-icon="deposit"></span>Add Funds</button>
           </div>
         </div>
         <div class="trading-wallet-grid investment-wallet-grid">
@@ -401,8 +414,8 @@
           <div><p>Editable positions</p><h3>Holdings</h3></div>
           <div class="head-actions">
             <button class="ghost-btn" id="validateSymbolsBtn" title="Test provider symbols">Test</button>
-            <button class="ghost-btn" id="refreshStocksBtn" title="Refresh market prices">↻</button>
-            <button class="ghost-btn" id="addTickerBtn" title="Add">＋</button>
+            <button class="ghost-btn icon-only" id="refreshStocksBtn" title="Refresh market prices" aria-label="Refresh market prices" data-icon="refresh"></button>
+            <button class="ghost-btn icon-only" id="addTickerBtn" title="Add" aria-label="Add holding" data-icon="plus"></button>
           </div>
         </div>
         <div class="table-wrap">
@@ -442,8 +455,8 @@
           <div><p>Confirmed corporate actions</p><h3>Dividend Income</h3></div>
           <div class="head-actions">
             <span id="dividendSyncMeta" class="pill">Official &amp; provider data</span>
-            <button id="refreshDividendsBtn" class="ghost-btn" type="button" title="Check confirmed dividends">↻</button>
-            <button id="addDividendBtn" class="primary-btn" type="button">＋ Dividend</button>
+            <button id="refreshDividendsBtn" class="ghost-btn icon-only" type="button" title="Check confirmed dividends" aria-label="Check confirmed dividends" data-icon="refresh"></button>
+            <button id="addDividendBtn" class="primary-btn" type="button"><span class="button-icon" data-icon="plus"></span>Dividend</button>
           </div>
         </div>
         <div id="dividendSummary" class="dividend-summary"></div>
@@ -472,7 +485,7 @@
         <article class="panel trading-benchmark-panel">
           <div class="panel-head">
             <div><p>Performance benchmark</p><h3>Portfolio vs S&amp;P 500 / SPY</h3></div>
-            <button id="refreshTradingBtn" class="ghost-btn" type="button" title="Refresh Trading prices">↻</button>
+            <button id="refreshTradingBtn" class="ghost-btn icon-only" type="button" title="Refresh Trading prices" aria-label="Refresh Trading prices" data-icon="refresh"></button>
           </div>
           <div class="benchmark-kpis">
             <span class="portfolio"><small>PORTFOLIO</small><b id="tradingPeriodReturn">0.00%</b></span>
@@ -491,7 +504,7 @@
       <article class="panel trading-wallet-panel">
         <div class="panel-head">
           <div><p>Trading liquidity</p><h3>Netcash &amp; USD Wallet</h3></div>
-          <div class="head-actions"><span id="tradingQuoteSource" class="pill">TWELVE DATA PRIMARY</span><button id="tradingDepositBtn" class="primary-btn" type="button">＋ Add Funds</button></div>
+          <div class="head-actions"><span id="tradingQuoteSource" class="pill">TWELVE DATA PRIMARY</span><button id="tradingDepositBtn" class="primary-btn" type="button"><span class="button-icon" data-icon="deposit"></span>Add Funds</button></div>
         </div>
         <div class="trading-wallet-grid">
           <article class="trading-wallet-card idr"><span class="stock-cash-icon">Rp</span><div><small>NETCASH INDONESIA</small><strong id="tradingCashIdr" class="private">Rp0</strong></div><div class="wallet-card-actions"><button type="button" data-trading-edit="IDR">Edit</button><button type="button" data-trading-withdraw="IDR">Tarik dana</button></div></article>
@@ -502,7 +515,7 @@
       <article class="panel trading-positions-panel">
         <div class="panel-head">
           <div><p>Optional active positions</p><h3>Trading Portfolio</h3></div>
-          <button id="addTradingPositionBtn" class="primary-btn" type="button">＋ Position</button>
+          <button id="addTradingPositionBtn" class="primary-btn" type="button"><span class="button-icon" data-icon="plus"></span>Position</button>
         </div>
         <div id="tradingPositions" class="trading-position-grid"></div>
       </article>
@@ -522,10 +535,10 @@
 
     <section id="electricity" class="page">
       <div class="toolbar">
-        <span class="pill">⚡ Rp1,740 / kWh</span>
+        <span class="pill"><span class="pill-icon" data-icon="bolt"></span>Rp1,740 / kWh</span>
         <div class="electricity-actions">
           <button class="top-up-btn" id="topUpElectricityBtn" type="button">TOP UP</button>
-          <button class="primary-btn" id="addElectricityBtn" type="button">＋ Reading</button>
+          <button class="primary-btn" id="addElectricityBtn" type="button"><span class="button-icon" data-icon="plus"></span>Reading</button>
         </div>
       </div>
 
@@ -599,15 +612,15 @@
     <section id="insights" class="page">
       <div class="insight-top">
         <article class="insight-card big blue">
-          <div class="ic">🛡</div>
+          <div class="ic" data-icon="shield"></div>
           <div><small>Cash Runway</small><strong id="cashRunway">0 months</strong><p>How long your current liquid balance can support the current monthly budget.</p></div>
         </article>
         <article class="insight-card big orange">
-          <div class="ic">🔥</div>
+          <div class="ic" data-icon="bolt"></div>
           <div><small>Largest Expense</small><strong id="largestExpense">—</strong><p>Your biggest spending bucket right now.</p></div>
         </article>
         <article class="insight-card big purple">
-          <div class="ic">🧠</div>
+          <div class="ic" data-icon="insights"></div>
           <div><small>Largest Holding</small><strong id="largestHolding">—</strong><p>Your most concentrated stock position.</p></div>
         </article>
       </div>
@@ -634,7 +647,7 @@
     </section>
   </main>
 
-  <button class="mobile-add-transaction" data-open-tx type="button" aria-label="Add transaction" title="Add transaction">＋</button>
+  <button class="mobile-add-transaction" data-open-tx type="button" aria-label="Add transaction" title="Add transaction" data-icon="plus"></button>
   <footer id="releaseIdentity" class="release-identity" aria-label="Release identity">Pundi v8.7.2 · Beta</footer>
 </div>
 

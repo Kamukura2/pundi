@@ -13,7 +13,7 @@ for (const icon of manifest.icons) assert.ok(existsSync(resolve(root, "public", 
 const index = read("app.html");
 const css = read("styles.css");
 for (const tab of ["accumulation","cashflow","expenses","clients","stocks","trading","electricity","prospect","insights"]) assert.match(index, new RegExp(`id="${tab}"`));
-assert.equal((index.match(/data-page="stocks"/g)||[]).length,2,"Sidebar and data menu must expose one Assets destination");
+assert.equal((index.match(/data-page="stocks"/g)||[]).length,3,"Sidebar, mobile nav, and data menu must expose one Assets destination each");
 assert.match(index,/data-page="stocks"[^>]*>[\s\S]*?Assets/,"The existing Stocks destination must be displayed as Assets");
 assert.doesNotMatch(index,/<span>Stocks<\/span>|>Stocks<\/button>/,"The top-level navigation label must no longer display Stocks");
 assert.doesNotMatch(index,/data-page="trading"/,"Trading must live inside Stocks instead of a separate route");
@@ -52,7 +52,8 @@ assert.match(index,/id="sideAvailableBalance"/,"Desktop sidebar must show Accumu
 assert.match(index,/id="mobileMenuBtn"[^>]*aria-controls="primarySidebar"/,"Mobile header must expose an accessible hamburger control");
 assert.match(index,/id="mobileMenuBackdrop"/,"Mobile drawer must include a dismissible backdrop");
 assert.match(index,/class="mobile-add-transaction"[^>]*data-open-tx/,"Mobile must retain one floating transaction action");
-assert.doesNotMatch(index,/class="mobile-nav"/,"The crowded mobile bottom navigation must be removed");
+assert.match(index,/class="mobile-nav"/,"Mobile navigation must expose the polished bottom destination bar");
+assert.match(index,/class="mobile-nav-add"[^>]*data-open-tx/,"Mobile navigation must expose one central transaction action");
 assert.match(index,/mobile-drawer\.css/);
 const drawerCss=read("mobile-drawer.css");
 assert.match(drawerCss,/v8\.1\.1 simple mobile drawer navigation/);
@@ -539,7 +540,7 @@ assert.match(read("public/sw.js"),/pundi-shell-v8\.7\.2/,"Service-worker cache m
 assert.match(read("vite.config.js"),/__PUNDI_BUILD_ID__/,"Build identity must be injected automatically");
 assert.match(appSource,/Pundi v8\.7\.2 · build/,"Public release identity must include version and build marker");
 assert.match(electricityIndex,/id="topUpElectricityBtn"[^>]*>\s*TOP UP\s*<\/button>/,"Electricity must expose a distinct TOP UP action");
-assert.match(electricityIndex,/id="addElectricityBtn"[^>]*>\s*＋ Reading\s*<\/button>/,"The existing Reading action must remain available");
+assert.match(electricityIndex,/id="addElectricityBtn"[^>]*>[\s\S]*Reading\s*<\/button>/,"The existing Reading action must remain available");
 assert.match(electricityIndex,/id="electricityTopUpModal"/);
 assert.match(electricityIndex,/id="electricityTopUpAmount"/);
 assert.match(electricityIndex,/id="electricityTopUpCancel"/);
