@@ -136,6 +136,10 @@ input:focus,select:focus,textarea:focus,button:focus-visible{outline:3px solid c
 .auth-card [hidden]{display:none!important}
 .auth-card .text-link:not([hidden]){display:flex;align-items:center;justify-content:center;width:100%;min-height:44px;margin-top:2px;padding:10px 14px;border:1px solid rgba(145,214,255,.24);border-radius:13px;background:rgba(255,255,255,.045)!important;color:#D8E8FF!important;font:600 13px/1.2 "Plus Jakarta Sans","Segoe UI",sans-serif;text-decoration:none;appearance:none;-webkit-appearance:none;box-shadow:none;transition:background .18s,border-color .18s,transform .18s}
 .auth-card .text-link:not([hidden]):hover{background:rgba(16,146,255,.16)!important;border-color:rgba(145,214,255,.48);transform:translateY(-1px)}
+.commerce-product{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px}
+.commerce-product>div{min-width:0}
+.commerce-product-icon{display:grid;place-items:center;width:42px;height:42px;border-radius:14px;background:linear-gradient(145deg,#1092FF,#6E63F6);color:#fff;box-shadow:0 10px 24px rgba(16,146,255,.2)}
+.commerce-product-icon .pundi-icon{width:22px;height:22px;color:#fff}
 .chart,.chart svg,.donut-layout,.hero-inline{min-width:0;max-width:100%}
 .chart svg{display:block;width:100%;max-width:100%}
 .auth-locked .release-identity{display:none}
