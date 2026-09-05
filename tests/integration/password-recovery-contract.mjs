@@ -12,9 +12,9 @@ const sw = read("public/sw.js");
 const styles = read("styles.css");
 
 assert.match(sync, /resetPasswordForEmail\(email, \{ redirectTo \}\)/);
-assert.match(sync, /window\.location\.origin\}\/auth\/reset-password/);
+assert.match(sync, /authRedirectOrigin\(\)\}\/auth\/reset-password/);
 assert.match(vercel, /\/auth\/reset-password/);
-assert.match(sw, /pundi-shell-v8\.7\.0/);
+assert.match(sw, /pundi-shell-v8\.8\.0/);
 assert.match(app, /onAuthStateChange\(\(event,session\)=>/);
 assert.match(app, /event!=="PASSWORD_RECOVERY"/);
 assert.match(app, /exchangeCodeForSession\(callbackCode\)/);
