@@ -48,7 +48,7 @@ try {
   await page.locator("#mobileMenuBtn").click();
   assert.equal(await page.locator("body").evaluate(el => el.classList.contains("mobile-menu-open")), true, "mobile drawer must open");
   assert.equal(await page.locator("#mobileMenuBtn").getAttribute("aria-expanded"), "true", "mobile drawer state must be announced");
-  await page.locator("#mobileMenuBackdrop").click();
+  await page.locator("#mobileMenuBackdrop").click({ position: { x: 380, y: 420 } });
   assert.equal(await page.locator("body").evaluate(el => el.classList.contains("mobile-menu-open")), false, "mobile drawer must close");
   await page.locator("#authGate").evaluate(el => { el.hidden = false; });
   await page.locator("#authModeToggle").click();

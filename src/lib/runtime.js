@@ -9,7 +9,7 @@ export function isNativeRuntime() {
 export function isDesktopRuntime() {
   if (typeof window === "undefined") return false;
   const desktopFlag = new URLSearchParams(window.location.search).get("pundi_desktop");
-  return window.location.protocol === "file:" || desktopFlag === "1";
+  return Boolean(window.pundiDesktop?.isDesktop) || window.location.protocol === "file:" || desktopFlag === "1";
 }
 
 export function isAppRuntime() {

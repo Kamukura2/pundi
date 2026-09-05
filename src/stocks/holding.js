@@ -6,6 +6,17 @@ export const isIdxMarket = market => String(market || "").toUpperCase() === "IDX
 export const isCryptoMarket = market => String(market || "").toUpperCase() === "CRYPTO";
 export const quantityUnit = market => isCryptoMarket(market) ? "units" : isIdxMarket(market) ? "lot" : "shares";
 
+export function tradingQuoteKey(position = {}) {
+  const market = String(position.market || "").trim().toUpperCase();
+  const currency = String(position.currency || "").trim().toUpperCase();
+  const symbol = String(position.providerSymbol || position.ticker || position.displaySymbol || "").trim().toUpperCase();
+  return `${market}:${currency}:${symbol}`;
+}
+
+export function persistenceProvider(stock = {}) {
+  return isCryptoAsset(stock) ? "binance" : String(stock.provider || "").trim().toLowerCase();
+}
+
 export function quantityForDisplay(stock) {
   const quantity = Number(stock?.quantity || 0);
   return isIdxMarket(stock?.market) ? quantity / IDX_SHARES_PER_LOT : quantity;

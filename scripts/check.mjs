@@ -80,6 +80,10 @@ assert.match(marketFunction, /data-api\.binance\.vision/);
 assert.match(marketFunction, /open\.er-api\.com/);
 assert.match(marketFunction, /market_data_cache/);
 assert.match(marketFunction, /PROVIDER_CONCURRENCY/);
+assert.match(marketFunction, /MAX_MEMORY_CACHE_ENTRIES/);
+assert.match(marketFunction, /MAX_DURABLE_CACHE_ENTRIES/);
+assert.match(marketFunction, /PUBLIC_HEALTH_GLOBAL_LIMIT/);
+assert.match(marketFunction, /timestampOrNull/);
 const marketClient = read("src/market-data/client.js");
 assert.match(marketClient, /functions\.invoke\("market-data"/);
 assert.doesNotMatch(marketClient, /apiUrl\(/, "Market-data client must not depend on a Vercel API route");
@@ -89,6 +93,7 @@ assert.match(viteConfig, /__PUNDI_SUPABASE_ANON_KEY__/);
 const supabaseClient = read("src/lib/supabase.js");
 assert.match(supabaseClient, /builtPublicConfig/);
 assert.match(read("supabase/migrations/023_market_data_cache.sql"), /revoke all on table public\.market_data_cache from anon, authenticated/);
+assert.match(read("supabase/migrations/024_crypto_price_precision.sql"), /numeric\(28,10\)/);
 
 const jsFiles = ["app.js","api/config.js","api/_lib/rate-limit.js","api/_lib/dividends.js","api/stocks/dividends.js","api/stocks/quote.js","api/stocks/validate.js","api/trading/quote.js","api/trading/benchmark.js","api/cron/refresh-stocks.js","api/crypto/quote.js","src/data/default-data.js","src/data/finance-model.js","src/data/electricity-model.js","src/data/currency-format.js","src/data/money-input.js","src/crypto/binance.js","src/market-data/client.js","supabase/functions/market-data/index.js","src/data/repository.js","src/lib/idb.js","src/lib/supabase.js","src/stocks/client.js","src/stocks/dividends.js","src/stocks/holding.js","src/trading/model.js","src/trading/crypto-lifecycle.js","src/sync/sync-manager.js"];
 for (const file of jsFiles) execFileSync(process.execPath, ["--check", resolve(root, file)], { stdio:"pipe" });
