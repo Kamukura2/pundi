@@ -29,7 +29,7 @@ const iso = value => {
 const timestampOrNull = value => {
   if (value === null || value === undefined || value === "") return null;
   const date = value instanceof Date ? value : new Date(value);
-  return Number.isFinite(date.getTime()) ? date.toISOString() : null;
+  return Number.isFinite(date.getTime()) && date.getTime() > 0 ? date.toISOString() : null;
 };
 const parseMarketTimestamp = value => {
   if (value === null || value === undefined || value === "") return Date.now();
@@ -307,8 +307,9 @@ async function fallbackFx() {
   const rate = Number(body?.rates?.IDR);
   if (!validFx(rate)) throw error("Fallback FX provider returned an invalid rate.", { code: "fx_payload_invalid", status: 502, state: "OFFLINE", retryable: true, provider: "open-er-api" });
   const stamp = body?.time_last_update_unix ? Number(body.time_last_update_unix) * 1000 : null;
-  const status = timestampOrNull(stamp) ? "FALLBACK" : "STALE";
-  return { ok: true, type: "fx", pair: "USD/IDR", normalizedSymbol: "USD/IDR", provider: "open-er-api", currency: "IDR", rate, price: rate, status, state: status, quoteTimestamp: timestampOrNull(stamp), asOf: timestampOrNull(stamp), errorClass: stamp ? null : "provider_timestamp_missing", retryable: !stamp, fallbackFrom: "yahoo" };
+  const asOf = timestampOrNull(stamp);
+  const status = asOf ? "FALLBACK" : "STALE";
+  return { ok: true, type: "fx", pair: "USD/IDR", normalizedSymbol: "USD/IDR", provider: "open-er-api", currency: "IDR", rate, price: rate, status, state: status, quoteTimestamp: asOf, asOf, errorClass: asOf ? null : "provider_timestamp_missing", retryable: !asOf, fallbackFrom: "yahoo" };
 }
 
 async function yahooHistory(symbol = "SPY") {
@@ -434,19 +435,21 @@ async function pruneDurableCache(headers, base) {
   const expired = new URL(table);
   expired.searchParams.set("expires_at", `lt.${new Date().toISOString()}`);
   await fetchWithTimeout(expired, { method: "DELETE", headers: { ...headers, Prefer: "return=minimal" } }, CACHE_REQUEST_TIMEOUT_MS);
-  const overflow = new URL(table);
-  overflow.searchParams.set("select", "cache_key");
-  overflow.searchParams.set("order", "updated_at.asc");
-  overflow.searchParams.set("offset", String(MAX_DURABLE_CACHE_ENTRIES));
-  overflow.searchParams.set("limit", "100");
-  const rows = await fetchWithTimeout(overflow, { headers }, CACHE_REQUEST_TIMEOUT_MS);
-  if (!Array.isArray(rows)) return;
-  for (const row of rows) {
-    if (!row?.cache_key) continue;
-    const remove = new URL(table);
-    remove.searchParams.set("cache_key", `eq.${row.cache_key}`);
-    await fetchWithTimeout(remove, { method: "DELETE", headers: { ...headers, Prefer: "return=minimal" } }, CACHE_REQUEST_TIMEOUT_MS);
-  }
+  const cutoff = new URL(table);
+  cutoff.searchParams.set("select", "updated_at,cache_key");
+  cutoff.searchParams.set("order", "updated_at.desc,cache_key.desc");
+  cutoff.searchParams.set("offset", String(MAX_DURABLE_CACHE_ENTRIES - 1));
+  cutoff.searchParams.set("limit", "1");
+  const rows = await fetchWithTimeout(cutoff, { headers }, CACHE_REQUEST_TIMEOUT_MS);
+  const boundary = Array.isArray(rows) ? rows[0] : null;
+  if (!boundary?.updated_at || !boundary?.cache_key) return;
+  const removeOlder = new URL(table);
+  removeOlder.searchParams.set("updated_at", `lt.${boundary.updated_at}`);
+  await fetchWithTimeout(removeOlder, { method: "DELETE", headers: { ...headers, Prefer: "return=minimal" } }, CACHE_REQUEST_TIMEOUT_MS);
+  const removeTied = new URL(table);
+  removeTied.searchParams.set("updated_at", `eq.${boundary.updated_at}`);
+  removeTied.searchParams.set("cache_key", `lt.${boundary.cache_key}`);
+  await fetchWithTimeout(removeTied, { method: "DELETE", headers: { ...headers, Prefer: "return=minimal" } }, CACHE_REQUEST_TIMEOUT_MS);
 }
 
 async function readCache(key, { allowExpired = true } = {}) {
@@ -473,7 +476,7 @@ async function readCache(key, { allowExpired = true } = {}) {
 async function writeDurableCache(key, payload, ttlMs) {
   const headers = cacheServiceHeaders();
   const base = env("SUPABASE_URL");
-  if (!headers || !base || !payload?.quoteTimestamp) return;
+  if (!headers || !base || !payload?.quoteTimestamp || !["LIVE", "DELAYED", "FALLBACK"].includes(String(payload.status || "").toUpperCase())) return;
   const expiresAt = new Date(Date.now() + ttlMs).toISOString();
   const body = { cache_key: key, payload, provider: String(payload.provider || "market-provider"), normalized_symbol: String(payload.normalizedSymbol || payload.pair || key).slice(0, 64), currency: String(payload.currency || "USD"), quote_status: String(payload.status || "STALE"), quote_as_of: payload.quoteTimestamp, expires_at: expiresAt, updated_at: new Date().toISOString() };
   try {
@@ -717,6 +720,6 @@ export function resetMarketDataTestState() {
   RATE_BUCKETS.clear();
 }
 
-export { handle as handleRequest, quoteEquity, quoteCrypto, quoteFx, parseCryptoInput, normalizeEquityMapping };
+export { handle as handleRequest, quoteEquity, quoteCrypto, quoteFx, parseCryptoInput, normalizeEquityMapping, pruneDurableCache };
 
 if (typeof Deno !== "undefined" && Deno.serve) Deno.serve(handle);

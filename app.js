@@ -1463,10 +1463,16 @@ async function refreshCryptoMarketData(){
  try{
   const body=await fetchCryptoQuotes(requests);
   const quotes=body.quotes||[];
-  quotes.forEach(quote=>handleCryptoTicker(quote.id,quote));
   const expectedIds=new Set(requests.map(request=>String(request.id)));
-  const receivedIds=new Set(quotes.map(quote=>String(quote?.id||quote?.normalizedSymbol||"")).filter(Boolean));
-  const degraded=quotes.some(quote=>quote?.ok===false||["STALE","OFFLINE"].includes(String(quote?.status||quote?.state||"").toUpperCase()))||receivedIds.size<expectedIds.size;
+  const receivedIds=new Set();
+  const consideredQuotes=quotes.filter(quote=>{
+   const id=String(quote?.id||quote?.normalizedSymbol||"");
+   if(!id||!expectedIds.has(id))return false;
+   receivedIds.add(id);
+   return true;
+  });
+  consideredQuotes.forEach(quote=>handleCryptoTicker(quote.id,quote));
+  const degraded=consideredQuotes.some(quote=>quote?.ok===false||!Number.isFinite(Number(quote?.price))||Number(quote.price)<=0||["STALE","OFFLINE"].includes(String(quote?.status||quote?.state||"").toUpperCase()))||receivedIds.size!==expectedIds.size;
   setCryptoMarketStatus({state:degraded?"stale":"live",reason:degraded?"Shared market data service returned partial or stale data":"Shared market data service"});
  }catch(error){setCryptoMarketStatus({state:"stale",reason:error.message});}
 }

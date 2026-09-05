@@ -5,7 +5,7 @@ process.env.SUPABASE_ANON_KEY = "";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "";
 
 const service = await import("../../supabase/functions/market-data/index.js");
-const { quoteEquity, quoteCrypto, quoteFx, marketStatus, normalizeEquityMapping, parseCryptoInput, handleRequest, resetMarketDataTestState } = service;
+const { quoteEquity, quoteCrypto, quoteFx, marketStatus, normalizeEquityMapping, parseCryptoInput, handleRequest, resetMarketDataTestState, pruneDurableCache } = service;
 
 const yahooBody = (symbol, price, stamp = Math.floor(Date.now() / 1000)) => ({
   chart: {
@@ -169,6 +169,38 @@ assert.equal(unknownAge.asOf, null);
 assert.equal(unknownAge.status, "STALE");
 assert.equal(unknownAge.state, "STALE");
 
+// Missing Binance closeTime must not become a 1970 LIVE quote or durable cache entry.
+resetMarketDataTestState();
+setProvider(async url => {
+  if (url.includes("binance.vision")) return jsonResponse({ lastPrice: "2" });
+  throw new Error(`Unexpected timestamp probe: ${url}`);
+});
+const missingBinanceTimestamp = await quoteCrypto({ symbol: "ZED", quote: "USD" }, { ignoreCache: true });
+assert.equal(missingBinanceTimestamp.status, "STALE");
+assert.equal(missingBinanceTimestamp.state, "STALE");
+assert.equal(missingBinanceTimestamp.asOf, null);
+assert.equal(missingBinanceTimestamp.quoteTimestamp, null);
+
+// A stale quote with a dependency timestamp must still not be durably persisted.
+process.env.SUPABASE_URL = "https://cache.test";
+process.env.SUPABASE_SERVICE_ROLE_KEY = "test";
+const stalePersistenceCalls = [];
+setProvider(async (url, options = {}) => {
+  const request = new URL(url);
+  const method = options.method || "GET";
+  stalePersistenceCalls.push({ request, method });
+  if (request.hostname === "cache.test") return jsonResponse([]);
+  if (request.hostname === "data-api.binance.vision") return jsonResponse({ lastPrice: "2" });
+  throw new Error(`Unexpected stale persistence call: ${url}`);
+});
+const stalePersistenceQuote = await quoteCrypto({ symbol: "YAK", quote: "USD" }, { ignoreCache: true });
+assert.equal(stalePersistenceQuote.status, "STALE");
+await new Promise(resolve => setTimeout(resolve, 0));
+assert.equal(stalePersistenceCalls.some(call => call.method === "POST"), false);
+assert.equal(stalePersistenceCalls.some(call => call.method === "DELETE"), false);
+process.env.SUPABASE_URL = "";
+process.env.SUPABASE_SERVICE_ROLE_KEY = "";
+
 // Derived IDR crypto must inherit a stale FX dependency state.
 resetMarketDataTestState();
 const originalNowValue = Date.now;
@@ -213,6 +245,29 @@ for (let attempt = 0; attempt < 6; attempt++) assert.equal((await handleRequest(
 const limitedHealth = await handleRequest(new Request("https://edge.test/market-data?action=health"));
 assert.equal(limitedHealth.status, 429);
 
+// Durable cache pruning keeps the newest 500 rows and removes every older row.
+const durableCalls = [];
+const cutoff = "2026-01-01T00:00:00.500Z";
+const cutoffKey = "boundary-key";
+responder = async (url, options = {}) => {
+  const request = new URL(String(url));
+  const method = options.method || "GET";
+  durableCalls.push({ request, method });
+  if (method === "GET") return jsonResponse([{ updated_at: cutoff, cache_key: cutoffKey }]);
+  return jsonResponse([]);
+};
+await pruneDurableCache({ apikey: "test", Authorization: "Bearer test" }, "https://cache.test");
+const cutoffRequest = durableCalls.find(call => call.method === "GET");
+assert.equal(cutoffRequest.request.searchParams.get("select"), "updated_at,cache_key");
+assert.equal(cutoffRequest.request.searchParams.get("order"), "updated_at.desc,cache_key.desc");
+assert.equal(cutoffRequest.request.searchParams.get("offset"), "499");
+assert.equal(cutoffRequest.request.searchParams.get("limit"), "1");
+const oldRequest = durableCalls.find(call => call.method === "DELETE" && call.request.searchParams.get("updated_at")?.startsWith("lt."));
+assert.equal(oldRequest.request.searchParams.get("updated_at"), `lt.${cutoff}`);
+const tieRequest = durableCalls.find(call => call.method === "DELETE" && call.request.searchParams.get("updated_at")?.startsWith("eq."));
+assert.equal(tieRequest.request.searchParams.get("updated_at"), `eq.${cutoff}`);
+assert.equal(tieRequest.request.searchParams.get("cache_key"), `lt.${cutoffKey}`);
+
 // Restore process-global fetch for the runner.
 globalThis.fetch = originalFetch;
-console.log(JSON.stringify({ status: "PASS", checks: ["mapping", "idx", "us", "direct-idr", "crypto-fallback", "fx", "cache", "stale", "negative", "health"] }));
+console.log(JSON.stringify({ status: "PASS", checks: ["mapping", "idx", "us", "direct-idr", "crypto-fallback", "fx", "cache", "stale", "negative", "health", "timestamp", "durable-prune"] }));
