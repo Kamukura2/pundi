@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate Pundi V3.2 web, Android, and Windows icon assets.
+"""Generate Pundi V3.3 web, Android, and Windows icon assets.
 
 The only logo input is the owner-approved white logogram. The output icons use
 that mark without a wordmark and keep a dark blue/blue-gradient surround.
@@ -18,6 +18,7 @@ ANDROID = ROOT / "android" / "app" / "src" / "main" / "res"
 TOP = (13, 27, 61, 255)
 BOTTOM = (16, 146, 255, 255)
 LOGO_FRACTION = 0.68
+FAVICON_LOGO_FRACTION = 0.41
 
 
 def source_mark() -> Image.Image:
@@ -48,12 +49,16 @@ def gradient(size: int) -> Image.Image:
     return image
 
 
-def app_icon(size: int) -> Image.Image:
-    return Image.alpha_composite(gradient(size), logo_layer(size))
+def app_icon(size: int, fraction: float = LOGO_FRACTION) -> Image.Image:
+    return Image.alpha_composite(gradient(size), logo_layer(size, fraction))
 
 
 def transparent_icon(size: int) -> Image.Image:
     return logo_layer(size)
+
+
+def favicon_icon(size: int) -> Image.Image:
+    return app_icon(size, FAVICON_LOGO_FRACTION)
 
 
 def write_png(path: Path, image: Image.Image) -> None:
@@ -66,10 +71,11 @@ def main() -> None:
     DESKTOP.mkdir(parents=True, exist_ok=True)
 
     icon_1024 = app_icon(1024)
-    write_png(WEB / "pundi-app-icon-1024.png", icon_1024)
-    write_png(WEB / "icon-192.png", icon_1024.resize((192, 192), Image.Resampling.LANCZOS))
-    icon_512 = icon_1024.resize((512, 512), Image.Resampling.LANCZOS)
-    write_png(WEB / "icon-512.png", icon_512)
+    favicon_1024 = favicon_icon(1024)
+    write_png(WEB / "pundi-app-icon-1024.png", favicon_1024)
+    write_png(WEB / "icon-192.png", favicon_1024.resize((192, 192), Image.Resampling.LANCZOS))
+    favicon_512 = favicon_1024.resize((512, 512), Image.Resampling.LANCZOS)
+    write_png(WEB / "icon-512.png", favicon_512)
 
     # A self-contained favicon SVG avoids old external/wordmark references.
     encoded = b64encode((WEB / "icon-512.png").read_bytes()).decode("ascii")
@@ -87,17 +93,18 @@ def main() -> None:
         write_png(ANDROID / f"mipmap-{density}" / "ic_launcher_round.png", app_icon(size))
         write_png(ANDROID / f"mipmap-{density}" / "ic_launcher_foreground.png", transparent_icon(size))
 
-    icon_1024.save(
+    favicon_1024.save(
         WEB / "icon.ico",
         format="ICO",
         sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)],
     )
+    (WEB.parent / "favicon.ico").write_bytes((WEB / "icon.ico").read_bytes())
     icon_1024.save(
         DESKTOP / "pundi.ico",
         format="ICO",
         sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)],
     )
-    print("Generated Pundi V3.2 icon assets from", SOURCE)
+    print("Generated Pundi V3.3 icon assets from", SOURCE)
     print("Web: icon.svg, icon-192.png, icon-512.png, pundi-app-icon-1024.png")
     print("Android: adaptive drawable/pundi_icon.png plus mdpi/hdpi/xhdpi/xxhdpi/xxxhdpi")
     print("Windows: desktop/pundi.ico (16, 24, 32, 48, 64, 128, 256 px)")

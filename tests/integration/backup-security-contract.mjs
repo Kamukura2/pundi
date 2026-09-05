@@ -43,7 +43,6 @@ assert.equal(serialized.includes("admin_role"), false);
 assert.equal(exported.userId, "owner-a", "format metadata may retain the exporting user id");
 
 const app = await readFile(new URL("../../app.js", import.meta.url), "utf8");
-const importHandler = app.slice(app.indexOf("backupFile.onchange"), app.indexOf("legacyImportBtn.onclick"));
-assert(importHandler.indexOf("validateBackup") < importHandler.indexOf("confirm("), "invalid backups must be validated before replacement confirmation");
+assert.doesNotMatch(app, /backupFile\.onchange|legacyImportBtn\.onclick|exportBackupBtn\.onclick|importBackupBtn\.onclick/, "backup controls are not part of the production UI");
 
-console.log("Backup security contract PASS: invalid schema, ownership, secrets, duplicate IDs, numeric safety, export privacy, and import validation ordering");
+console.log("Backup security contract PASS: invalid schema, ownership, secrets, duplicate IDs, numeric safety, export privacy, and no production backup controls");

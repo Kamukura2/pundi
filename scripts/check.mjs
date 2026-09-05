@@ -300,7 +300,7 @@ assert.equal(packageJson.scripts["test:password-recovery"],"node tests/integrati
 assert.match(accountLifecycleIntegration,/explicit Pundi test configuration/);
 assert.match(accountLifecycleIntegration,/admin\.auth\.admin\.createUser/);
 assert.match(accountLifecycleIntegration,/admin\.auth\.admin\.deleteUser/);
-for (const marker of ["resetPasswordForEmail","emailRedirectTo","updateUser","changePassword","prompt","DELETE","Final confirmation"]) assert.match(accountLifecycle+authSyncSource,new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")),`Account lifecycle contract missing ${marker}`);
+for (const marker of ["resetPasswordForEmail","emailRedirectTo","updateUser","changePassword","DELETE"]) assert.match(accountLifecycle+authSyncSource,new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")),`Account lifecycle contract missing ${marker}`);
 for (const marker of ["/auth/reset-password","PASSWORD_RECOVERY","recoveryMode","expectedUserId","Password updated successfully.","Request a new reset link"]) assert.match(authAppSource+authSyncSource,new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")),`Password recovery contract missing ${marker}`);
 for (const marker of ["auth.getUser","auth.admin.deleteUser","confirmation_required","admin_deletion_blocked","clearUserScopedState","scope:\"local\""]) assert.match(accountApi+accountLifecycle+authSyncSource,new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")),`Account lifecycle security missing ${marker}`);
 assert.doesNotMatch(accountApi,/body\.user_id|request\.body\.user_id/i,"Account deletion must use JWT identity, not client user ID");

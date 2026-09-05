@@ -32,7 +32,9 @@ try {
   for (const target of ["accumulation", "cashflow", "stocks"]) { await page.locator(`[data-page="${target}"]`).first().click(); await page.locator(`#${target}`).waitFor({ state: "visible", timeout: 10000 }); }
   await page.locator("#dataBtn").click();
   await page.locator("#dataModal").waitFor({ state: "visible", timeout: 10000 });
-  for (const id of ["accountEmail", "accountCreatedAt", "accountPlan", "accountStatus", "changePasswordBtn", "logoutBtn", "deleteAccountBtn"]) assert.equal(await page.locator(`#${id}`).count(), 1);
+  for (const id of ["accountEmail", "accountPlan", "accountPlanDetail", "changePasswordBtn", "logoutBtn"]) assert.equal(await page.locator(`#${id}`).count(), 1);
+  for (const id of ["accountCreatedAt", "accountStatus", "deleteAccountBtn", "exportBackupBtn", "importBackupBtn", "legacyImportBtn", "seedDataBtn"]) assert.equal(await page.locator(`#${id}`).count(), 0);
+  assert.doesNotMatch(await page.locator("#dataModal").innerText(), /Failed to fetch|Created\s+\S+|Plan\s*\S+\s*status\s*\S+/i);
   const token = await page.evaluate(() => {
     for (const key of Object.keys(localStorage)) { try { const value = JSON.parse(localStorage.getItem(key)); if (value?.access_token) return value.access_token; } catch {} }
     return null;
