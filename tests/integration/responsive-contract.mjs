@@ -23,7 +23,7 @@ try {
   assert.equal(await page.locator("#authConfirmField").isHidden(), true, "sign-in must not show confirmation field");
   assert.equal(await page.locator(".mobile-nav").count(), 0, "legacy mobile dock must be removed");
   assert.equal(await page.locator(".mobile-add-transaction").count(), 1, "mobile transaction action must remain floating");
-  const viewports = [[360,800],[390,844],[768,1024],[1366,768],[1920,1080]];
+  const viewports = [[360,800],[390,844],[768,1024],[1280,720],[1366,768],[1440,900],[1920,1080]];
   for (const [width,height] of viewports) {
     await page.setViewportSize({width,height});
     const result = await page.evaluate(() => ({
@@ -44,6 +44,13 @@ try {
     assert.equal(result.floatingAction, true, `floating action missing at ${width}x${height}`);
   }
   await page.setViewportSize({width:390,height:844});
+  await page.locator("#authGate").evaluate(el => { el.hidden = true; });
+  await page.locator("#mobileMenuBtn").click();
+  assert.equal(await page.locator("body").evaluate(el => el.classList.contains("mobile-menu-open")), true, "mobile drawer must open");
+  assert.equal(await page.locator("#mobileMenuBtn").getAttribute("aria-expanded"), "true", "mobile drawer state must be announced");
+  await page.locator("#mobileMenuBackdrop").click();
+  assert.equal(await page.locator("body").evaluate(el => el.classList.contains("mobile-menu-open")), false, "mobile drawer must close");
+  await page.locator("#authGate").evaluate(el => { el.hidden = false; });
   await page.locator("#authModeToggle").click();
   assert.equal(await page.locator("#authConfirm").isVisible(), true, "sign-up confirmation visible");
   await page.locator("#authModeToggle").click();
@@ -54,7 +61,7 @@ try {
   assert.equal(await page.locator("#authTitle").textContent(), "Sign in", "fresh auth shell returns to sign-in");
   await browser.close();
   browser = null;
-  console.log("Responsive headless contract PASS: five viewports, auth modes, drawer shell, and onboarding bounds");
+  console.log("Responsive headless contract PASS: seven viewports, auth modes, drawer shell, and onboarding bounds");
 } finally {
   if (browser) { try { await browser.close(); } catch {} }
   if (server.exitCode === null && server.pid) {
