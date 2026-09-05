@@ -19,7 +19,10 @@ const appSource = read("app.js");
 assert.match(appSource, /symbolMappings=new Map\(equityPositions\.map\(position=>\[tradingQuoteKey\(position\)/);
 assert.doesNotMatch(appSource, /quotes\.get\("SPY"\)/);
 assert.match(appSource, /priceAsOf=quote\.asOf\|\|quote\.quoteTimestamp\|\|null/);
-assert.match(appSource, /const degraded=quotes\.some\(quote=>quote\?\.ok===false/);
+assert.match(appSource, /const degraded=consideredQuotes\.some\(quote=>quote\?\.ok===false/);
+assert.match(appSource, /const expectedIds=new Set\(requests\.map\(request=>String\(request\.id\)\)\)/);
+assert.match(appSource, /if\(!id\|\|!expectedIds\.has\(id\)\)return false;/);
+assert.match(appSource, /receivedIds\.size!==expectedIds\.size/);
 
 // The schema must retain the eight-decimal crypto price contract.
 const precision = read("supabase/migrations/024_crypto_price_precision.sql");
@@ -76,15 +79,26 @@ const filteredStatuses = [];
 const filteredStream = new CryptoMarketStream({
   fetchQuotes: async () => ({ quotes: [
     { id: "ok", ok: true, price: 10, status: "LIVE" },
-    { id: "unexpected", ok: true, price: 99, status: "LIVE" }
+    { id: "unexpected", ok: true, price: 0, status: "LIVE" }
   ] }),
   onTicker: (id, quote) => filteredTickers.push([id, quote]),
   onStatus: status => filteredStatuses.push(status)
 });
-filteredStream.setRequests([{ id: "ok", symbol: "BTC", quote: "USD" }, { id: "missing", symbol: "ETH", quote: "USD" }]);
-for (let attempt = 0; attempt < 20 && !filteredStatuses.some(status => status.state === "stale"); attempt++) await new Promise(resolve => setTimeout(resolve, 5));
+filteredStream.setRequests([{ id: "ok", symbol: "BTC", quote: "USD" }]);
+for (let attempt = 0; attempt < 20 && !filteredStatuses.some(status => status.state === "live"); attempt++) await new Promise(resolve => setTimeout(resolve, 5));
 assert.deepEqual(filteredTickers.map(([id]) => id), ["ok"]);
-assert.equal(filteredStatuses.at(-1)?.state, "stale");
+assert.equal(filteredStatuses.at(-1)?.state, "live");
 filteredStream.stop();
 
-console.log(JSON.stringify({ status: "PASS", checks: ["crypto-persistence-mapping", "precision-migration", "batch-chunking", "quote-key", "stream-partial-failure", "stream-identity-filter"] }));
+const invalidPriceStatuses = [];
+const invalidPriceStream = new CryptoMarketStream({
+  fetchQuotes: async () => ({ quotes: [{ id: "bad-price", ok: true, price: 0, status: "LIVE" }] }),
+  onTicker: () => {},
+  onStatus: status => invalidPriceStatuses.push(status)
+});
+invalidPriceStream.setRequests([{ id: "bad-price", symbol: "BTC", quote: "USD" }]);
+for (let attempt = 0; attempt < 20 && !invalidPriceStatuses.some(status => status.state === "stale"); attempt++) await new Promise(resolve => setTimeout(resolve, 5));
+assert.equal(invalidPriceStatuses.at(-1)?.state, "stale");
+invalidPriceStream.stop();
+
+console.log(JSON.stringify({ status: "PASS", checks: ["crypto-persistence-mapping", "precision-migration", "batch-chunking", "quote-key", "stream-partial-failure", "stream-identity-filter", "stream-price-validation"] }));

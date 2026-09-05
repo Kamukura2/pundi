@@ -177,13 +177,15 @@ export class CryptoMarketStream {
       if (!quotes.length) throw Object.assign(new Error("No crypto quotes returned."), { code: "crypto_provider_unavailable" });
       const expectedIds = new Set(this.requests.map(request => request.id));
       const receivedIds = new Set();
+      const expectedQuotes = [];
       quotes.forEach(quote => {
         const id = String(quote?.id || quote?.normalizedSymbol || "");
         if (!id || !expectedIds.has(id)) return;
         receivedIds.add(id);
+        expectedQuotes.push(quote);
         this.onTicker(id, quote);
       });
-      const degraded = quotes.some(quote => quote?.ok === false || ["STALE", "OFFLINE"].includes(String(quote?.status || quote?.state || "").toUpperCase()))
+      const degraded = expectedQuotes.some(quote => quote?.ok === false || !validCryptoPrice(quote?.price) || ["STALE", "OFFLINE"].includes(String(quote?.status || quote?.state || "").toUpperCase()))
         || [...expectedIds].some(id => !receivedIds.has(id));
       if (degraded) {
         this.onStatus({ state: "stale", reason: "shared market-data service returned partial or stale data" });
