@@ -4,9 +4,9 @@ import { electricityHistoryEvents, electricityPeriods as calculateElectricityPer
 import { formatCryptoQuote, formatFiatCurrency } from "./src/data/currency-format.js";
 import { validateBackup } from "./src/data/repository.js";
 import { formatMoneyInput, isMoneyField, parseMoneyInput } from "./src/data/money-input.js";
-import { CryptoMarketStream, convertCryptoPrice, fetchBinanceTicker, isCryptoAsset, normalizeCryptoSymbol, normalizeQuoteValueToIdr, parseCryptoPairInput, providerQuoteCurrency, resolveCryptoPair } from "./src/crypto/binance.js";
+import { CryptoMarketStream, convertCryptoPrice, fetchBinanceTicker, fetchCryptoQuotes, isCryptoAsset, normalizeCryptoSymbol, normalizeQuoteValueToIdr, parseCryptoPairInput, providerQuoteCurrency, resolveCryptoPair } from "./src/crypto/binance.js";
 import { SyncManager } from "./src/sync/sync-manager.js";
-import { fetchHoldingDividends, fetchHoldingQuote, fetchTradingBenchmark, fetchTradingQuote, fetchUsdIdrRate, isPriceStale, validateHoldingSymbol } from "./src/stocks/client.js";
+import { fetchHoldingDividends, fetchHoldingQuote, fetchHoldingQuotes, fetchTradingBenchmark, fetchTradingQuote, fetchUsdIdrRate, isPriceStale, validateHoldingSymbol } from "./src/stocks/client.js";
 import { normalizeStockMapping, quantityForDisplay, quantityForStorage, quantityUnit } from "./src/stocks/holding.js";
 import { advanceDividendLifecycle, creditDividendToWallet, dividendEventYear, dividendGross, dividendNativeGross, dividendReceivables, mergeDividendEvents, projectedDividendForMonth, reconcileDividendState, reverseDividendCredit, summarizeDividends } from "./src/stocks/dividends.js";
 import { getAuthenticatedSession, getSupabase } from "./src/lib/supabase.js";
@@ -14,11 +14,12 @@ import { applyOpeningPosition, applyTrade, archiveClosedTradingPositions, cashEv
 import { historicalCryptoQuote } from "./src/trading/crypto-lifecycle.js";
 import { feedbackPayload } from "./src/feedback/contract.js";
 import { fetchCommerceAccount, fetchCommerceCatalog, fetchCommerceStatus, createCommerceCheckout, loadMidtransSnap } from "./src/commerce/client.js";
-import { apiUrl, isNativeRuntime } from "./src/lib/runtime.js";
+import { apiUrl, isAppRuntime } from "./src/lib/runtime.js";
 import { initializeNativeShell } from "./src/lib/native-shell.js";
+import { pundiIcon } from "./src/ui/pundi-icons.js";
 
 const BUILD_ID = __PUNDI_BUILD_ID__;
-const APP_VERSION = "8.7.2";
+const APP_VERSION = "8.8.0";
 
 const COLORS=["#7F66FF","#39C3FF","#FF8F63","#36D695","#F4C24F","#FF6EA8","#62C8FF","#8D7AFF"];
 const COMPANY_EXPENSE_TAG="Expense Perusahaan";
@@ -84,13 +85,16 @@ const save=(options)=>syncManager?.persist(state,options);
 const saveSettings=()=>save();
 const q=(s)=>document.querySelector(s);
 const qa=(s)=>[...document.querySelectorAll(s)];
+const hydrateIconSlots=()=>qa("[data-icon]").forEach(slot=>{if(!slot.querySelector(".pundi-icon"))slot.innerHTML=pundiIcon(slot.dataset.icon||"info");});
+hydrateIconSlots();
 const releaseIdentity=q("#releaseIdentity");
-if(releaseIdentity) releaseIdentity.textContent = `Pundi v8.7.2 · build ${BUILD_ID} · Beta`;
+if(releaseIdentity) releaseIdentity.textContent = `Pundi v8.8.0 · build ${BUILD_ID} · Beta`;
 const onboardingCard=q("#onboardingCard");
 const onboardingDismiss=q("[data-onboarding-dismiss]");
 const onboardingAddAccount=q("#onboardingAddAccount");
 const onboardingAddTransaction=q("#onboardingAddTransaction");
 const onboardingExploreAssets=q("#onboardingExploreAssets");
+const authCard=q(".auth-card");
 const feedbackModal=q("#feedbackModal");
 const feedbackForm=q("#feedbackForm");
 const feedbackCategory=q("#feedbackCategory");
@@ -289,7 +293,7 @@ function lineMulti(series,labels=[]){
  </svg>`;
 }
 function listRows(items){
- return items.map(x=>`<div class="list-row"><div class="list-ic">${x.icon||"•"}</div><div class="list-meta"><b>${x.name}</b><small>${x.sub||""}</small></div><div class="list-value ${x.cls||""} private">${x.value||""}</div></div>`).join("");
+ return items.map(x=>`<div class="list-row"><div class="list-ic">${pundiIcon(x.icon||"info")}</div><div class="list-meta"><b>${x.name}</b><small>${x.sub||""}</small></div><div class="list-value ${x.cls||""} private">${x.value||""}</div></div>`).join("");
 }
 function attachTips(){
  const show=(el,e)=>{
@@ -306,7 +310,7 @@ function attachTips(){
  });
 }
 function toastMsg(x){toast.textContent=x;toast.classList.add("show");setTimeout(()=>toast.classList.remove("show"),1400)}
-function setTheme(t){state.theme=t;document.documentElement.dataset.theme=t;localStorage.setItem("pundi-theme-cache",t);saveSettings();themeBtn.textContent=t==="dark"?"☀":"☾"}
+function setTheme(t){state.theme=t;document.documentElement.dataset.theme=t;localStorage.setItem("pundi-theme-cache",t);saveSettings();themeBtn.innerHTML=pundiIcon(t==="dark"?"sun":"moon");themeBtn.setAttribute("aria-label",t==="dark"?"Switch to light theme":"Switch to dark theme")}
 function setStockWorkspace(view,{refresh=true}={}){
  const next=view==="trading"?"trading":"investment";state.stockView=next;
  localStorage.setItem("pundi-stock-view-cache",next);
@@ -343,24 +347,24 @@ function renderAccumulation(){
  outstandingIncome.textContent=fmt(totalOutstanding());
  cashHealth.textContent=projected>monthlyBudget()*2?"Healthy projected net worth":projected>0?"Positive projected net worth":"Negative projected net worth";
  accChart.innerHTML=line(timeline.map(row=>row.nw),timeline.map(row=>new Intl.DateTimeFormat(state.language==="id"?"id-ID":"en-US",{month:"short"}).format(new Date(row.year,row.month,1))),true);
- accountList.innerHTML=listRows(state.accounts.map(a=>({icon:a.type==="Cash"?"💵":a.type==="Bank"?"🏦":"📱",name:a.name,sub:a.type,value:fmt(a.balance)})));
- paymentSummary.innerHTML=listRows(receivableClients().map(c=>({icon:c.clientType==="ending"?"⚑":c.status==="paid"?"✅":"⏳",name:c.name,sub:c.clientType==="ending"?"Ending client":`Paid ${fmt(c.paid)}`,value:fmt(clientOutstanding(c)),cls:clientOutstanding(c)===0?"positive":""})));
+ accountList.innerHTML=listRows(state.accounts.map(a=>({icon:a.type==="Cash"?"cash":a.type==="Bank"?"bank":"wallet",name:a.name,sub:a.type,value:fmt(a.balance)})));
+ paymentSummary.innerHTML=listRows(receivableClients().map(c=>({icon:c.clientType==="ending"?"flag":c.status==="paid"?"check":"clock",name:c.name,sub:c.clientType==="ending"?"Ending client":`Paid ${fmt(c.paid)}`,value:fmt(clientOutstanding(c)),cls:clientOutstanding(c)===0?"positive":""})));
  pendingSummary.innerHTML=listRows([
-  {icon:"🧾",name:"Remaining monthly budget",sub:"Only the unpaid portion this month",value:fmt(current.recurringExpense)},
-  {icon:"📅",name:"Yearly due",sub:"Due or overdue this month",value:fmt(current.yearlyExpense)},
-  {icon:"📌",name:"Events + credit due",sub:"Only items due this month",value:fmt(current.eventExpense+current.creditExpense)}
-  ,{icon:"🫱🏻‍🫲🏽",name:"Entrusted funds",sub:"Active cash + stock liabilities",value:`−${fmt(entrustedTotal())}`}
+  {icon:"expenses",name:"Remaining monthly budget",sub:"Only the unpaid portion this month",value:fmt(current.recurringExpense)},
+  {icon:"calendar",name:"Yearly due",sub:"Due or overdue this month",value:fmt(current.yearlyExpense)},
+  {icon:"pin",name:"Events + credit due",sub:"Only items due this month",value:fmt(current.eventExpense+current.creditExpense)}
+  ,{icon:"income",name:"Entrusted funds",sub:"Active cash + stock liabilities",value:`−${fmt(entrustedTotal())}`}
  ]);
  balanceDonut.innerHTML=donut(state.accounts.map(a=>[a.name,Number(a.balance)]),fmt(accountTotal(),true));
  balanceLegend.innerHTML=legend(state.accounts.map(a=>[a.name,Number(a.balance)]));
  monthModel.innerHTML=listRows([
-  {icon:"🏦",name:"Starting balance",sub:"Cash, bank & wallets after entrusted funds",value:fmt(netAccountTotal()),cls:netAccountTotal()<0?"negative":"positive"},
-  {icon:"📥",name:"Outstanding clients",sub:"Recurring + ending, unpaid only",value:fmt(current.income),cls:"positive"},
-  {icon:"📓",name:"History entries",sub:"Tracking only · excluded from assets and projection",value:"Ledger only"},
-  {icon:"🧾",name:"Remaining expenses",sub:"Monthly + yearly + events + credit",value:`−${fmt(current.expenses)}`,cls:"negative"},
-  {icon:"📈",name:"Investment Stocks",sub:"Long-term holdings + optional liquid assets",value:fmt(netPortfolio()),cls:netPortfolio()<0?"negative":"positive"},
-  {icon:"⚡",name:"Trading Stocks",sub:"Active positions + Trading wallets",value:fmt(tradingAssets()),cls:tradingAssets()<0?"negative":"positive"},
-  {icon:"💎",name:"Projected month-end net worth",sub:"Cash after obligations + Investment + Trading",value:fmt(projected),cls:projected<0?"negative":"positive"}
+  {icon:"bank",name:"Starting balance",sub:"Cash, bank & wallets after entrusted funds",value:fmt(netAccountTotal()),cls:netAccountTotal()<0?"negative":"positive"},
+  {icon:"income",name:"Outstanding clients",sub:"Recurring + ending, unpaid only",value:fmt(current.income),cls:"positive"},
+  {icon:"ledger",name:"History entries",sub:"Tracking only · excluded from assets and projection",value:"Ledger only"},
+  {icon:"expenses",name:"Remaining expenses",sub:"Monthly + yearly + events + credit",value:`−${fmt(current.expenses)}`,cls:"negative"},
+  {icon:"assets",name:"Investment Stocks",sub:"Long-term holdings + optional liquid assets",value:fmt(netPortfolio()),cls:netPortfolio()<0?"negative":"positive"},
+  {icon:"trading",name:"Trading Stocks",sub:"Active positions + Trading wallets",value:fmt(tradingAssets()),cls:tradingAssets()<0?"negative":"positive"},
+  {icon:"pro",name:"Projected month-end net worth",sub:"Cash after obligations + Investment + Trading",value:fmt(projected),cls:projected<0?"negative":"positive"}
  ]);
 }
 
@@ -370,7 +374,7 @@ function renderCashflow(){
  cashMonthLabel.textContent=activeMonthLabel.toUpperCase();
  cashMonthExpense.textContent=fmt(totalExpense);
  const groupExpenses=field=>Object.entries(expenseRows.reduce((groups,row)=>{const fallback=field==="channel"?"Offline":"Uncategorized",key=String(row[field]||fallback).trim()||fallback;groups[key]=(groups[key]||0)+Number(row.amount);return groups;},{})).sort((a,b)=>b[1]-a[1]);
- const categoryEntries=groupExpenses("category"),channelEntries=groupExpenses("channel"),emptyLegend=`<div class="list-row"><div class="list-ic">ℹ</div><div class="list-meta"><b>No expense this month</b><small>New expenses will appear here automatically</small></div></div>`;
+ const categoryEntries=groupExpenses("category"),channelEntries=groupExpenses("channel"),emptyLegend=`<div class="list-row"><div class="list-ic">${pundiIcon("info")}</div><div class="list-meta"><b>No expense this month</b><small>New expenses will appear here automatically</small></div></div>`;
  cashDonut.innerHTML=donut(categoryEntries.length?categoryEntries:[["No expense",1]],fmt(totalExpense,true));
  cashLegend.innerHTML=categoryEntries.length?legend(categoryEntries):emptyLegend;
  cashChannelDonut.innerHTML=donut(channelEntries.length?channelEntries:[["No expense",1]],fmt(totalExpense,true));
@@ -379,7 +383,7 @@ function renderCashflow(){
  budgetPace.innerHTML=pace.map(([name,spent,budget])=>{
   const pct=budget?spent/budget*100:0, cls=pct>100?"over":pct>80?"warn":"";
   return `<div class="progress-row"><div class="progress-top"><b>${name}</b><small class="private">${fmt(spent)} / ${fmt(budget)}</small></div><div class="progress ${cls}"><span style="width:${Math.min(100,pct)}%"></span></div><small>${pct.toFixed(1)}% used</small></div>`;
- }).join("")||`<div class="list-row"><div class="list-ic">ℹ</div><div class="list-meta"><b>No budget categories</b><small>Add categories in Expenses → Budget</small></div></div>`;
+ }).join("")||`<div class="list-row"><div class="list-ic">${pundiIcon("info")}</div><div class="list-meta"><b>No budget categories</b><small>Add categories in Expenses → Budget</small></div></div>`;
  let list=[...state.transactions];
  const search=(txSearch.value||"").toLowerCase();
  list=list.filter(t=>state.filter==="all"||t.type===state.filter).filter(t=>(`${t.description} ${t.category} ${t.channel}`).toLowerCase().includes(search));
@@ -392,16 +396,16 @@ function renderCashflow(){
   const active=transactionTagFilter?.kind===kind&&transactionTagFilter.value===String(value||"");
   return `<button type="button" class="tx-filter-chip ${kind} ${active?"active":""}" data-tx-tag-kind="${kind}" data-tx-tag-value="${encodeURIComponent(String(value||""))}">${escapeHtml(value||"—")}</button>`;
  };
- const row=t=>`<div class="tx-row"><div class="tx-badge ${t.type}"><span>${t.type==="income" ? "+" : "−"}</span></div><div class="tx-main"><b>${escapeHtml(t.description)}</b></div><div class="tx-meta">${tagChip("category",t.category)}${tagChip("channel",t.channel)}<span class="tx-date">${escapeHtml(t.date)}</span></div><div class="tx-amt ${t.type==="income"?"positive":"negative"} private">${t.type==="income"?"+":"−"}${fmt(t.amount)}</div><button class="icon-mini tx-edit" data-id="${t.id}" title="Edit">✎</button><button class="icon-mini tx-delete" data-delete-tx="${t.id}" title="Delete">🗑</button></div>`;
+ const row=t=>`<div class="tx-row"><div class="tx-badge ${t.type}">${pundiIcon(t.type==="income"?"income":"expenses")}</div><div class="tx-main"><b>${escapeHtml(t.description)}</b></div><div class="tx-meta">${tagChip("category",t.category)}${tagChip("channel",t.channel)}<span class="tx-date">${escapeHtml(t.date)}</span></div><div class="tx-amt ${t.type==="income"?"positive":"negative"} private">${t.type==="income"?"+":"−"}${fmt(t.amount)}</div><button class="icon-mini tx-edit" data-id="${t.id}" title="Edit" aria-label="Edit transaction">${pundiIcon("edit")}</button><button class="icon-mini tx-delete" data-delete-tx="${t.id}" title="Delete" aria-label="Delete transaction">${pundiIcon("trash")}</button></div>`;
  const currentIncome=visibleCurrent.filter(t=>t.type==="income").reduce((sum,t)=>sum+Number(t.amount),0),currentExpense=visibleCurrent.filter(t=>t.type==="expense").reduce((sum,t)=>sum+Number(t.amount),0);
- const currentSection=`<section class="tx-current-month"><div class="tx-period-head"><span><small>CURRENT MONTH</small><b>${activeMonthLabel}</b></span><span class="archive-totals private"><em class="positive">+${fmt(currentIncome)}</em><em class="negative">−${fmt(currentExpense)}</em><small>${visibleCurrent.length} transactions</small></span></div><div class="tx-current-list">${visibleCurrent.length?visibleCurrent.map(row).join(""):`<div class="list-row"><div class="list-ic">ℹ</div><div class="list-meta"><b>No matching transactions this month</b><small>The active month starts fresh automatically; previous records remain in Archive.</small></div></div>`}</div></section>`;
+ const currentSection=`<section class="tx-current-month"><div class="tx-period-head"><span><small>CURRENT MONTH</small><b>${activeMonthLabel}</b></span><span class="archive-totals private"><em class="positive">+${fmt(currentIncome)}</em><em class="negative">−${fmt(currentExpense)}</em><small>${visibleCurrent.length} transactions</small></span></div><div class="tx-current-list">${visibleCurrent.length?visibleCurrent.map(row).join(""):`<div class="list-row"><div class="list-ic">${pundiIcon("info")}</div><div class="list-meta"><b>No matching transactions this month</b><small>The active month starts fresh automatically; previous records remain in Archive.</small></div></div>`}</div></section>`;
  const keys=[...groups.keys()].sort((a,b)=>b.localeCompare(a));
  const archiveSection=`<section class="tx-history-archive"><div class="tx-archive-heading"><div><small>ARCHIVE</small><h4>Previous Months</h4></div><p>Stored permanently and excluded from the current-month totals.</p></div>${keys.map(key=>{
   const rows=sortRows(groups.get(key));
   const [year,month]=key.split("-").map(Number),label=Number.isFinite(month)?new Intl.DateTimeFormat(state.language==="id"?"id-ID":"en-US",{month:"long",year:"numeric"}).format(new Date(year,month-1,1)):key;
   const income=rows.filter(t=>t.type==="income").reduce((sum,t)=>sum+Number(t.amount),0),expense=rows.filter(t=>t.type==="expense").reduce((sum,t)=>sum+Number(t.amount),0);
   return `<details class="tx-archive"><summary><span><small>MONTHLY ARCHIVE</small><b>${label}</b></span><span class="archive-totals private"><em class="positive">+${fmt(income)}</em><em class="negative">−${fmt(expense)}</em><small>${rows.length} transactions</small></span></summary><div class="tx-archive-list">${rows.map(row).join("")}</div></details>`;
- }).join("")||`<div class="list-row"><div class="list-ic">✓</div><div class="list-meta"><b>No previous-month archive yet</b><small>When the month changes, this month's records move here automatically.</small></div></div>`}</section>`;
+ }).join("")||`<div class="list-row"><div class="list-ic">${pundiIcon("info")}</div><div class="list-meta"><b>No previous-month archive yet</b><small>When the month changes, this month's records move here automatically.</small></div></div>`}</section>`;
  txList.innerHTML=currentSection+archiveSection;
  qa("[data-tx-tag-kind]").forEach(button=>button.onclick=()=>{
   const next={kind:button.dataset.txTagKind,value:decodeURIComponent(button.dataset.txTagValue||"")};
@@ -429,7 +433,7 @@ function renderExpenses(){
   const progress=getBudgetProgress(b,state.transactions,new Date());
   const pct=b.monthly?progress.paid/b.monthly*100:0, cls=pct>=100?"done":pct>80?"warn":"";
   const status=progress.status==="done"?"DONE THIS MONTH":progress.status==="partial"?"PARTIAL":"AUTO FROM HISTORY";
-  return `<div class="progress-row budget-progress ${cls}" data-budget-id="${b.id}" title="Drag card to reorder"><div class="progress-top"><b class="budget-category-tag">${b.category}</b><span class="budget-status ${progress.status}">${status}</span></div><div class="progress ${cls}"><span style="width:${Math.min(100,pct)}%"></span></div><div class="budget-numbers private"><small>Paid ${fmt(progress.paid)}</small><b>Remaining ${fmt(progress.remaining)}</b><small>Default ${fmt(b.monthly)}</small></div><div class="tile-actions"><button class="icon-mini" data-edit-budget="${i}" title="Edit">✎</button><button class="icon-mini" data-remove-budget="${i}" title="Remove">🗑</button></div></div>`;
+  return `<div class="progress-row budget-progress ${cls}" data-budget-id="${b.id}" title="Drag card to reorder"><div class="progress-top"><b class="budget-category-tag">${b.category}</b><span class="budget-status ${progress.status}">${status}</span></div><div class="progress ${cls}"><span style="width:${Math.min(100,pct)}%"></span></div><div class="budget-numbers private"><small>Paid ${fmt(progress.paid)}</small><b>Remaining ${fmt(progress.remaining)}</b><small>Default ${fmt(b.monthly)}</small></div><div class="tile-actions"><button class="icon-mini" data-edit-budget="${i}" title="Edit" aria-label="Edit budget">${pundiIcon("edit")}</button><button class="icon-mini" data-remove-budget="${i}" title="Remove" aria-label="Remove budget">${pundiIcon("trash")}</button></div></div>`;
  }).join("");
  qa("[data-edit-budget]").forEach(b=>b.onclick=()=>editMonthly(Number(b.dataset.editBudget)));
  qa("[data-remove-budget]").forEach(b=>b.onclick=()=>{state.budgets.splice(Number(b.dataset.removeBudget),1); save(); renderAll();});
@@ -454,10 +458,10 @@ function renderExpenses(){
  const done=Number(y.lastPaidYear)===currentYear();
   const dueCurrent=!done&&monthIndexFromName(y.month)===new Date().getMonth();
   const dueMonth=String(y.month||"—").slice(0,3).toUpperCase();
-  return `<div class="tile yearly-tile ${done?"done":dueCurrent?"due due-current":"due"}" data-yearly-id="${y.id}" title="Drag card to reorder"><span class="payment-badge ${done?"done":"due"}">${done?`DONE ${currentYear()}`:`DUE ${currentYear()}`} · <b>${dueMonth}</b></span><h4>${escapeHtml(y.name)}</h4><small>${escapeHtml(y.category)}</small><strong class="private">${fmt(y.amount)}</strong><div class="tile-actions"><button class="year-paid-toggle ${done?"done":""}" data-paid-yearly="${i}">${done?"Undo done":"Done this year"}</button><button class="icon-mini" data-edit-yearly="${i}" title="Edit">✎</button><button class="icon-mini" data-remove-yearly="${i}" title="Remove">🗑</button></div></div>`;
- }).join("") || `<div class="list-row"><div class="list-ic">ℹ</div><div class="list-meta"><b>No yearly expenses</b></div></div>`;
+  return `<div class="tile yearly-tile ${done?"done":dueCurrent?"due due-current":"due"}" data-yearly-id="${y.id}" title="Drag card to reorder"><span class="payment-badge ${done?"done":"due"}">${done?`DONE ${currentYear()}`:`DUE ${currentYear()}`} · <b>${dueMonth}</b></span><h4>${escapeHtml(y.name)}</h4><small>${escapeHtml(y.category)}</small><strong class="private">${fmt(y.amount)}</strong><div class="tile-actions"><button class="year-paid-toggle ${done?"done":""}" data-paid-yearly="${i}">${done?"Undo done":"Done this year"}</button><button class="icon-mini" data-edit-yearly="${i}" title="Edit" aria-label="Edit yearly expense">${pundiIcon("edit")}</button><button class="icon-mini" data-remove-yearly="${i}" title="Remove" aria-label="Remove yearly expense">${pundiIcon("trash")}</button></div></div>`;
+ }).join("") || `<div class="list-row"><div class="list-ic">${pundiIcon("info")}</div><div class="list-meta"><b>No yearly expenses</b></div></div>`;
  const now=new Date(),orderedEvents=[...state.events].sort((a,b)=>Number(a.sortOrder||0)-Number(b.sortOrder||0));
- eventGrid.innerHTML=orderedEvents.map(e=>{const i=state.events.indexOf(e),date=new Date(`${e.date}T00:00:00`),tone=date.getFullYear()!==now.getFullYear()?"outside":date.getMonth()===now.getMonth()?"current":"this-year",month=new Intl.DateTimeFormat(state.language==="id"?"id-ID":"en-US",{month:"short"}).format(date).toUpperCase();return `<div class="tile event-tile event-${tone}" data-event-id="${e.id}" title="Drag card to reorder"><span class="event-year">DUE ${date.getFullYear()} · <b>${month}</b></span><h4>${e.name}</h4><small>${e.date} · ${e.category}</small><strong class="private">${fmt(e.amount)}</strong><div class="tile-actions"><button class="icon-mini" data-edit-event="${i}" title="Edit">✎</button><button class="icon-mini" data-remove-event="${i}" title="Remove">🗑</button></div></div>`;}).join("") || `<div class="list-row"><div class="list-ic">ℹ</div><div class="list-meta"><b>No events</b></div></div>`;
+ eventGrid.innerHTML=orderedEvents.map(e=>{const i=state.events.indexOf(e),date=new Date(`${e.date}T00:00:00`),tone=date.getFullYear()!==now.getFullYear()?"outside":date.getMonth()===now.getMonth()?"current":"this-year",month=new Intl.DateTimeFormat(state.language==="id"?"id-ID":"en-US",{month:"short"}).format(date).toUpperCase();return `<div class="tile event-tile event-${tone}" data-event-id="${e.id}" title="Drag card to reorder"><span class="event-year">DUE ${date.getFullYear()} · <b>${month}</b></span><h4>${e.name}</h4><small>${e.date} · ${e.category}</small><strong class="private">${fmt(e.amount)}</strong><div class="tile-actions"><button class="icon-mini" data-edit-event="${i}" title="Edit" aria-label="Edit event">${pundiIcon("edit")}</button><button class="icon-mini" data-remove-event="${i}" title="Remove" aria-label="Remove event">${pundiIcon("trash")}</button></div></div>`;}).join("") || `<div class="list-row"><div class="list-ic">${pundiIcon("info")}</div><div class="list-meta"><b>No events</b></div></div>`;
  qa("[data-edit-yearly]").forEach(b=>b.onclick=()=>editYearly(Number(b.dataset.editYearly)));
  qa("[data-remove-yearly]").forEach(b=>b.onclick=()=>{state.yearly.splice(Number(b.dataset.removeYearly),1); save(); renderAll();});
  qa("[data-paid-yearly]").forEach(b=>b.onclick=()=>{const item=state.yearly[Number(b.dataset.paidYearly)];item.lastPaidYear=Number(item.lastPaidYear)===currentYear()?null:currentYear();save();renderAll();});
@@ -477,7 +481,7 @@ function creditIcon(source){
  return `<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18M7 15h4"/></svg>`;
 }
 function emptyLane(label){
- return `<div class="lane-empty"><span>＋</span><small>${label}</small></div>`;
+ return `<div class="lane-empty"><span>${pundiIcon("plus")}</span><small>${label}</small></div>`;
 }
 
 function bindPointerSort(cardSelector,laneSelector,onCommit){
@@ -579,9 +583,9 @@ function renderCredit(){
   return `<article class="metric-card credit-facility ${creditClass(facility.source)}"><div class="credit-brand-icon">${creditIcon(facility.source)}</div><small>${facility.source}</small><strong class="private">${fmt(used)}</strong><span>Limit ${fmt(facility.limit)}</span></article>`;
  }).join("");
  const activeCredit=state.credit.filter(x=>!x.paid).sort((a,b)=>Number(a.sortOrder||0)-Number(b.sortOrder||0));
- creditItems.innerHTML=activeCredit.map(c=>{const due=new Date(`${c.due}T00:00:00`),month=new Intl.DateTimeFormat(state.language==="id"?"id-ID":"en-US",{month:"short"}).format(due).toUpperCase();return `<div class="credit-row" data-credit-id="${c.id}" title="Drag card to reorder"><input type="checkbox" class="credit-check" data-paid="${c.id}"><div class="credit-source-icon ${creditClass(c.source)}">${creditIcon(c.source)}</div><div class="credit-main"><b>${c.description}</b><small>${c.source} · <span class="credit-due">DUE ${due.getFullYear()} · <b>${month}</b></span></small></div><div class="list-value private">${fmt(c.amount)}</div><button class="icon-mini" data-edit-credit="${c.id}" title="Edit">✎</button><button class="icon-mini" data-del-credit="${c.id}" title="Remove">🗑</button></div>`;}).join("") || `<div class="list-row"><div class="list-ic">ℹ</div><div class="list-meta"><b>No active credit items</b><small>Add an item using the plus button</small></div></div>`;
+ creditItems.innerHTML=activeCredit.map(c=>{const due=new Date(`${c.due}T00:00:00`),month=new Intl.DateTimeFormat(state.language==="id"?"id-ID":"en-US",{month:"short"}).format(due).toUpperCase();return `<div class="credit-row" data-credit-id="${c.id}" title="Drag card to reorder"><input type="checkbox" class="credit-check" data-paid="${c.id}"><div class="credit-source-icon ${creditClass(c.source)}">${creditIcon(c.source)}</div><div class="credit-main"><b>${c.description}</b><small>${c.source} · <span class="credit-due">DUE ${due.getFullYear()} · <b>${month}</b></span></small></div><div class="list-value private">${fmt(c.amount)}</div><button class="icon-mini" data-edit-credit="${c.id}" title="Edit" aria-label="Edit credit item">${pundiIcon("edit")}</button><button class="icon-mini" data-del-credit="${c.id}" title="Remove" aria-label="Remove credit item">${pundiIcon("trash")}</button></div>`;}).join("") || `<div class="list-row"><div class="list-ic">${pundiIcon("info")}</div><div class="list-meta"><b>No active credit items</b><small>Add an item using the plus button</small></div></div>`;
  const paidCredit=state.credit.filter(x=>x.paid).sort((a,b)=>Number(a.sortOrder||0)-Number(b.sortOrder||0));
- creditArchive.innerHTML=paidCredit.length?paidCredit.map(c=>`<div class="list-row credit-archive-row" data-credit-id="${c.id}" title="Drag card to reorder"><div class="list-ic credit-source-icon ${creditClass(c.source)}">${creditIcon(c.source)}</div><div class="list-meta"><b>${c.description}</b><small>${c.source}</small></div><div class="list-value private">${fmt(c.amount)}</div><button class="icon-mini" data-edit-credit="${c.id}" title="Edit">✎</button></div>`).join(""):`<div class="list-row"><div class="list-ic">ℹ</div><div class="list-meta"><b>No archive yet</b></div></div>`;
+ creditArchive.innerHTML=paidCredit.length?paidCredit.map(c=>`<div class="list-row credit-archive-row" data-credit-id="${c.id}" title="Drag card to reorder"><div class="list-ic credit-source-icon ${creditClass(c.source)}">${creditIcon(c.source)}</div><div class="list-meta"><b>${c.description}</b><small>${c.source}</small></div><div class="list-value private">${fmt(c.amount)}</div><button class="icon-mini" data-edit-credit="${c.id}" title="Edit" aria-label="Edit credit item">${pundiIcon("edit")}</button></div>`).join(""):`<div class="list-row"><div class="list-ic">${pundiIcon("info")}</div><div class="list-meta"><b>No archive yet</b></div></div>`;
  qa("[data-paid]").forEach(c=>c.onchange=()=>{const item=state.credit.find(x=>x.id===c.dataset.paid); if(item){item.paid=true; save(); renderAll();}});
  qa("[data-edit-credit]").forEach(c=>c.onclick=()=>editCredit(c.dataset.editCredit));
  qa("[data-del-credit]").forEach(c=>c.onclick=()=>{state.credit=state.credit.filter(x=>x.id!==c.dataset.delCredit); save(); renderAll();});
@@ -596,7 +600,7 @@ function renderEntrusted(){
  const ordered=[...state.entrustedFunds].sort((a,b)=>Number(a.settled)-Number(b.settled)||Number(a.sortOrder||0)-Number(b.sortOrder||0));
  const cash=entrustedTotal("cash"),stocks=entrustedTotal("stocks");
  entrustedSummary.innerHTML=`<span><small>Cash Balance</small><b class="private">−${fmt(cash)}</b></span><span><small>Stocks</small><b class="private">−${fmt(stocks)}</b></span><span><small>Active Liability</small><b class="private">−${fmt(cash+stocks)}</b></span>`;
- entrustedItems.innerHTML=ordered.map(item=>`<div class="entrusted-row ${item.settled?"settled":"active"}" data-entrusted-id="${item.id}" title="Drag card to reorder"><input type="checkbox" data-settled-entrusted="${item.id}" ${item.settled?"checked":""} aria-label="Mark ${item.name} settled"><div class="entrusted-source ${item.source}">${item.source==="cash"?"💵":"📈"}</div><div class="entrusted-main"><b>${item.name}</b><small>${item.source==="cash"?"Cash Balance":"Stocks"} · ${item.settled?"Settled":"Active"}</small></div><strong class="private">−${fmt(item.amount)}</strong><button class="icon-mini" data-edit-entrusted="${item.id}" title="Edit">✎</button><button class="icon-mini" data-delete-entrusted="${item.id}" title="Remove">🗑</button></div>`).join("")||`<div class="list-row"><div class="list-ic">ℹ</div><div class="list-meta"><b>No entrusted funds</b><small>Add money held on behalf of someone else</small></div></div>`;
+ entrustedItems.innerHTML=ordered.map(item=>`<div class="entrusted-row ${item.settled?"settled":"active"}" data-entrusted-id="${item.id}" title="Drag card to reorder"><input type="checkbox" data-settled-entrusted="${item.id}" ${item.settled?"checked":""} aria-label="Mark ${item.name} settled"><div class="entrusted-source ${item.source}">${pundiIcon(item.source==="cash"?"cash":"assets")}</div><div class="entrusted-main"><b>${item.name}</b><small>${item.source==="cash"?"Cash Balance":"Stocks"} · ${item.settled?"Settled":"Active"}</small></div><strong class="private">−${fmt(item.amount)}</strong><button class="icon-mini" data-edit-entrusted="${item.id}" title="Edit" aria-label="Edit entrusted fund">${pundiIcon("edit")}</button><button class="icon-mini" data-delete-entrusted="${item.id}" title="Remove" aria-label="Remove entrusted fund">${pundiIcon("trash")}</button></div>`).join("")||`<div class="list-row"><div class="list-ic">${pundiIcon("info")}</div><div class="list-meta"><b>No entrusted funds</b><small>Add money held on behalf of someone else</small></div></div>`;
  qa("[data-settled-entrusted]").forEach(input=>input.onchange=()=>{const item=state.entrustedFunds.find(row=>row.id===input.dataset.settledEntrusted);if(item){item.settled=input.checked;save();renderAll();}});
  qa("[data-edit-entrusted]").forEach(button=>button.onclick=()=>editEntrusted(button.dataset.editEntrusted));
  qa("[data-delete-entrusted]").forEach(button=>button.onclick=()=>{const item=state.entrustedFunds.find(row=>row.id===button.dataset.deleteEntrusted);if(!item||!confirm(`Delete ${item.name}?`))return;state.entrustedFunds=state.entrustedFunds.filter(row=>row.id!==item.id);save();renderAll();});
@@ -614,7 +618,7 @@ function renderClients(){
  clientIncomeOutstanding.textContent=fmt(income.outstanding);
  clientIncomeRecurring.textContent=fmt(income.recurring);
  clientIncomeRemainingMonths.textContent=`${Math.max(0,11-new Date().getMonth())} remaining months`;
- const card=(c)=>{const i=state.clients.indexOf(c),ending=c.clientType==="ending",outstanding=clientOutstanding(c),paid=ending?c.endingPaid:outstanding===0,visual=ending?(paid?"ending-paid":"ending-unpaid"):paid?"paid":"outstanding",statusIcon=ending?"⚑":paid?"✓":"⏳",statusText=paid?"PAID":fmt(outstanding),meta=ending?(paid?"Final payment completed":"Final payment pending"):`Paid this month: ${fmt(getClientPaidThisMonth(c))} · Previous: ${fmt(c.carry)}`;return `<div class="client-card ${visual} ${ending?"ending":"recurring"}" data-client-id="${c.id}" title="Drag card to reorder or move between sections"><div class="status-icon ${paid?"paid":"pending"}" title="${ending?`ending client · ${paid?"paid":"unpaid"}`:paid?"paid":"outstanding"}">${statusIcon}</div><h4>${escapeHtml(c.name)}</h4><small>${ending?"Final payment":"Recurring monthly"} · ${fmt(c.monthly)}</small><strong class="private client-outstanding-copy ${paid?"is-paid":"is-due"}">${statusText}</strong><small class="client-payment-meta private">${meta}</small><div class="client-actions"><button class="icon-mini" data-edit-client="${i}" title="Edit">✎</button><button class="icon-mini" data-status-client="${i}" title="Status">◉</button><button class="icon-mini" data-remove-client="${i}" title="Remove">🗑</button></div></div>`;};
+ const card=(c)=>{const i=state.clients.indexOf(c),ending=c.clientType==="ending",outstanding=clientOutstanding(c),paid=ending?c.endingPaid:outstanding===0,visual=ending?(paid?"ending-paid":"ending-unpaid"):paid?"paid":"outstanding",statusIcon=ending?"flag":paid?"check":"clock",statusText=paid?"PAID":fmt(outstanding),meta=ending?(paid?"Final payment completed":"Final payment pending"):`Paid this month: ${fmt(getClientPaidThisMonth(c))} · Previous: ${fmt(c.carry)}`;return `<div class="client-card ${visual} ${ending?"ending":"recurring"}" data-client-id="${c.id}" title="Drag card to reorder or move between sections"><div class="status-icon ${paid?"paid":"pending"}" title="${ending?`ending client · ${paid?"paid":"unpaid"}`:paid?"paid":"outstanding"}">${pundiIcon(statusIcon)}</div><h4>${escapeHtml(c.name)}</h4><small>${ending?"Final payment":"Recurring monthly"} · ${fmt(c.monthly)}</small><strong class="private client-outstanding-copy ${paid?"is-paid":"is-due"}">${statusText}</strong><small class="client-payment-meta private">${meta}</small><div class="client-actions"><button class="icon-mini" data-edit-client="${i}" title="Edit" aria-label="Edit client">${pundiIcon("edit")}</button><button class="icon-mini" data-status-client="${i}" title="Status" aria-label="Change client status">${pundiIcon("target")}</button><button class="icon-mini" data-remove-client="${i}" title="Remove" aria-label="Remove client">${pundiIcon("trash")}</button></div></div>`;};
  const recurring=[...recurringClients()].sort((a,b)=>Number(a.sortOrder||0)-Number(b.sortOrder||0)),ending=[...endingClients()].sort((a,b)=>Number(a.sortOrder||0)-Number(b.sortOrder||0));
  recurringClientCount.textContent=recurring.length;endingClientCount.textContent=ending.length;
  recurringClientGrid.innerHTML=recurring.map(card).join("")||emptyLane("No recurring clients");
@@ -656,7 +660,7 @@ function renderStocks(){
  stockWalletValue.textContent=fmt(Number(state.stockExtras?.walletUsd||0)*Number(state.usdIdr||0));
  if(typeof usdIdrRate!=="undefined"){
   const meta=state.usdIdrMeta;
-  const providerLabel=meta?.provider==="yahoo"?"YAHOO FINANCE":meta?.provider==="manual"?"MANUAL":meta?.error?"SAVED RATE · YAHOO UNAVAILABLE":"SAVED RATE · REFRESH YAHOO";
+  const providerLabel=meta?.provider==="yahoo"?"YAHOO FINANCE":meta?.provider==="open-er-api"?"OPEN ER-API":meta?.provider==="manual"?"MANUAL":meta?.error?"SAVED RATE · PROVIDER UNAVAILABLE":"SAVED RATE · REFRESH MARKET DATA";
   usdIdrRate.textContent=`1 USD = ${new Intl.NumberFormat("id-ID",{maximumFractionDigits:2}).format(Number(state.usdIdr||0))} IDR · ${providerLabel}`;
   usdIdrRate.title=meta?.asOf?`${providerLabel} · updated ${new Date(meta.asOf).toLocaleString("en-GB",{dateStyle:"medium",timeStyle:"short"})}`:"Last saved exchange rate";
  }
@@ -671,7 +675,7 @@ function renderStocks(){
   const cryptoPctAttr=crypto?`data-crypto-holding-pct="${s.id}"`:"";
   const cryptoStatusAttr=crypto?`data-crypto-holding-status="${s.id}"`:"";
   const pl=stockValue(s)-invested(s);
-  return `<tr><td data-label="Ticker"><input data-stock="${i}" data-field="ticker" value="${s.ticker}"></td><td data-label="Market"><select data-stock="${i}" data-field="market">${marketSelect}</select></td><td data-label="Provider Symbol"><input data-stock="${i}" data-field="providerSymbol" value="${s.providerSymbol||s.ticker}" ${crypto?"disabled":""}></td><td data-label="Currency"><input value="${s.currency}" title="Selected automatically from market" disabled></td><td data-label="Quantity"><div class="quantity-field"><input data-stock="${i}" data-field="quantity" type="number" min="0" step="${quantityStep}" value="${crypto?plainCryptoNumber(qty):qty}"><small>${unit}</small></div></td><td data-label="Average / Share"><input data-stock="${i}" data-field="avg" type="number" step="${priceStep}" value="${crypto?plainCryptoNumber(s.avg):s.avg}"></td><td data-label="Current / Fallback"><input data-stock="${i}" data-field="current" type="number" step="${priceStep}" value="${crypto?plainCryptoNumber(s.current):s.current}" title="${crypto?"Live Binance price in USDT":"Latest price. Edit only to set a manual fallback."}" ${crypto?`disabled ${cryptoCurrentAttr}`:""}></td><td data-label="Price State"><span class="price-state ${stale?'stale':''}" ${cryptoStatusAttr}>${stale?'STALE · ':''}${statusLabel}</span><small class="price-time">${stamp}</small></td><td data-label="Value" class="private" ${cryptoValueAttr}>${fmt(stockValue(s))}</td><td data-label="Profit / Loss" class="private holding-pl ${pl<0?"negative":pl>0?"positive":""}" ${cryptoPlAttr}><b>${fmt(pl)}</b><small ${cryptoPctAttr}>${percent(pl,invested(s))}</small></td><td class="stock-remove"><button class="icon-mini" data-del-stock="${i}" title="Remove" aria-label="Remove ${s.ticker}">🗑</button></td></tr>`;
+  return `<tr><td data-label="Ticker"><input data-stock="${i}" data-field="ticker" value="${s.ticker}"></td><td data-label="Market"><select data-stock="${i}" data-field="market">${marketSelect}</select></td><td data-label="Provider Symbol"><input data-stock="${i}" data-field="providerSymbol" value="${s.providerSymbol||s.ticker}" ${crypto?"disabled":""}></td><td data-label="Currency"><input value="${s.currency}" title="Selected automatically from market" disabled></td><td data-label="Quantity"><div class="quantity-field"><input data-stock="${i}" data-field="quantity" type="number" min="0" step="${quantityStep}" value="${crypto?plainCryptoNumber(qty):qty}"><small>${unit}</small></div></td><td data-label="Average / Share"><input data-stock="${i}" data-field="avg" type="number" step="${priceStep}" value="${crypto?plainCryptoNumber(s.avg):s.avg}"></td><td data-label="Current / Fallback"><input data-stock="${i}" data-field="current" type="number" step="${priceStep}" value="${crypto?plainCryptoNumber(s.current):s.current}" title="${crypto?"Current shared market quote; direct IDR is preferred where supported":"Latest price. Edit only to set a manual fallback."}" ${crypto?`disabled ${cryptoCurrentAttr}`:""}></td><td data-label="Price State"><span class="price-state ${stale?'stale':''}" ${cryptoStatusAttr}>${stale?'STALE · ':''}${statusLabel}</span><small class="price-time">${stamp}</small></td><td data-label="Value" class="private" ${cryptoValueAttr}>${fmt(stockValue(s))}</td><td data-label="Profit / Loss" class="private holding-pl ${pl<0?"negative":pl>0?"positive":""}" ${cryptoPlAttr}><b>${fmt(pl)}</b><small ${cryptoPctAttr}>${percent(pl,invested(s))}</small></td><td class="stock-remove"><button class="icon-mini" data-del-stock="${i}" title="Remove" aria-label="Remove ${s.ticker}">${pundiIcon("trash")}</button></td></tr>`;
  }).join("");
  qa("[data-stock]").forEach(el=>el.onchange=()=>{
   const i=Number(el.dataset.stock),f=el.dataset.field,s=state.stocks[i];
@@ -751,9 +755,9 @@ function renderDividends(){
   const activeRows=rows.filter(event=>!event.creditedAt&&event.status!=="cancelled"&&dividendEventYear(event)>=year);
   const eventHtml=activeRows.length?activeRows.map(event=>{
    const native=dividendNativeGross(event),date=event.paymentDate||event.recordDate||event.exDate||"Date unavailable",review=event.eligibilityStatus==="review"&&!event.creditedAt,eligibility=dividendEligibilityView(event,holding);
-   return `<div class="dividend-event"><div class="dividend-event-main"><b>${escapeHtml(event.type.toUpperCase())} · ${formatDividendNative(event.amountPerShare,event.currency)} / share</b><small>${escapeHtml(dividendSourceLabel(event))} · ${escapeHtml(date)}</small></div><div class="dividend-event-cell" title="Position owned on the dividend record date"><small>${eligibility.label}</small><b>${Number(eligibility.value).toLocaleString("en-US",{maximumFractionDigits:6})}</b></div><div class="dividend-event-cell"><small>GROSS DIVIDEND</small><b class="private">${formatDividendNative(native,event.currency)}</b></div><div class="dividend-event-cell"><small>PAYMENT DATE</small><b>${escapeHtml(event.paymentDate||"—")}</b></div><div><span class="dividend-status ${event.status} ${review?"review":""}">${review?`Confirm ${eligibility.unit}`:event.status}</span></div><div class="dividend-event-actions">${review?`<button type="button" class="credit" data-credit-dividend="${event.id}" title="Confirm position owned on record date and credit wallet">✓ Confirm</button>`:""}<button type="button" data-edit-dividend="${event.id}" title="Edit dividend">✎</button><button type="button" data-delete-dividend="${event.id}" title="Delete dividend">🗑</button></div></div>`;
+   return `<div class="dividend-event"><div class="dividend-event-main"><b>${escapeHtml(event.type.toUpperCase())} · ${formatDividendNative(event.amountPerShare,event.currency)} / share</b><small>${escapeHtml(dividendSourceLabel(event))} · ${escapeHtml(date)}</small></div><div class="dividend-event-cell" title="Position owned on the dividend record date"><small>${eligibility.label}</small><b>${Number(eligibility.value).toLocaleString("en-US",{maximumFractionDigits:6})}</b></div><div class="dividend-event-cell"><small>GROSS DIVIDEND</small><b class="private">${formatDividendNative(native,event.currency)}</b></div><div class="dividend-event-cell"><small>PAYMENT DATE</small><b>${escapeHtml(event.paymentDate||"—")}</b></div><div><span class="dividend-status ${event.status} ${review?"review":""}">${review?`Confirm ${eligibility.unit}`:event.status}</span></div><div class="dividend-event-actions">${review?`<button type="button" class="credit" data-credit-dividend="${event.id}" title="Confirm position owned on record date and credit wallet">${pundiIcon("check")} Confirm</button>`:""}<button type="button" data-edit-dividend="${event.id}" title="Edit dividend">${pundiIcon("edit")}</button><button type="button" data-delete-dividend="${event.id}" title="Delete dividend">${pundiIcon("trash")}</button></div></div>`;
   }).join(""):`<div class="dividend-empty"><b>0 upcoming dividend</b><span>No active confirmed dividend is stored for ${escapeHtml(holding.ticker)}.</span></div>`;
-  return `<details class="dividend-ticker-card" ${rows.length?"open":""}><summary><div class="dividend-ticker-title"><strong>${escapeHtml(holding.ticker)}</strong><small>${holding.market} · ${holding.currency}</small></div><div class="dividend-ticker-stat"><small>${year} per share</small><b>${formatDividendNative(perShare,holding.currency)}</b></div><div class="dividend-ticker-stat"><small>${year} entitlement</small><b class="private">${fmt(holdingTotal)}</b></div><div class="dividend-ticker-stat"><small>Remaining</small><b class="private">${fmt(remaining)}</b></div><span class="dividend-toggle">⌄</span></summary><div class="dividend-events">${eventHtml}</div></details>`;
+  return `<details class="dividend-ticker-card" ${rows.length?"open":""}><summary><div class="dividend-ticker-title"><strong>${escapeHtml(holding.ticker)}</strong><small>${holding.market} · ${holding.currency}</small></div><div class="dividend-ticker-stat"><small>${year} per share</small><b>${formatDividendNative(perShare,holding.currency)}</b></div><div class="dividend-ticker-stat"><small>${year} entitlement</small><b class="private">${fmt(holdingTotal)}</b></div><div class="dividend-ticker-stat"><small>Remaining</small><b class="private">${fmt(remaining)}</b></div><span class="dividend-toggle">${pundiIcon("chevron-down")}</span></summary><div class="dividend-events">${eventHtml}</div></details>`;
  }).join("");
  dividendCreditHistory.innerHTML=`<section class="dividend-history"><div class="dividend-history-head"><div><p>CONFIRMED RECEIPTS</p><h4>Dividend Credit History</h4></div><span class="pill">${paidRows.length} credited</span></div>${paidRows.length?`<div class="dividend-history-list">${paidRows.map(event=>{
  const creditedNative=Number(event.creditedAmountNative||dividendNativeGross(event)),creditedDate=String(event.creditedAt).slice(0,10);
@@ -870,7 +874,7 @@ function renderTrading(){
   const native=Math.abs(Number(row.quantity||0)*Number(row.price||0));
   const amountIdr=row.type==="deposit"||row.type==="withdraw"?Math.abs(Number(row.externalFlowIdr||0)):native*(["USD","USDT"].includes(String(row.currency||"").toUpperCase())?Number(row.fxRate||state.usdIdr):1);
   const label={opening:"OPEN",deposit:"FUNDS",withdraw:"WITHDRAW",buy:"BUY",sell:"SELL"}[row.type]||row.type.toUpperCase();
-  return `<div class="trading-ledger-row ${row.type}"><i>${row.type==="sell"?"↗":row.type==="buy"||row.type==="opening"?"↘":row.type==="deposit"?"+":"−"}</i><div><b>${label}${row.ticker?` · ${escapeHtml(row.ticker)}`:""}</b><small>${row.date}${row.quantity?` · ${Number(row.quantity).toLocaleString("en-US",{maximumFractionDigits:6})} @ ${plainNumber(row.price)} ${row.currency}`:""}</small></div><strong class="private">${row.type==="buy"?"−":row.type==="sell"?"+":""}${money(amountIdr)}${row.realizedPlIdr?`<small class="${row.realizedPlIdr<0?"negative":"positive"}">P/L ${row.realizedPlIdr>=0?"+":""}${money(row.realizedPlIdr)}</small>`:""}</strong><button type="button" class="trading-ledger-delete" data-trading-ledger-delete="${row.id}" title="Delete this Trading record" aria-label="Delete ${label} record">🗑</button></div>`;
+  return `<div class="trading-ledger-row ${row.type}"><i>${pundiIcon(row.type==="sell"?"arrow-up-right":row.type==="buy"||row.type==="opening"?"arrow-down-right":row.type==="deposit"?"plus":"minus")}</i><div><b>${label}${row.ticker?` · ${escapeHtml(row.ticker)}`:""}</b><small>${row.date}${row.quantity?` · ${Number(row.quantity).toLocaleString("en-US",{maximumFractionDigits:6})} @ ${plainNumber(row.price)} ${row.currency}`:""}</small></div><strong class="private">${row.type==="buy"?"−":row.type==="sell"?"+":""}${money(amountIdr)}${row.realizedPlIdr?`<small class="${row.realizedPlIdr<0?"negative":"positive"}">P/L ${row.realizedPlIdr>=0?"+":""}${money(row.realizedPlIdr)}</small>`:""}</strong><button type="button" class="trading-ledger-delete" data-trading-ledger-delete="${row.id}" title="Delete this Trading record" aria-label="Delete ${label} record">${pundiIcon("trash")}</button></div>`;
  }).join(""):`<div class="trading-empty"><b>No Trading records yet</b><span>Deposits, withdrawals, buys and sells remain permanently recorded here.</span></div>`;
 
  qa("[data-trading-ledger-delete]").forEach(button=>button.onclick=()=>{
@@ -1013,8 +1017,8 @@ function renderElectricityHistory(){
   const anomaly=!topUp&&anomalousReadingIds.has(event.id);
   const value=topUp?`+${Number(event.amount||0).toFixed(2)} kWh`:`${plainNumber(Number(event.remaining||0))} kWh`;
   const label=topUp?"TOP UP":anomaly?"Reading · REVIEW":"Reading";
-  return `<div class="list-row electricity-history-row ${topUp?"electricity-history-topup":anomaly?"electricity-history-anomaly":"electricity-history-reading"}"><div class="list-ic">${topUp?"＋":anomaly?"⚠":"⚡"}</div><div class="list-meta"><b>${label}</b><small>${escapeHtml(event.date)} · ${escapeHtml(event.time)}</small></div><div class="list-value private">${value}</div></div>`;
- }).join(""): `<div class="list-row"><div class="list-ic">ℹ</div><div class="list-meta"><b>No electricity activity yet</b><small>Add a physical reading or top up to start the history.</small></div></div>`;
+  return `<div class="list-row electricity-history-row ${topUp?"electricity-history-topup":anomaly?"electricity-history-anomaly":"electricity-history-reading"}"><div class="list-ic">${pundiIcon(topUp?"plus":anomaly?"warning":"electricity")}</div><div class="list-meta"><b>${label}</b><small>${escapeHtml(event.date)} · ${escapeHtml(event.time)}</small></div><div class="list-value private">${value}</div></div>`;
+ }).join(""): `<div class="list-row"><div class="list-ic">${pundiIcon("info")}</div><div class="list-meta"><b>No electricity activity yet</b><small>Add a physical reading or top up to start the history.</small></div></div>`;
 }
 function renderElectricity(){
  const periods=electricityPeriods(), latest=periods.at(-1);
@@ -1025,12 +1029,12 @@ function renderElectricity(){
  monthlyElectricCost.textContent=anomaly?"Review reading":fmt((latest?.daily||0)*30*state.rateKwh);
  electricUsageChart.innerHTML=bars(series.vals.length?series.vals:[0],series.labels.length?series.labels:["—"]);
  electricInterval.innerHTML=anomaly?listRows([
-  {icon:"⚠",name:"Reading anomaly",sub:`Raw calculated usage is ${latest.rawUsed.toFixed(2)} kWh. Correct the reading or add the missing top-up.`,value:"Review"}
+  {icon:"warning",name:"Reading anomaly",sub:`Raw calculated usage is ${latest.rawUsed.toFixed(2)} kWh. Correct the reading or add the missing top-up.`,value:"Review"}
  ]):latest?listRows([
-  {icon:"⚡",name:`${latest.used.toFixed(1)} kWh used`,sub:`${latest.from.date} ${latest.from.time} → ${latest.to.date} ${latest.to.time}`,value:fmt(latest.cost)},
-  {icon:"📆",name:`${latest.days.toFixed(1)} days interval`,sub:`Average ${latest.daily.toFixed(1)} kWh/day`,value:fmt(latest.daily*state.rateKwh)+" / day"},
-  {icon:"📌",name:"Estimated monthly",sub:"Based on latest daily usage",value:fmt(latest.daily*30*state.rateKwh)}
- ]):`<div class="list-row"><div class="list-ic">ℹ</div><div class="list-meta"><b>Add at least 2 readings</b></div></div>`;
+  {icon:"electricity",name:`${latest.used.toFixed(1)} kWh used`,sub:`${latest.from.date} ${latest.from.time} → ${latest.to.date} ${latest.to.time}`,value:fmt(latest.cost)},
+  {icon:"calendar",name:`${latest.days.toFixed(1)} days interval`,sub:`Average ${latest.daily.toFixed(1)} kWh/day`,value:fmt(latest.daily*state.rateKwh)+" / day"},
+  {icon:"pin",name:"Estimated monthly",sub:"Based on latest daily usage",value:fmt(latest.daily*30*state.rateKwh)}
+ ]):`<div class="list-row"><div class="list-ic">${pundiIcon("info")}</div><div class="list-meta"><b>Add at least 2 readings</b></div></div>`;
  renderElectricityHistory();
 }
 
@@ -1055,11 +1059,11 @@ function renderProspect(){
  const monthlyNetPositive=monthlyOperating.net>=0;
  annualPerformanceDashboard.innerHTML=`
   <div class="operating-flow-card operating-income">
-   <div class="operating-flow-icon">↗</div><div><small>ANNUAL INCOME</small><strong class="private">${fmt(operating.income)}</strong><p>Recurring clients × 12 months</p></div>
+   <div class="operating-flow-icon">${pundiIcon("income")}</div><div><small>ANNUAL INCOME</small><strong class="private">${fmt(operating.income)}</strong><p>Recurring clients × 12 months</p></div>
   </div>
   <div class="operating-connector"><span>MINUS</span></div>
   <div class="operating-flow-card operating-expense">
-   <div class="operating-flow-icon">↘</div><div><small>ANNUAL EXPENSE</small><strong class="private">${fmt(operating.expense)}</strong><p>Monthly Budget × 12 + Yearly Budget</p></div>
+   <div class="operating-flow-icon">${pundiIcon("expenses")}</div><div><small>ANNUAL EXPENSE</small><strong class="private">${fmt(operating.expense)}</strong><p>Monthly Budget × 12 + Yearly Budget</p></div>
   </div>
   <div class="operating-breakdown">
    <span><small>MONTHLY BUDGET · 12×</small><b class="private">${fmt(operating.monthlyExpense)}</b></span>
@@ -1080,7 +1084,7 @@ function renderProspect(){
    </div>
    <p>Monthly Income − Monthly Expense · read-only</p>
   </div>`;
- yearGrid.innerHTML=pr.map(y=>{const ages=ageTriplet(y.year).join(", "),current=y.year===currentYear(),hasCredit=Number(y.expenses.credit)>0,investmentValue=netPortfolio(y.year,state.prospectMode),tradingValue=tradingAssets(),dividendIncome=Number(y.incomeBreakdown.dividends||0); return `<details class="year-card prospect-year-card"><summary><div class="year-head"><small>${y.year}</small><span class="age-triplet">${ages}</span></div><div class="year-summary-value"><h4 class="private ${moneyClass(y.nw)}">${fmt(y.nw)}</h4><span class="year-toggle">⌄</span></div><small class="year-equation">Opening Cash + Investment + Trading + Income + Dividends − Expenses</small></summary><div class="year-details"><small class="year-split private"><span>Opening Cash <b class="${moneyClass(y.opening)}">${fmt(y.opening)}</b></span><span>Investment Stocks <b class="${moneyClass(investmentValue)}">${fmt(investmentValue)}</b></span><span>Trading Stocks <b class="${moneyClass(tradingValue)}">${fmt(tradingValue)}</b></span><span>${current?"Remaining recurring income":"Recurring income"} <b class="positive">+${fmt(y.incomeBreakdown.recurring)}</b></span>${y.incomeBreakdown.outstanding?`<span>Current receivables <b class="positive">+${fmt(y.incomeBreakdown.outstanding)}</b></span>`:""}${dividendIncome?`<span>Dividend Income <b class="positive">+${fmt(dividendIncome)}</b></span>`:""}${current?`<span>This month remaining <b class="negative">−${fmt(y.expenses.currentMonth)}</b></span>`:""}<span>Recurring expense <b class="negative">−${fmt(y.expenses.recurring)}</b></span><span>Yearly expense <b class="negative">−${fmt(y.expenses.yearly)}</b></span><span>Events <b class="negative">−${fmt(y.expenses.events)}</b></span>${hasCredit?`<span>Credit & PayLater <b class="negative">−${fmt(y.expenses.credit)}</b></span>`:""}</small></div></details>`;}).join("");
+ yearGrid.innerHTML=pr.map(y=>{const ages=ageTriplet(y.year).join(", "),current=y.year===currentYear(),hasCredit=Number(y.expenses.credit)>0,investmentValue=netPortfolio(y.year,state.prospectMode),tradingValue=tradingAssets(),dividendIncome=Number(y.incomeBreakdown.dividends||0); return `<details class="year-card prospect-year-card"><summary><div class="year-head"><small>${y.year}</small><span class="age-triplet">${ages}</span></div><div class="year-summary-value"><h4 class="private ${moneyClass(y.nw)}">${fmt(y.nw)}</h4><span class="year-toggle">${pundiIcon("chevron-down")}</span></div><small class="year-equation">Opening Cash + Investment + Trading + Income + Dividends − Expenses</small></summary><div class="year-details"><small class="year-split private"><span>Opening Cash <b class="${moneyClass(y.opening)}">${fmt(y.opening)}</b></span><span>Investment Stocks <b class="${moneyClass(investmentValue)}">${fmt(investmentValue)}</b></span><span>Trading Stocks <b class="${moneyClass(tradingValue)}">${fmt(tradingValue)}</b></span><span>${current?"Remaining recurring income":"Recurring income"} <b class="positive">+${fmt(y.incomeBreakdown.recurring)}</b></span>${y.incomeBreakdown.outstanding?`<span>Current receivables <b class="positive">+${fmt(y.incomeBreakdown.outstanding)}</b></span>`:""}${dividendIncome?`<span>Dividend Income <b class="positive">+${fmt(dividendIncome)}</b></span>`:""}${current?`<span>This month remaining <b class="negative">−${fmt(y.expenses.currentMonth)}</b></span>`:""}<span>Recurring expense <b class="negative">−${fmt(y.expenses.recurring)}</b></span><span>Yearly expense <b class="negative">−${fmt(y.expenses.yearly)}</b></span><span>Events <b class="negative">−${fmt(y.expenses.events)}</b></span>${hasCredit?`<span>Credit & PayLater <b class="negative">−${fmt(y.expenses.credit)}</b></span>`:""}</small></div></details>`;}).join("");
 }
 
 function renderInsights(){
@@ -1102,19 +1106,19 @@ function renderInsights(){
  const positiveYears=yearlyMomentum.filter(value=>value>=0).length;
  const coachTitle=baseLast.nw>=currentNW()?"Consistency is compounding":"The model is a signal, not a verdict";
  const coachText=baseLast.nw>=currentNW()?`${positiveYears} of ${yearlyMomentum.length} projected years improve or hold net worth. Keep income visible, protect runway, and review targets regularly.`:`Your base path needs an adjustment. Closing the income–expense gap now has more impact than waiting for a perfect market year.`;
- insightCoach.innerHTML=`<div class="coach-message"><span>✦</span><div><small>MOMENTUM NOTE</small><h3>${coachTitle}</h3><p>${coachText}</p></div></div><div class="momentum-strip" aria-label="Year-over-year net worth momentum">${yearlyMomentum.map((value,index)=>`<span title="${baseProjection[index].year}: ${value>=0?"+":""}${fmt(value)}"><i class="${value<0?"down":"up"}" style="height:${Math.max(8,Math.abs(value)/momentumPeak*100)}%"></i><small>${String(baseProjection[index].year).slice(2)}</small></span>`).join("")}</div>`;
+ insightCoach.innerHTML=`<div class="coach-message"><span>${pundiIcon("spark")}</span><div><small>MOMENTUM NOTE</small><h3>${coachTitle}</h3><p>${coachText}</p></div></div><div class="momentum-strip" aria-label="Year-over-year net worth momentum">${yearlyMomentum.map((value,index)=>`<span title="${baseProjection[index].year}: ${value>=0?"+":""}${fmt(value)}"><i class="${value<0?"down":"up"}" style="height:${Math.max(8,Math.abs(value)/momentumPeak*100)}%"></i><small>${String(baseProjection[index].year).slice(2)}</small></span>`).join("")}</div>`;
  const operating=annualOperatingPerformance({clients:state.clients,budgets:state.budgets,yearly:state.yearly});
  const monthlyNet=operating.net/12,monthlyExpense=operating.expense/12,monthlyGap=Math.max(0,-monthlyNet);
  const collectionBase=totalPaid()+totalOutstanding(),collectionPct=collectionBase?totalPaid()/collectionBase*100:100;
  const bufferTarget=monthlyBudget()*3,bufferGap=Math.max(0,bufferTarget-netAccountTotal()),bufferPct=bufferTarget?netAccountTotal()/bufferTarget*100:100;
  const operatingCoverage=monthlyExpense?fixedIncome()/monthlyExpense*100:100;
  const priorities=[
-  {icon:monthlyGap?"↗":"✓",tone:monthlyGap?"red":"green",label:"OPERATING BALANCE",title:monthlyGap?`Close ${fmt(monthlyGap)} monthly gap`:`Protect ${fmt(monthlyNet)} monthly surplus`,text:monthlyGap?"Increase recurring income or trim planned budgets until monthly net reaches zero.":"The operating model is profitable. Keep the surplus visible and intentional.",progress:Math.min(100,operatingCoverage)},
-  {icon:totalOutstanding()?"◎":"✓",tone:totalOutstanding()?"orange":"green",label:"CLIENT FOLLOW-UP",title:totalOutstanding()?`Collect ${fmt(totalOutstanding())}`:"All client income collected",text:totalOutstanding()?"Prioritize outstanding recurring and ending-client payments.":"No open client receivables remain this month.",progress:Math.min(100,collectionPct)},
-  {icon:bufferGap?"◒":"✓",tone:bufferGap?"blue":"green",label:"CASH BUFFER",title:bufferGap?`Build ${fmt(bufferGap)} more`:`3-month buffer secured`,text:bufferGap?`Target liquid reserve: ${fmt(bufferTarget)} based on three months of budget.`:"Liquid balance already covers at least three months of planned budget.",progress:Math.min(100,bufferPct)}
+  {icon:monthlyGap?"expenses":"check",tone:monthlyGap?"red":"green",label:"OPERATING BALANCE",title:monthlyGap?`Close ${fmt(monthlyGap)} monthly gap`:`Protect ${fmt(monthlyNet)} monthly surplus`,text:monthlyGap?"Increase recurring income or trim planned budgets until monthly net reaches zero.":"The operating model is profitable. Keep the surplus visible and intentional.",progress:Math.min(100,operatingCoverage)},
+  {icon:totalOutstanding()?"income":"check",tone:totalOutstanding()?"orange":"green",label:"CLIENT FOLLOW-UP",title:totalOutstanding()?`Collect ${fmt(totalOutstanding())}`:"All client income collected",text:totalOutstanding()?"Prioritize outstanding recurring and ending-client payments.":"No open client receivables remain this month.",progress:Math.min(100,collectionPct)},
+  {icon:bufferGap?"assets":"check",tone:bufferGap?"blue":"green",label:"CASH BUFFER",title:bufferGap?`Build ${fmt(bufferGap)} more`:`3-month buffer secured`,text:bufferGap?`Target liquid reserve: ${fmt(bufferTarget)} based on three months of budget.`:"Liquid balance already covers at least three months of planned budget.",progress:Math.min(100,bufferPct)}
  ];
  const firstOpen=priorities.find(item=>item.progress<100);
- insightActionPlan.innerHTML=`<div class="action-plan-head"><div><small>NEXT MOVES</small><h3>Financial Action Plan</h3></div><span>${firstOpen?"FOCUS MODE":"ON TRACK"}</span></div><div class="action-plan-list">${priorities.map(item=>`<article class="action-plan-item ${item.tone}"><div class="action-plan-icon">${item.icon}</div><div class="action-plan-copy"><small>${item.label}</small><b class="private">${item.title}</b><p>${item.text}</p><div class="action-plan-progress"><i style="width:${item.progress.toFixed(1)}%"></i></div></div><strong>${item.progress.toFixed(0)}%</strong></article>`).join("")}</div><div class="action-plan-footer"><span>✦</span><p><b>Next milestone:</b> <span class="private">${firstOpen?firstOpen.title:"Maintain the current plan and review it monthly."}</span></p></div>`;
+ insightActionPlan.innerHTML=`<div class="action-plan-head"><div><small>NEXT MOVES</small><h3>Financial Action Plan</h3></div><span>${firstOpen?"FOCUS MODE":"ON TRACK"}</span></div><div class="action-plan-list">${priorities.map(item=>`<article class="action-plan-item ${item.tone}"><div class="action-plan-icon">${pundiIcon(item.icon)}</div><div class="action-plan-copy"><small>${item.label}</small><b class="private">${item.title}</b><p>${item.text}</p><div class="action-plan-progress"><i style="width:${item.progress.toFixed(1)}%"></i></div></div><strong>${item.progress.toFixed(0)}%</strong></article>`).join("")}</div><div class="action-plan-footer"><span>${pundiIcon("target")}</span><p><b>Next milestone:</b> <span class="private">${firstOpen?firstOpen.title:"Maintain the current plan and review it monthly."}</span></p></div>`;
  const now=new Date(),prev=new Date(now.getFullYear(),now.getMonth()-1,1);
  const expenseIn=(date)=>state.transactions.filter(row=>row.type==="expense"&&String(row.date).startsWith(`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}`)).reduce((sum,row)=>sum+Number(row.amount),0);
  const thisExpense=expenseIn(now),previousExpense=expenseIn(prev),expenseDelta=previousExpense?((thisExpense-previousExpense)/previousExpense*100):0;
@@ -1146,16 +1150,16 @@ function renderInsights(){
  const usdAssets=state.stocks.filter(row=>row.currency==="USD").reduce((sum,row)=>sum+stockValue(row),0)+Number(state.stockExtras?.walletUsd||0)*Number(state.usdIdr||0);
  const usdExposure=portfolio()?usdAssets/portfolio()*100:0;
  const decisionMetrics=[
-  {icon:"↗",tone:monthlyNet>=0?"green":"red",label:"Monthly Net",value:`${monthlyNet>=0?"+":""}${fmt(monthlyNet)}`,text:"Recurring client income minus monthly budget and one-twelfth of yearly budget."},
-  {icon:"◎",tone:operating.net>=0?"green":"red",label:"Annual Net",value:`${operating.net>=0?"+":""}${fmt(operating.net)}`,text:"Full-year recurring income minus monthly budget × 12 and yearly budget."},
-  {icon:"%",tone:operatingMargin>=0?"green":"red",label:"Operating Margin",value:`${operatingMargin>=0?"+":""}${operatingMargin.toFixed(1)}%`,text:"Annual operating net divided by annual recurring-client income."},
-  {icon:"◔",tone:budgetUsedPct>100?"red":budgetUsedPct>75?"orange":"blue",label:"Budget Used",value:`${budgetUsedPct.toFixed(1)}%`,text:`${fmt(usedBudget)} recorded against ${fmt(monthlyBudget())} of monthly budget.`},
-  {icon:"◇",tone:clientConcentration>50?"orange":"blue",label:"Client Concentration",value:`${clientConcentration.toFixed(1)}%`,text:largestClient?`${escapeHtml(largestClient.name)} is the largest share of recurring monthly income.`:"Add recurring clients to calculate concentration."},
-  {icon:"$",tone:usdExposure>60?"orange":"blue",label:"USD Exposure",value:`${usdExposure.toFixed(1)}%`,text:"Share of Investment assets held in USD stocks and USD Wallet."},
-  {icon:"α",tone:tradingAlpha<0?"red":tradingAlpha>0?"green":"blue",label:"Trading Alpha vs SPY",value:`${tradingAlpha>=0?"+":""}${tradingAlpha.toFixed(2)}%`,text:`Selected-period Trading return ${tradingPerf.portfolioReturn.toFixed(2)}% versus SPY ${tradingPerf.spyReturn.toFixed(2)}%.`},
-  {icon:"✓",tone:closedTrades.length&&!winningTrades.length?"red":tradingWinRate>=50?"green":"blue",label:"Trading Win Rate",value:closedTrades.length?`${tradingWinRate.toFixed(1)}%`:"—",text:closedTrades.length?`${winningTrades.length} profitable sell execution${winningTrades.length===1?"":"s"} from ${closedTrades.length} total.`:"No realized sell executions yet."}
+  {icon:"income",tone:monthlyNet>=0?"green":"red",label:"Monthly Net",value:`${monthlyNet>=0?"+":""}${fmt(monthlyNet)}`,text:"Recurring client income minus monthly budget and one-twelfth of yearly budget."},
+  {icon:"target",tone:operating.net>=0?"green":"red",label:"Annual Net",value:`${operating.net>=0?"+":""}${fmt(operating.net)}`,text:"Full-year recurring income minus monthly budget × 12 and yearly budget."},
+  {icon:"insights",tone:operatingMargin>=0?"green":"red",label:"Operating Margin",value:`${operatingMargin>=0?"+":""}${operatingMargin.toFixed(1)}%`,text:"Annual operating net divided by annual recurring-client income."},
+  {icon:"expenses",tone:budgetUsedPct>100?"red":budgetUsedPct>75?"orange":"blue",label:"Budget Used",value:`${budgetUsedPct.toFixed(1)}%`,text:`${fmt(usedBudget)} recorded against ${fmt(monthlyBudget())} of monthly budget.`},
+  {icon:"account",tone:clientConcentration>50?"orange":"blue",label:"Client Concentration",value:`${clientConcentration.toFixed(1)}%`,text:largestClient?`${escapeHtml(largestClient.name)} is the largest share of recurring monthly income.`:"Add recurring clients to calculate concentration."},
+  {icon:"wallet",tone:usdExposure>60?"orange":"blue",label:"USD Exposure",value:`${usdExposure.toFixed(1)}%`,text:"Share of Investment assets held in USD stocks and USD Wallet."},
+  {icon:"trading",tone:tradingAlpha<0?"red":tradingAlpha>0?"green":"blue",label:"Trading Alpha vs SPY",value:`${tradingAlpha>=0?"+":""}${tradingAlpha.toFixed(2)}%`,text:`Selected-period Trading return ${tradingPerf.portfolioReturn.toFixed(2)}% versus SPY ${tradingPerf.spyReturn.toFixed(2)}%.`},
+  {icon:"check",tone:closedTrades.length&&!winningTrades.length?"red":tradingWinRate>=50?"green":"blue",label:"Trading Win Rate",value:closedTrades.length?`${tradingWinRate.toFixed(1)}%`:"—",text:closedTrades.length?`${winningTrades.length} profitable sell execution${winningTrades.length===1?"":"s"} from ${closedTrades.length} total.`:"No realized sell executions yet."}
  ];
- insightLong.innerHTML=decisionMetrics.map(x=>`<article class="signal-item metric-signal ${x.tone}"><div class="signal-ic"><span class="metric-symbol">${x.icon}</span></div><div><small>${x.label}</small><b class="private">${x.value}</b><p>${x.text}</p></div></article>`).join("");
+ insightLong.innerHTML=decisionMetrics.map(x=>`<article class="signal-item metric-signal ${x.tone}"><div class="signal-ic"><span class="metric-symbol">${pundiIcon(x.icon)}</span></div><div><small>${x.label}</small><b class="private">${x.value}</b><p>${x.text}</p></div></article>`).join("");
 }
 
 function renderAll(){
@@ -1370,8 +1374,11 @@ function autoDueDate(source){
 function cryptoRows(){
  return [...state.stocks,...state.tradingPositions].filter(isCryptoAsset);
 }
+function cryptoMarketRequests(){
+ return cryptoRows().map(row=>({id:row.id,symbol:row.ticker,quote:row.currency}));
+}
 function cryptoProviderSymbols(){
- return [...new Set(cryptoRows().map(row=>String(row.providerSymbol||"").trim().toUpperCase()).filter(Boolean))];
+ return [...new Set(cryptoRows().map(row=>String(row.providerSymbol||row.ticker||"").trim().toUpperCase()).filter(Boolean))];
 }
 function setCryptoMarketStatus({state:status="offline",reason=""}={}){
  const element=q("#cryptoMarketStatus");
@@ -1379,11 +1386,11 @@ function setCryptoMarketStatus({state:status="offline",reason=""}={}){
  const label=status.toUpperCase();
  element.textContent=`CRYPTO ${label}`;
  element.className=`crypto-market-status crypto-status-${status}`;
- element.title=reason||`Binance market data ${label.toLowerCase()}`;
+ element.title=reason||`Shared market data service ${label.toLowerCase()}`;
 }
-function updateCryptoPriceNodes(providerSymbol){
- const pair=String(providerSymbol||"").toUpperCase();
- const stock=state.stocks.find(row=>String(row.providerSymbol||"").toUpperCase()===pair);
+function updateCryptoPriceNodes(key){
+ const normalized=String(key||"").toUpperCase();
+ const stock=state.stocks.find(row=>String(row.id)===String(key))||state.stocks.find(row=>String(row.providerSymbol||"").toUpperCase()===normalized);
  if(stock){
   const value=stockValue(stock),cost=invested(stock),pl=value-cost;
   qa(`[data-crypto-holding-current="${stock.id}"]`).forEach(element=>{if(document.activeElement!==element)element.value=plainCryptoNumber(stock.current);});
@@ -1392,7 +1399,7 @@ function updateCryptoPriceNodes(providerSymbol){
   qa(`[data-crypto-holding-pct="${stock.id}"]`).forEach(element=>element.textContent=percent(pl,cost));
   qa(`[data-crypto-holding-status="${stock.id}"]`).forEach(element=>element.textContent=String(stock.priceStatus||"STALE").toUpperCase());
  }
- const position=state.tradingPositions.find(row=>String(row.providerSymbol||"").toUpperCase()===pair);
+ const position=state.tradingPositions.find(row=>String(row.id)===String(key))||state.tradingPositions.find(row=>String(row.providerSymbol||"").toUpperCase()===normalized);
  if(position){
   const value=tradingPositionValue(position,state.usdIdr),cost=tradingPositionCost(position,state.usdIdr),pl=value-cost,pct=cost?pl/cost*100:0;
   qa(`[data-crypto-position-current="${position.id}"]`).forEach(element=>element.textContent=formatFiatCurrency(position.current,position.currency,{locale:"en-US",maximumFractionDigits:position.currency==="USDT"?8:4}));
@@ -1412,9 +1419,9 @@ function renderCryptoSummary(){
  }
  if(state.page==="stocks"&&state.stockView==="trading"){
   const metrics=tradingStats();
-  tradingEquity.textContent=fmt(metrics.equity,true);
-  tradingUnrealizedPl.textContent=`${metrics.unrealized>=0?"+":""}${fmt(metrics.unrealized,true)}`;
-  tradingTotalPl.textContent=`${metrics.realized>=0?"+":""}${fmt(metrics.realized,true)} · ${metrics.realizedReturn>=0?"+":""}${metrics.realizedReturn.toFixed(2)}%`;
+  tradingEquity.textContent=fmt(metrics.equity);
+  tradingUnrealizedPl.textContent=`${metrics.unrealized>=0?"+":""}${fmt(metrics.unrealized)}`;
+  tradingTotalPl.textContent=`${metrics.realized>=0?"+":""}${fmt(metrics.realized)} · ${metrics.realizedReturn>=0?"+":""}${metrics.realizedReturn.toFixed(2)}%`;
  }
  if(state.page==="accumulation")renderAccumulation();
  if(state.page==="prospect")renderProspect();
@@ -1425,55 +1432,66 @@ function scheduleCryptoSummary(){
  const run=()=>{cryptoSummaryFrame=null;renderCryptoSummary();};
  cryptoSummaryFrame=typeof requestAnimationFrame==="function"?requestAnimationFrame(run):setTimeout(run,250);
 }
-function handleCryptoTicker(providerSymbol,quote){
- if(!Number.isFinite(Number(quote?.price))||Number(quote.price)<=0)return;
- const sourceQuote=quote.sourceQuote||providerQuoteCurrency(providerSymbol);
- const apply=row=>{
-  const requestedPrice=convertCryptoPrice(quote.price,sourceQuote,row.currency,state.usdIdr);
-  if(!Number.isFinite(requestedPrice)||requestedPrice<=0)return;
-  row.current=requestedPrice;
-  row.priceSource="binance";
-  row.priceStatus=quote.status||"stale";
-  row.priceAsOf=quote.asOf||new Date().toISOString();
-  row.lastPriceFetchAt=new Date().toISOString();
-  row.changePercent=Number(quote.changePercent);
- };
- state.stocks.filter(row=>String(row.providerSymbol||"").toUpperCase()===String(providerSymbol).toUpperCase()).forEach(apply);
- state.tradingPositions.filter(row=>String(row.providerSymbol||"").toUpperCase()===String(providerSymbol).toUpperCase()).forEach(apply);
- updateCryptoPriceNodes(providerSymbol);
+function handleCryptoTicker(requestId,quote){
+ const target=cryptoRows().find(row=>String(row.id)===String(requestId))||cryptoRows().find(row=>String(row.providerSymbol||"").toUpperCase()===String(requestId).toUpperCase());
+ if(!target)return;
+ if(quote?.ok===false||!Number.isFinite(Number(quote?.price))||Number(quote.price)<=0){
+  target.priceStatus=quote?.state||"OFFLINE";
+  updateCryptoPriceNodes(target.id);
+  return;
+ }
+ const requestedQuote=String(quote.requestedQuote||target.currency||"").toUpperCase();
+ const requestedPrice=requestedQuote===String(target.currency||"").toUpperCase()?Number(quote.price):convertCryptoPrice(quote.price,quote.sourceQuote||providerQuoteCurrency(quote.normalizedSymbol||target.providerSymbol),target.currency,state.usdIdr);
+ if(!Number.isFinite(requestedPrice)||requestedPrice<=0){target.priceStatus="OFFLINE";updateCryptoPriceNodes(target.id);return;}
+ target.current=requestedPrice;
+ target.priceSource=quote.provider||"market-data";
+ target.priceStatus=quote.status||"STALE";
+ target.priceAsOf=quote.asOf||quote.quoteTimestamp||new Date().toISOString();
+ target.lastPriceFetchAt=new Date().toISOString();
+ target.changePercent=Number(quote.changePercent24h);
+ updateCryptoPriceNodes(target.id);
  scheduleCryptoSummary();
 }
 function syncCryptoMarketData(){
- const symbols=state.page==="stocks"?cryptoProviderSymbols():[];
+ const requests=state.page==="stocks"?cryptoMarketRequests():[];
  if(!cryptoMarketStream)cryptoMarketStream=new CryptoMarketStream({onTicker:handleCryptoTicker,onStatus:setCryptoMarketStatus});
- cryptoMarketStream.setSymbols(symbols);
+ cryptoMarketStream.setRequests(requests);
 }
 async function refreshCryptoMarketData(){
- const symbols=cryptoProviderSymbols();
- for(const symbol of symbols){
-  try{handleCryptoTicker(symbol,await fetchBinanceTicker(symbol));}
-  catch(error){setCryptoMarketStatus({state:"stale",reason:error.message});}
- }
+ const requests=cryptoMarketRequests();
+ if(!requests.length)return;
+ try{
+  const body=await fetchCryptoQuotes(requests);
+  (body.quotes||[]).forEach(quote=>handleCryptoTicker(quote.id,quote));
+  setCryptoMarketStatus({state:(body.quotes||[]).some(quote=>quote.status==="STALE"||quote.status==="OFFLINE")?"stale":"live",reason:"Shared market data service"});
+ }catch(error){setCryptoMarketStatus({state:"stale",reason:error.message});}
 }
 
 async function refreshStockPrices({silent=false}={}){
  if(!navigator.onLine)return;
  if(typeof refreshStocksBtn!=="undefined")refreshStocksBtn.disabled=true;
  if(normalizeStockMappings())await save();
+ const stocks=state.stocks.filter(row=>!isCryptoAsset(row));
  let updated=0,failed=0;
- for(const stock of state.stocks.filter(row=>!isCryptoAsset(row))){
-  try{
-   const quote=await fetchHoldingQuote(stock.id);
-   stock.current=Number(quote.price);stock.priceSource=quote.provider;stock.priceStatus=quote.status;
-   stock.priceAsOf=quote.asOf;stock.lastPriceFetchAt=new Date().toISOString();updated++;
-  }catch(error){
-   stock.priceStatus=error.code==="provider_plan_unavailable"?"API unavailable for current plan":`API error · ${error.code||"unavailable"}`;
-   stock.lastPriceFetchAt=new Date().toISOString();failed++;
+ try{
+  const body=await fetchHoldingQuotes(stocks.map(stock=>stock.id));
+  for(const stock of stocks){
+   const quote=(body.quotes||[]).find(item=>String(item.holdingId)===String(stock.id));
+   if(quote&&quote.ok!==false&&Number.isFinite(Number(quote.price))&&Number(quote.price)>0){
+    stock.current=Number(quote.price);stock.priceSource=quote.provider;stock.priceStatus=quote.status||"DELAYED";
+    stock.priceAsOf=quote.asOf||quote.quoteTimestamp;stock.lastPriceFetchAt=new Date().toISOString();updated++;
+   }else{
+    stock.priceStatus=quote?.state==="STALE"?"STALE · saved price":"OFFLINE · saved price";
+    stock.lastPriceFetchAt=new Date().toISOString();failed++;
+   }
   }
+ }catch(error){
+  stocks.forEach(stock=>{stock.priceStatus="OFFLINE · saved price";stock.lastPriceFetchAt=new Date().toISOString();});
+  failed=stocks.length;
  }
  save();renderAll();
  if(typeof refreshStocksBtn!=="undefined")refreshStocksBtn.disabled=false;
- if(!silent)toastMsg(`${updated} price${updated===1?"":"s"} updated${failed?`, ${failed} fallback`:""}`);
+ if(!silent)toastMsg(`${updated} price${updated===1?"":"s"} updated${failed?`, ${failed} saved price${failed===1?"":"s"} retained`:""}`);
 }
 
 async function refreshInvestmentDividends({silent=false,force=false}={}){
@@ -1517,9 +1535,9 @@ async function refreshTradingPrices({silent=false,force=false}={}){
   const activePositions=state.tradingPositions.filter(position=>Number(position.quantity)>1e-9);
   const equityPositions=activePositions.filter(position=>!isCryptoAsset(position));
   const cryptoPositions=activePositions.filter(isCryptoAsset);
-  const quotes=new Map(),symbols=[...new Set(equityPositions.map(position=>String(position.providerSymbol||position.ticker).trim().toUpperCase()).filter(Boolean))];
+  const quotes=new Map(),symbolMappings=new Map(equityPositions.map(position=>[String(position.providerSymbol||position.ticker).trim().toUpperCase(),position])),symbols=[...symbolMappings.keys()].filter(Boolean);
   for(const symbol of symbols){
-   try{const quote=await fetchTradingQuote(symbol,{force});quotes.set(symbol,quote);lastCoverage=quote.coverage||quote.provider;}
+   try{const mapping=symbolMappings.get(symbol)||{},quote=await fetchTradingQuote(symbol,{force,market:mapping.market||"NASDAQ",currency:mapping.currency||"USD"});quotes.set(symbol,quote);lastCoverage=quote.coverage||quote.provider;}
    catch(error){quotes.set(symbol,{error});}
   }
   for(const position of equityPositions){
@@ -1630,7 +1648,7 @@ qa("[data-go]").forEach(b=>b.onclick=()=>switchPage(b.dataset.go));
 qa("[data-stock-workspace]").forEach(button=>button.onclick=()=>setStockWorkspace(button.dataset.stockWorkspace));
 themeBtn.onclick=()=>setTheme(state.theme==="dark"?"light":"dark");
 languageBtn.onclick=()=>{state.language=state.language==="en"?"id":"en";applyLanguage();saveSettings();renderAll();switchPage(state.page);};
-privacyBtn.onclick=()=>{state.privacy=!state.privacy; document.body.classList.toggle("private-hidden",state.privacy); privacyBtn.textContent=state.privacy?"🙈":"👁"; renderAll();};
+privacyBtn.onclick=()=>{state.privacy=!state.privacy; document.body.classList.toggle("private-hidden",state.privacy); privacyBtn.innerHTML=pundiIcon(state.privacy?"eye-off":"eye"); privacyBtn.setAttribute("aria-label",state.privacy?"Show private values":"Hide private values"); renderAll();};
 feedbackBtn.onclick=()=>{ feedbackMessageStatus.textContent="";feedbackCategory.value="";feedbackMessage.value="";feedbackCounter.textContent="0 / 4000";feedbackModal.showModal();feedbackCategory.focus(); };
 feedbackMessage.oninput=()=>{feedbackCounter.textContent=`${feedbackMessage.value.length} / 4000`;};
 feedbackForm.onsubmit=async event=>{
@@ -1679,7 +1697,7 @@ addAccountBtn.onclick=()=>openSimple("Add Account",[
 ],o=>state.accounts.push({id:createId(),...o}));
 
 manageAccountsBtn.onclick=()=>{
- manageAccountsList.innerHTML=state.accounts.map((a,i)=>`<div class="manage-account-row"><input data-ma-name="${i}" value="${a.name}"><input data-ma-bal="${i}" type="number" value="${a.balance}"><button class="icon-mini" data-ma-del="${i}">🗑</button></div>`).join("")+`<button class="primary-btn" id="saveAccountsBtn">Save Changes</button>`;
+ manageAccountsList.innerHTML=state.accounts.map((a,i)=>`<div class="manage-account-row"><input data-ma-name="${i}" value="${a.name}"><input data-ma-bal="${i}" type="number" value="${a.balance}"><button class="icon-mini" data-ma-del="${i}" title="Remove account" aria-label="Remove ${a.name}">${pundiIcon("trash")}</button></div>`).join("")+`<button class="primary-btn" id="saveAccountsBtn">Save Changes</button>`;
  manageAccountsModal.showModal();
  qa("[data-ma-del]").forEach(b=>b.onclick=()=>{state.accounts.splice(Number(b.dataset.maDel),1); manageAccountsModal.close(); save(); renderAll();});
  q("#saveAccountsBtn").onclick=()=>{
@@ -1747,7 +1765,7 @@ addTickerBtn.onclick=()=>openSimple("Add Ticker",[
   try{
    const parsed=parseCryptoPairInput(ticker,values.quote||"USD"),resolved=await resolveCryptoPair(parsed.baseSymbol,parsed.requestedQuote,state.usdIdr),quote=resolved;
    if(state.stocks.some(row=>isCryptoAsset(row)&&row.ticker===parsed.baseSymbol)){alert(`${parsed.baseSymbol} already exists in this portfolio.`);return false;}
-   const current=Number(quote.price),row={id:createId(),ticker:parsed.baseSymbol,displaySymbol:parsed.baseSymbol,assetType:"crypto",market:"CRYPTO",provider:"binance",providerSymbol:resolved.providerSymbol,currency:resolved.requestedQuote,quantity:Number(values.quantity),avg:Number(values.avg),current,manualCurrent:current,priceSource:"binance",priceStatus:"stale",priceAsOf:resolved.asOf,lastPriceFetchAt:new Date().toISOString(),base:{},optimistic:{}};
+   const current=Number(quote.price),row={id:createId(),ticker:parsed.baseSymbol,displaySymbol:parsed.baseSymbol,assetType:"crypto",market:"CRYPTO",provider:resolved.provider||"market-data",providerSymbol:resolved.providerSymbol||resolved.normalizedSymbol,currency:resolved.requestedQuote,quantity:Number(values.quantity),avg:Number(values.avg),current,manualCurrent:current,priceSource:resolved.provider||"market-data",priceStatus:resolved.status||"OFFLINE",priceAsOf:resolved.asOf||resolved.quoteTimestamp,lastPriceFetchAt:new Date().toISOString(),base:{},optimistic:{}};
    YEARS.slice(1).forEach(year=>{row.base[year]=current;row.optimistic[year]=current;});
    state.stocks.push(row);syncCryptoMarketData();return `Crypto Investment asset added · ${parsed.baseSymbol}/${resolved.requestedQuote}`;
   }catch(error){alert(error.message);return false;}
@@ -1770,7 +1788,7 @@ addTradingPositionBtn.onclick=()=>openSimple("Add Trading Position",[
  if(crypto){
   try{
    const resolved=await resolveCryptoPair(parsed.baseSymbol,requestedQuote,state.usdIdr);
-   providerSymbol=resolved.providerSymbol;currency=resolved.requestedQuote;assetType="crypto";current=Number(resolved.price);priceSource="binance";priceStatus="stale";
+   providerSymbol=resolved.providerSymbol||resolved.normalizedSymbol;currency=resolved.requestedQuote;assetType="crypto";current=Number(resolved.price);priceSource=resolved.provider||"market-data";priceStatus=resolved.status||"OFFLINE";
   }catch(error){alert(error.message);return false;}
  }
  const reusable=state.tradingPositions.find(row=>row.ticker===canonicalTicker&&row.market===values.market&&Number(row.quantity)<=1e-9);
@@ -1866,7 +1884,7 @@ function applyCloudState(next,{preserveUi=false}={}){
  document.documentElement.dataset.theme=state.theme;
  localStorage.setItem("pundi-theme-cache",state.theme);
  localStorage.setItem("pundi-language-cache",state.language||"en");
- themeBtn.textContent=state.theme==="dark"?"☀":"☾";
+ themeBtn.innerHTML=pundiIcon(state.theme==="dark"?"sun":"moon");
  baseGrowth.value=state.baseGrowth;optimisticGrowth.value=state.optimisticGrowth;
  const dividendStateChanged=advanceDividendLifecycle(state,new Date());
  updateModeToggleLabels();renderAllPreservingScroll();switchPage(state.page,{preserveScroll:true});syncCryptoMarketData();
@@ -1916,7 +1934,7 @@ function renderCommerceCatalog(catalog){
  const checkoutAvailable=Boolean(catalog?.configured&&(catalog.products||[]).length);
  commerceCatalogState=checkoutAvailable?catalog:{...(catalog||{}),configured:false,products:PUNDI_FALLBACK_CATALOG};
  commerceStatus.textContent=checkoutAvailable?(catalog.production?"Production checkout is available. Payment is verified server-side before access is granted.":"Sandbox checkout is available for testing only."):"Pundi Pro Lifetime · Rp49.000 · one-time account purchase. Checkout is unavailable until provider activation; your free account remains available.";
- commerceCatalog.innerHTML=commerceCatalogState.products.map(item=>`<div class="commerce-product"><div><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.description||"Account entitlement")}</small></div><div><b>${escapeHtml(commerceMoney(item.amount,item.currency))}</b><button class="primary-btn commerce-buy" type="button" data-commerce-sku="${escapeHtml(item.sku)}" ${checkoutAvailable?"":"disabled"}>${checkoutAvailable?"Buy":"Coming soon"}</button></div></div>`).join("");
+ commerceCatalog.innerHTML=commerceCatalogState.products.map(item=>`<div class="commerce-product"><span class="commerce-product-icon">${pundiIcon(item.sku==="PUNDI_PRO_LIFETIME"?"pro":"card")}</span><div><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.description||"Account entitlement")}</small></div><div><b>${escapeHtml(commerceMoney(item.amount,item.currency))}</b><button class="primary-btn commerce-buy" type="button" data-commerce-sku="${escapeHtml(item.sku)}" ${checkoutAvailable?"":"disabled"}>${checkoutAvailable?"Buy":"Coming soon"}</button></div></div>`).join("");
  qa("[data-commerce-sku]").forEach(button=>button.onclick=()=>startCommerceCheckout(button.dataset.commerceSku,button));
 }
 async function refreshCommerce(){
@@ -1982,11 +2000,11 @@ async function showSignedIn(user){
  }
 
 async function boot(){
- document.documentElement.dataset.theme=state.theme;themeBtn.textContent=state.theme==="dark"?"☀":"☾";
- privacyBtn.textContent="👁";txDate.value=todayISO();updateModeToggleLabels();
+ document.documentElement.dataset.theme=state.theme;themeBtn.innerHTML=pundiIcon(state.theme==="dark"?"sun":"moon");
+ privacyBtn.innerHTML=pundiIcon(state.privacy?"eye-off":"eye");txDate.value=todayISO();updateModeToggleLabels();
  baseGrowth.value=state.baseGrowth;optimisticGrowth.value=state.optimisticGrowth;renderAll();applyLanguage();
  initializeNativeShell();
- if(!isNativeRuntime() && "serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{});
+ if(!isAppRuntime() && "serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{});
  try{
    const hashParams=new URLSearchParams(location.hash.replace(/^#/,"?"));
    const queryParams=new URLSearchParams(location.search);
@@ -2054,12 +2072,28 @@ function setAuthMode(mode){
  authModeToggle.hidden=forgot||recovery||expired||initializing;
  authModeToggle.textContent=signUp?"Already have an account? Sign in":"Don't have an account? Sign up";
  authError.className="auth-message error";
+ authPassword.removeAttribute("aria-invalid");
+ authCard?.classList.remove("auth-shake");
  if(!expired)authError.textContent="";
 }
 
 function setAuthMessage(kind,message){
  authError.className=`auth-message ${kind}`;
  authError.textContent=message;
+}
+
+function isCredentialFailure(error){
+ const message=String(error?.message||"").toLowerCase();
+ return Number(error?.status)===400||message.includes("invalid login credentials")||message.includes("invalid credentials")||message.includes("incorrect password");
+}
+
+function triggerAuthShake(){
+ if(!authCard)return;
+ authPassword.setAttribute("aria-invalid","true");
+ authCard.classList.remove("auth-shake");
+ void authCard.offsetWidth;
+ authCard.classList.add("auth-shake");
+ authPassword.focus({preventScroll:true});
 }
 
 function authErrorMessage(error, mode){
@@ -2120,7 +2154,10 @@ authForm.onsubmit=async event=>{
   }else{
    const user=await syncManager.connect(email,authPassword.value);await showSignedIn(user);
   }
- }catch(error){setAuthMessage("error",authErrorMessage(error,authMode))}
+ }catch(error){
+  setAuthMessage("error",authErrorMessage(error,authMode));
+  if(authMode==="signin"&&isCredentialFailure(error))triggerAuthShake();
+ }
  finally{authSubmit.disabled=false;if(authMode==="signup")authSubmit.textContent="Create account";else if(authMode==="forgot")authSubmit.textContent="Send reset link";else if(authMode==="recovery")authSubmit.textContent="Update password";else authSubmit.textContent="Sign in";}
 };
 

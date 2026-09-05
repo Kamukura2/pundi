@@ -1,12 +1,22 @@
 {
   "name": "pundi",
-  "version": "8.7.2",
+  "version": "8.8.0",
   "private": true,
   "type": "module",
+  "main": "desktop/main.cjs",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "desktop:start": "npm run build && electron desktop/main.cjs",
+    "desktop:dist": "npm run build && electron-builder --win portable",
+    "desktop:dist:manual": "npm run build && node scripts/package-windows-manual.mjs",
+    "test:desktop": "node tests/integration/desktop-contract.mjs",
+    "test:v32": "node tests/integration/v32-refinement-contract.mjs",
+    "test:market-data": "node tests/integration/market-data-contract.mjs",
+    "audit:market-data": "node scripts/audit-public-providers.mjs",
+    "probe:market-data": "node scripts/live-market-data-probe.mjs",
     "preview": "vite preview",
+    "brand:assets": "python scripts/generate-brand-assets.py",
     "check": "node scripts/check.mjs && node scripts/check-telegram.mjs",
     "supabase:pundi": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File scripts/pundi-supabase.ps1",
     "beta:status": "node scripts/beta-status.mjs",
@@ -68,6 +78,8 @@
   "devDependencies": {
     "@capacitor/cli": "^8.5.0",
     "axe-core": "^4.13.0",
+    "electron": "^44.2.0",
+    "electron-builder": "^26.15.3",
     "fake-indexeddb": "^6.2.5",
     "playwright": "^1.62.1",
     "typescript": "^7.0.2",
@@ -75,5 +87,19 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "build": {
+    "appId": "online.pundi.desktop",
+    "productName": "Pundi",
+    "asar": true,
+    "directories": { "output": "artifacts/windows-v32" },
+    "files": ["dist/**/*", "desktop/**/*", "package.json"],
+    "win": {
+      "icon": "desktop/pundi.ico",
+      "target": [{ "target": "portable", "arch": ["x64"] }]
+    },
+    "portable": {
+      "artifactName": "Pundi-${version}-Windows-x64.exe"
+    }
   }
 }

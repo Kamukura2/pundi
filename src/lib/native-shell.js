@@ -11,7 +11,8 @@ export async function initializeNativeShell() {
 
   await Promise.allSettled([
     StatusBar.setOverlaysWebView({ overlay: false }),
-    StatusBar.setStyle({ style: Style.Dark })
+    StatusBar.setBackgroundColor({ color: "#0D1B3D" }),
+    StatusBar.setStyle({ style: Style.Light })
   ]);
 
   App.addListener("backButton", ({ canGoBack }) => {

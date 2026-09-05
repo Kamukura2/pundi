@@ -5,6 +5,9 @@ dist/
 runtime/admin-smoke-health/
 runtime/beta/
 runtime/growth/
+runtime/market-data/
+runtime/windows-package/
+artifacts/
 supabase/.temp/
 
 # local/generated Android artifacts

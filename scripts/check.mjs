@@ -13,7 +13,7 @@ for (const icon of manifest.icons) assert.ok(existsSync(resolve(root, "public", 
 const index = read("app.html");
 const css = read("styles.css");
 for (const tab of ["accumulation","cashflow","expenses","clients","stocks","trading","electricity","prospect","insights"]) assert.match(index, new RegExp(`id="${tab}"`));
-assert.equal((index.match(/data-page="stocks"/g)||[]).length,2,"Sidebar and data menu must expose one Assets destination");
+assert.equal((index.match(/data-page="stocks"/g)||[]).length,2,"Sidebar and data menu must expose one Assets destination each");
 assert.match(index,/data-page="stocks"[^>]*>[\s\S]*?Assets/,"The existing Stocks destination must be displayed as Assets");
 assert.doesNotMatch(index,/<span>Stocks<\/span>|>Stocks<\/button>/,"The top-level navigation label must no longer display Stocks");
 assert.doesNotMatch(index,/data-page="trading"/,"Trading must live inside Stocks instead of a separate route");
@@ -52,7 +52,8 @@ assert.match(index,/id="sideAvailableBalance"/,"Desktop sidebar must show Accumu
 assert.match(index,/id="mobileMenuBtn"[^>]*aria-controls="primarySidebar"/,"Mobile header must expose an accessible hamburger control");
 assert.match(index,/id="mobileMenuBackdrop"/,"Mobile drawer must include a dismissible backdrop");
 assert.match(index,/class="mobile-add-transaction"[^>]*data-open-tx/,"Mobile must retain one floating transaction action");
-assert.doesNotMatch(index,/class="mobile-nav"/,"The crowded mobile bottom navigation must be removed");
+assert.doesNotMatch(index,/class="mobile-nav"/,"Legacy mobile bottom dock must be removed in V3.2");
+assert.doesNotMatch(index,/class="mobile-nav-add"[^>]*data-open-tx/,"Legacy dock transaction action must be removed in favor of the floating action");
 assert.match(index,/mobile-drawer\.css/);
 const drawerCss=read("mobile-drawer.css");
 assert.match(drawerCss,/v8\.1\.1 simple mobile drawer navigation/);
@@ -72,7 +73,24 @@ assert.match(serviceWorker, /pathname\.startsWith\("\/api\/"\)/);
 assert.match(serviceWorker, /const copy = response\.clone\(\);[\s\S]*?cache\.put\(request, copy\)/, "Service Worker must clone asset responses before asynchronous cache writes");
 assert.doesNotMatch(serviceWorker, /cache\.put\(request, response\.clone\(\)\)/, "Service Worker must not clone asset responses inside the cache callback");
 
-const jsFiles = ["app.js","api/config.js","api/_lib/rate-limit.js","api/_lib/dividends.js","api/stocks/dividends.js","api/stocks/quote.js","api/stocks/validate.js","api/trading/quote.js","api/trading/benchmark.js","api/cron/refresh-stocks.js","api/crypto/quote.js","src/data/default-data.js","src/data/finance-model.js","src/data/electricity-model.js","src/data/currency-format.js","src/data/money-input.js","src/crypto/binance.js","src/data/repository.js","src/lib/idb.js","src/lib/supabase.js","src/stocks/client.js","src/stocks/dividends.js","src/stocks/holding.js","src/trading/model.js","src/trading/crypto-lifecycle.js","src/sync/sync-manager.js"];
+const marketFunction = read("supabase/functions/market-data/index.js");
+assert.match(marketFunction, /indodaxDirect/);
+assert.ok(existsSync(resolve(root, "supabase/functions/market-data/index.ts")));
+assert.match(marketFunction, /data-api\.binance\.vision/);
+assert.match(marketFunction, /open\.er-api\.com/);
+assert.match(marketFunction, /market_data_cache/);
+assert.match(marketFunction, /PROVIDER_CONCURRENCY/);
+const marketClient = read("src/market-data/client.js");
+assert.match(marketClient, /functions\.invoke\("market-data"/);
+assert.doesNotMatch(marketClient, /apiUrl\(/, "Market-data client must not depend on a Vercel API route");
+const viteConfig = read("vite.config.js");
+assert.match(viteConfig, /__PUNDI_SUPABASE_URL__/);
+assert.match(viteConfig, /__PUNDI_SUPABASE_ANON_KEY__/);
+const supabaseClient = read("src/lib/supabase.js");
+assert.match(supabaseClient, /builtPublicConfig/);
+assert.match(read("supabase/migrations/023_market_data_cache.sql"), /revoke all on table public\.market_data_cache from anon, authenticated/);
+
+const jsFiles = ["app.js","api/config.js","api/_lib/rate-limit.js","api/_lib/dividends.js","api/stocks/dividends.js","api/stocks/quote.js","api/stocks/validate.js","api/trading/quote.js","api/trading/benchmark.js","api/cron/refresh-stocks.js","api/crypto/quote.js","src/data/default-data.js","src/data/finance-model.js","src/data/electricity-model.js","src/data/currency-format.js","src/data/money-input.js","src/crypto/binance.js","src/market-data/client.js","supabase/functions/market-data/index.js","src/data/repository.js","src/lib/idb.js","src/lib/supabase.js","src/stocks/client.js","src/stocks/dividends.js","src/stocks/holding.js","src/trading/model.js","src/trading/crypto-lifecycle.js","src/sync/sync-manager.js"];
 for (const file of jsFiles) execFileSync(process.execPath, ["--check", resolve(root, file)], { stdio:"pipe" });
 
 for (const file of jsFiles.map(read)) {
@@ -533,13 +551,13 @@ assert.match(appSource, /tx-history-archive/, "Previous History months must rema
 
 const electricityIndex = read("app.html");
 const electricityCss = read("styles.css");
-assert.equal(JSON.parse(read("package.json")).version,"8.7.2","Package version must be v8.7.2");
-assert.match(electricityIndex,/<title>Pundi v8\.7\.2[^<]*<\/title>/,"Document title must be v8.7.2");
-assert.match(read("public/sw.js"),/pundi-shell-v8\.7\.2/,"Service-worker cache must invalidate for the v8.7.2 release");
+assert.equal(JSON.parse(read("package.json")).version,"8.8.0","Package version must be v8.8.0");
+assert.match(electricityIndex,/<title>Pundi v8\.8\.0[^<]*<\/title>/,"Document title must be v8.8.0");
+assert.match(read("public/sw.js"),/pundi-shell-v8\.8\.0/,"Service-worker cache must invalidate for the v8.8.0 release");
 assert.match(read("vite.config.js"),/__PUNDI_BUILD_ID__/,"Build identity must be injected automatically");
-assert.match(appSource,/Pundi v8\.7\.2 · build/,"Public release identity must include version and build marker");
+assert.match(appSource,/Pundi v8\.8\.0 · build/,"Public release identity must include version and build marker");
 assert.match(electricityIndex,/id="topUpElectricityBtn"[^>]*>\s*TOP UP\s*<\/button>/,"Electricity must expose a distinct TOP UP action");
-assert.match(electricityIndex,/id="addElectricityBtn"[^>]*>\s*＋ Reading\s*<\/button>/,"The existing Reading action must remain available");
+assert.match(electricityIndex,/id="addElectricityBtn"[^>]*>[\s\S]*Reading\s*<\/button>/,"The existing Reading action must remain available");
 assert.match(electricityIndex,/id="electricityTopUpModal"/);
 assert.match(electricityIndex,/id="electricityTopUpAmount"/);
 assert.match(electricityIndex,/id="electricityTopUpCancel"/);
@@ -560,7 +578,7 @@ assert.match(cryptoApi,/permissionSets/,"Binance SPOT validation must accept the
 assert.match(cryptoApi,/Crypto symbol not found/);
 assert.match(cryptoApi,/Crypto market data is temporarily unavailable/);
 const binanceSource = read("src/crypto/binance.js");
-assert.match(binanceSource,/PUNDI_CRYPTO_API/,"Browser Crypto REST must use the same-origin Vercel API route");
+assert.match(binanceSource,/invokeMarketData|fetchCryptoQuote/,"Browser Crypto requests must use the shared Supabase market-data function");
 assert.match(electricityIndex,/id="cryptoMarketStatus"/);
 assert.equal((appSource.match(/options:\["IDX","NASDAQ","NYSE","CRYPTO"\]/g)||[]).length,2,"Investment and Trading new-entry market selectors must match exactly");
 assert.equal((appSource.match(/options:\["USD","IDR","USDT"\]/g)||[]).length,2,"Investment and Trading Crypto quote selectors must match exactly");

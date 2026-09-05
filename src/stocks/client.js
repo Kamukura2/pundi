@@ -1,5 +1,6 @@
 import { getSupabase } from "../lib/supabase.js";
 import { apiUrl } from "../lib/runtime.js";
+import { invokeMarketData } from "../market-data/client.js";
 
 async function request(path, holdingId) {
   const supabase = await getSupabase();
@@ -23,12 +24,13 @@ async function authenticatedRequest(path) {
   return body;
 }
 
-export const fetchHoldingQuote = holdingId => request("/api/stocks/quote", holdingId);
+export const fetchHoldingQuote = holdingId => invokeMarketData({ action:"quote", holdingId });
+export const fetchHoldingQuotes = holdingIds => invokeMarketData({ action:"batchQuotes", holdingIds });
 export const fetchHoldingDividends = holdingId => request("/api/stocks/dividends", holdingId);
-export const validateHoldingSymbol = holdingId => request("/api/stocks/validate", holdingId);
-export const fetchUsdIdrRate = ({force=false}={}) => authenticatedRequest(`/api/stocks/fx${force?`?refresh=1&t=${Date.now()}`:""}`);
-export const fetchTradingQuote = (symbol,{force=false}={}) => authenticatedRequest(`/api/trading/quote?symbol=${encodeURIComponent(symbol)}${force?`&refresh=1&t=${Date.now()}`:""}`);
-export const fetchTradingBenchmark = () => authenticatedRequest("/api/trading/benchmark");
+export const validateHoldingSymbol = holdingId => invokeMarketData({ action:"validateHolding", holdingId });
+export const fetchUsdIdrRate = ({force=false}={}) => invokeMarketData({ action:"fx", refresh:force?"1":"0" });
+export const fetchTradingQuote = (symbol,{force=false,market="NASDAQ",currency="USD"}={}) => invokeMarketData({ action:"tradingQuote", symbol, market, currency, refresh:force?"1":"0" });
+export const fetchTradingBenchmark = () => invokeMarketData({ action:"benchmarkHistory", symbol:"SPY" });
 
 export function isPriceStale(stock) {
   if (!stock.priceAsOf) return true;

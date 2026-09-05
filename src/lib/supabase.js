@@ -4,7 +4,15 @@ import { apiUrl } from "./runtime.js";
 
 let clientPromise;
 
+function builtPublicConfig() {
+  const supabaseUrl = typeof __PUNDI_SUPABASE_URL__ === "string" ? __PUNDI_SUPABASE_URL__.trim() : "";
+  const supabaseAnonKey = typeof __PUNDI_SUPABASE_ANON_KEY__ === "string" ? __PUNDI_SUPABASE_ANON_KEY__.trim() : "";
+  return supabaseUrl && supabaseAnonKey ? { supabaseUrl, supabaseAnonKey } : null;
+}
+
 async function loadPublicConfig() {
+  const built = builtPublicConfig();
+  if (built) return built;
   try {
     const response = await fetch(apiUrl("/api/config"), { cache: "no-store" });
     if (!response.ok) throw new Error("Supabase public configuration is unavailable.");

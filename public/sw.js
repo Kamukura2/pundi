@@ -1,5 +1,5 @@
-const SHELL_CACHE = "pundi-shell-v8.7.2";
-const SHELL = ["/", "/app.html", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
+const SHELL_CACHE = "pundi-shell-v8.8.0";
+const SHELL = ["/", "/app.html", "/manifest.webmanifest", "/icons/icon.svg", "/icons/icon.ico", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(SHELL_CACHE).then(cache => cache.addAll(SHELL)).then(() => self.skipWaiting()));

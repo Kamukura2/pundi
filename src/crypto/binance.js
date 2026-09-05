@@ -1,19 +1,18 @@
+import { fetchCryptoQuote, fetchCryptoQuotes } from "../market-data/client.js";
+
+// Kept as public-provider documentation for legacy callers. Runtime quote
+// requests now go through the shared Supabase Edge Function below.
 export const BINANCE_REST_BASE = "https://data-api.binance.vision/api/v3";
 export const BINANCE_WS_BASE = "wss://data-stream.binance.vision/stream?streams=";
-export const PUNDI_CRYPTO_API = "/api/crypto/quote";
-import { apiUrl } from "../lib/runtime.js";
+export const PUNDI_CRYPTO_API = "market-data";
 export const DEFAULT_CRYPTO_QUOTE = "USD";
 export const CRYPTO_QUOTE_CURRENCIES = ["USD", "IDR", "USDT"];
 
-// Portfolio normalization only: stablecoin quotes are approximated with USD.
-// This is not a claim that any stablecoin is exactly equal to USD.
 export const isStableQuote = currency => ["USDT", "USDC", "FDUSD"].includes(String(currency || "").toUpperCase());
 export const isDollarLikeCurrency = currency => ["USD", ...CRYPTO_QUOTE_CURRENCIES.filter(value => isStableQuote(value))].includes(String(currency || "").toUpperCase());
 export const normalizeQuoteValueToIdr = (amount, currency, usdIdr) => Number(amount || 0) * (isDollarLikeCurrency(currency) ? Number(usdIdr || 0) : 1);
 
 const baseSymbolPattern = /^[A-Z0-9]{2,20}$/;
-const quoteSymbolPattern = /^(USD|IDR|USDT)$/;
-const exchangeInfoCache = new Map();
 
 export function normalizeQuoteCurrency(value, fallback = DEFAULT_CRYPTO_QUOTE) {
   const quote = String(value || fallback).trim().toUpperCase();
@@ -32,10 +31,10 @@ export function parseCryptoPairInput(value, defaultQuote = DEFAULT_CRYPTO_QUOTE)
   const fallbackQuote = normalizeQuoteCurrency(defaultQuote);
   if (!raw) throw new Error("Crypto symbol not found.");
   const separated = raw.match(/^([A-Z0-9]{2,20})[\/_-](USD|IDR|USDT)$/);
-  if (separated) return { baseSymbol:normalizeCryptoSymbol(separated[1]), requestedQuote:separated[2], explicitQuote:true };
+  if (separated) return { baseSymbol: normalizeCryptoSymbol(separated[1]), requestedQuote: separated[2], explicitQuote: true };
   const compactQuote = ["USDT", "USD", "IDR"].find(quote => raw.endsWith(quote) && raw.length > quote.length);
-  if (compactQuote) return { baseSymbol:normalizeCryptoSymbol(raw.slice(0, -compactQuote.length)), requestedQuote:compactQuote, explicitQuote:true };
-  return { baseSymbol:normalizeCryptoSymbol(raw), requestedQuote:fallbackQuote, explicitQuote:false };
+  if (compactQuote) return { baseSymbol: normalizeCryptoSymbol(raw.slice(0, -compactQuote.length)), requestedQuote: compactQuote, explicitQuote: true };
+  return { baseSymbol: normalizeCryptoSymbol(raw), requestedQuote: fallbackQuote, explicitQuote: false };
 }
 
 export function binanceSpotSymbol(baseSymbol, quoteCurrency = "USDT") {
@@ -71,8 +70,7 @@ export function validCryptoPrice(value) {
 
 export function normalizeStableQuoteToUsd(value, sourceQuote) {
   const amount = Number(value);
-  if (!Number.isFinite(amount) || amount <= 0) return null;
-  if (String(sourceQuote || "").toUpperCase() === "IDR") return null;
+  if (!Number.isFinite(amount) || amount <= 0 || String(sourceQuote || "").toUpperCase() === "IDR") return null;
   return amount;
 }
 
@@ -89,173 +87,100 @@ export function convertCryptoPrice(value, sourceQuote, requestedQuote, usdIdr) {
 }
 
 export function parseBinanceTicker(data = {}, { source = "rest", sourceQuote = "USDT" } = {}) {
-  const price = Number(data.lastPrice);
-  if (!validCryptoPrice(price)) throw Object.assign(new Error("Binance returned no valid crypto price."), { code:"crypto_price_unavailable" });
+  const price = Number(data.lastPrice ?? data.price);
+  if (!validCryptoPrice(price)) throw Object.assign(new Error("Binance returned no valid crypto price."), { code: "crypto_price_unavailable" });
   const timestamp = Number(data.closeTime || data.E || Date.now());
-  return {
-    price,
-    asOf: new Date(Number.isFinite(timestamp) && timestamp > 0 ? timestamp : Date.now()).toISOString(),
-    status: source === "websocket" ? "live" : "stale",
-    provider: "binance",
-    source,
-    sourceQuote,
-    changePercent: Number(data.priceChangePercent),
-    high: Number(data.highPrice),
-    low: Number(data.lowPrice),
-    volume: Number(data.volume)
-  };
+  return { price, asOf: new Date(Number.isFinite(timestamp) && timestamp > 0 ? timestamp : Date.now()).toISOString(), status: source === "websocket" ? "LIVE" : "STALE", provider: "binance", source, sourceQuote, changePercent: Number(data.priceChangePercent), high: Number(data.highPrice), low: Number(data.lowPrice), volume: Number(data.volume) };
 }
 
-async function requestCryptoQuote(baseSymbol, requestedQuote = DEFAULT_CRYPTO_QUOTE, usdIdr = "") {
+async function requestCryptoQuote(baseSymbol, requestedQuote = DEFAULT_CRYPTO_QUOTE) {
   const base = normalizeCryptoSymbol(baseSymbol);
   const quote = normalizeQuoteCurrency(requestedQuote);
-  let response;
-  try {
-    const fx = usdIdr ? `&usdIdr=${encodeURIComponent(usdIdr)}` : "";
-    response = await fetch(apiUrl(`${PUNDI_CRYPTO_API}?symbol=${encodeURIComponent(base)}&quote=${quote}${fx}`), { headers:{Accept:"application/json"}, cache:"no-store" });
-  } catch { throw Object.assign(new Error("Unable to reach Crypto market data. Please try again."), { code:"crypto_network_error" }); }
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok || body.ok !== true) {
-    const message = body.code === "crypto_symbol_not_found" || body.code === "crypto_symbol_invalid" ? "Crypto symbol not found." : body.code === "crypto_price_route_unavailable" ? "No supported market-price route for this Crypto asset." : body.error || "Live Crypto price is temporarily unavailable.";
-    throw Object.assign(new Error(message), { code:body.code || "crypto_provider_error", status:response.status });
-  }
-  return body;
+  return fetchCryptoQuote(base, quote);
 }
 
-export async function resolveCryptoPair(value, requestedQuote = DEFAULT_CRYPTO_QUOTE, usdIdr = "") {
+export async function resolveCryptoPair(value, requestedQuote = DEFAULT_CRYPTO_QUOTE) {
   const parsed = parseCryptoPairInput(value, requestedQuote);
-  return requestCryptoQuote(parsed.baseSymbol, parsed.requestedQuote, usdIdr);
+  return requestCryptoQuote(parsed.baseSymbol, parsed.requestedQuote);
 }
 
-// Backward-compatible v8.2.x resolver; new positions use USD by default.
-export async function resolveCryptoSymbol(baseSymbol, quoteCurrency = DEFAULT_CRYPTO_QUOTE, usdIdr = "") {
-  return resolveCryptoPair(baseSymbol, quoteCurrency, usdIdr);
+export async function resolveCryptoSymbol(baseSymbol, quoteCurrency = DEFAULT_CRYPTO_QUOTE) {
+  return resolveCryptoPair(baseSymbol, quoteCurrency);
 }
 
-export async function fetchBinanceTicker(providerSymbol, requestedQuote = "USDT", usdIdr = "") {
+export async function fetchBinanceTicker(providerSymbol, requestedQuote = "USDT") {
   const sourceQuote = providerQuoteCurrency(providerSymbol);
-  const body = await requestCryptoQuote(cryptoBaseSymbol(providerSymbol, sourceQuote), requestedQuote, usdIdr);
-  return { price:body.price, asOf:body.asOf, status:"stale", provider:"binance", source:"same-origin-rest", sourceQuote:body.sourceQuote || sourceQuote, changePercent:body.changePercent24h, high:body.high, low:body.low, volume:body.volume };
+  const base = cryptoBaseSymbol(providerSymbol, sourceQuote);
+  const body = await requestCryptoQuote(base, requestedQuote);
+  return { price: body.price, asOf: body.asOf, status: body.status || "STALE", provider: body.provider || "market-data", source: "pundi-market-data", sourceQuote: body.requestedQuote || requestedQuote, requestedQuote: body.requestedQuote || requestedQuote, changePercent: body.changePercent24h, high: body.high, low: body.low, volume: body.volume, providerSymbol: body.normalizedSymbol };
 }
 
+export { fetchCryptoQuotes };
+
+// Shared Edge Function polling replaces direct per-client Binance WebSocket
+// connections. This keeps web, Android, and Windows on one contract and uses
+// one batch request for all visible crypto rows.
 export class CryptoMarketStream {
   constructor({ onTicker = () => {}, onStatus = () => {} } = {}) {
     this.onTicker = onTicker;
     this.onStatus = onStatus;
-    this.symbols = [];
-    this.socket = null;
+    this.requests = [];
+    this.timer = null;
     this.retryTimer = null;
-    this.restTimer = null;
-    this.staleTimer = null;
-    this.retryCount = 0;
     this.closed = true;
-    this.lastMessageAt = 0;
+    this.retryCount = 0;
+    this.refreshing = false;
+  }
+
+  setRequests(requests = []) {
+    const next = requests.map(item => ({ id: String(item.id || item.symbol || ""), symbol: String(item.symbol || "").trim().toUpperCase(), quote: normalizeQuoteCurrency(item.quote || "USD") })).filter(item => item.id && item.symbol).sort((a, b) => a.id.localeCompare(b.id));
+    if (JSON.stringify(next) === JSON.stringify(this.requests)) return;
+    this.requests = next;
+    this.retryCount = 0;
+    this.closed = !next.length;
+    this.stopTimers();
+    if (this.closed) { this.onStatus({ state: "offline", reason: "no crypto holdings" }); return; }
+    this.onStatus({ state: "connecting", reason: "shared market-data service" });
+    this.refresh();
+    this.timer = setInterval(() => this.refresh(), 60_000);
   }
 
   setSymbols(symbols = []) {
-    const next = [...new Set(symbols.map(symbol => String(symbol || "").trim().toLowerCase()).filter(Boolean))].sort();
-    if (next.join(",") === this.symbols.join(",")) return;
-    this.symbols = next;
-    this.retryCount = 0;
-    this.closed = !next.length;
-    this.clearTimers();
-    this.socket?.close();
-    this.socket = null;
-    if (!this.closed) this.connect();
-    else this.onStatus({ state:"offline", reason:"no crypto symbols" });
+    this.setRequests(symbols.map(symbol => ({ id: symbol, symbol, quote: "USDT" })));
+  }
+
+  stopTimers() {
+    if (this.timer) clearInterval(this.timer);
+    if (this.retryTimer) clearTimeout(this.retryTimer);
+    this.timer = null;
+    this.retryTimer = null;
   }
 
   stop() {
-    this.symbols = [];
+    this.stopTimers();
+    this.requests = [];
     this.closed = true;
-    this.clearTimers();
-    this.socket?.close();
-    this.socket = null;
-    this.onStatus({ state:"offline", reason:"stopped" });
+    this.refreshing = false;
+    this.onStatus({ state: "offline", reason: "stopped" });
   }
 
-  clearTimers() {
-    if (this.retryTimer) clearTimeout(this.retryTimer);
-    if (this.restTimer) clearInterval(this.restTimer);
-    if (this.staleTimer) clearInterval(this.staleTimer);
-    this.retryTimer = null;
-    this.restTimer = null;
-    this.staleTimer = null;
-  }
-
-  connect() {
-    if (this.closed || !this.symbols.length) return;
-    if (typeof WebSocket === "undefined") {
-      this.onStatus({ state:"offline", reason:"WebSocket unavailable" });
-      this.startRestFallback();
-      return;
-    }
-    const url = `${BINANCE_WS_BASE}${this.symbols.map(symbol => `${symbol}@ticker`).join("/")}`;
-    this.onStatus({ state:"connecting" });
+  async refresh() {
+    if (this.closed || !this.requests.length || this.refreshing) return;
+    this.refreshing = true;
     try {
-      const socket = new WebSocket(url);
-      this.socket = socket;
-      socket.onopen = () => {
-        if (socket !== this.socket) return;
-        this.retryCount = 0;
-        this.lastMessageAt = Date.now();
-        this.stopRestFallback();
-        if (this.staleTimer) clearInterval(this.staleTimer);
-        this.staleTimer = setInterval(() => {
-          if (!this.closed && this.lastMessageAt && Date.now() - this.lastMessageAt > 15000) this.onStatus({ state:"stale", reason:"No recent ticker message" });
-        }, 5000);
-        this.onStatus({ state:"live" });
-      };
-      socket.onmessage = event => {
-        if (socket !== this.socket) return;
-        let payload;
-        try { payload = typeof event.data === "string" ? JSON.parse(event.data) : event.data; } catch { return; }
-        const ticker = payload?.data || payload;
-        if (!ticker?.s || !validCryptoPrice(ticker.lastPrice)) return;
-        this.lastMessageAt = Date.now();
-        this.onTicker(String(ticker.s).toUpperCase(), parseBinanceTicker(ticker, {source:"websocket",sourceQuote:providerQuoteCurrency(ticker.s)}));
-      };
-      socket.onerror = () => { if (socket === this.socket) socket.close(); };
-      socket.onclose = () => {
-        if (socket !== this.socket || this.closed) return;
-        this.socket = null;
-        if (this.staleTimer) clearInterval(this.staleTimer);
-        this.staleTimer = null;
-        this.onStatus({ state:"stale", reason:"WebSocket disconnected" });
-        this.startRestFallback();
-        this.scheduleReconnect();
-      };
-      this.staleTimer = setInterval(() => {
-        if (!this.closed && this.lastMessageAt && Date.now() - this.lastMessageAt > 15000) this.onStatus({ state:"stale", reason:"No recent ticker message" });
-      }, 5000);
+      const body = await fetchCryptoQuotes(this.requests);
+      const quotes = Array.isArray(body?.quotes) ? body.quotes : [];
+      if (!quotes.length) throw Object.assign(new Error("No crypto quotes returned."), { code: "crypto_provider_unavailable" });
+      quotes.forEach(quote => { if (quote?.ok !== false && validCryptoPrice(quote.price)) this.onTicker(String(quote.id || quote.normalizedSymbol || ""), quote); });
+      this.retryCount = 0;
+      this.onStatus({ state: quotes.some(quote => quote.status === "STALE" || quote.status === "OFFLINE") ? "stale" : "live", reason: "shared market-data service" });
     } catch (error) {
-      this.onStatus({ state:"offline", reason:error.message });
-      this.startRestFallback();
-      this.scheduleReconnect();
-    }
-  }
-
-  scheduleReconnect() {
-    if (this.closed || this.retryTimer) return;
-    const delay = Math.min(30000, 1000 * (2 ** Math.min(this.retryCount, 5)));
-    this.retryCount += 1;
-    this.retryTimer = setTimeout(() => { this.retryTimer = null; this.connect(); }, delay);
-  }
-
-  startRestFallback() {
-    if (this.restTimer || this.closed) return;
-    const refresh = async () => {
-      for (const symbol of this.symbols) {
-        try { this.onTicker(symbol.toUpperCase(), await fetchBinanceTicker(symbol.toUpperCase())); }
-        catch (error) { this.onStatus({ state:"stale", reason:error.message }); }
+      this.onStatus({ state: "stale", reason: error.message });
+      if (!this.closed && !this.retryTimer) {
+        const delay = Math.min(30_000, 2_000 * (2 ** Math.min(this.retryCount, 4)));
+        this.retryCount += 1;
+        this.retryTimer = setTimeout(() => { this.retryTimer = null; this.refresh(); }, delay);
       }
-    };
-    refresh();
-    this.restTimer = setInterval(refresh, 20000);
-  }
-
-  stopRestFallback() {
-    if (this.restTimer) clearInterval(this.restTimer);
-    this.restTimer = null;
+    } finally { this.refreshing = false; }
   }
 }
