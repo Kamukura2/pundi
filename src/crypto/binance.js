@@ -89,8 +89,11 @@ export function convertCryptoPrice(value, sourceQuote, requestedQuote, usdIdr) {
 export function parseBinanceTicker(data = {}, { source = "rest", sourceQuote = "USDT" } = {}) {
   const price = Number(data.lastPrice ?? data.price);
   if (!validCryptoPrice(price)) throw Object.assign(new Error("Binance returned no valid crypto price."), { code: "crypto_price_unavailable" });
-  const timestamp = Number(data.closeTime || data.E || Date.now());
-  return { price, asOf: new Date(Number.isFinite(timestamp) && timestamp > 0 ? timestamp : Date.now()).toISOString(), status: source === "websocket" ? "LIVE" : "STALE", provider: "binance", source, sourceQuote, changePercent: Number(data.priceChangePercent), high: Number(data.highPrice), low: Number(data.lowPrice), volume: Number(data.volume) };
+  const timestamp = Number(data.closeTime || data.E || 0);
+  const hasTimestamp = Number.isFinite(timestamp) && timestamp > 0;
+  const asOf = hasTimestamp ? new Date(timestamp).toISOString() : null;
+  const status = asOf ? (source === "websocket" ? "LIVE" : "STALE") : "STALE";
+  return { price, asOf, status, provider: "binance", source, sourceQuote, changePercent: Number(data.priceChangePercent), high: Number(data.highPrice), low: Number(data.lowPrice), volume: Number(data.volume) };
 }
 
 async function requestCryptoQuote(baseSymbol, requestedQuote = DEFAULT_CRYPTO_QUOTE) {
@@ -121,9 +124,10 @@ export { fetchCryptoQuotes };
 // connections. This keeps web, Android, and Windows on one contract and uses
 // one batch request for all visible crypto rows.
 export class CryptoMarketStream {
-  constructor({ onTicker = () => {}, onStatus = () => {} } = {}) {
+  constructor({ onTicker = () => {}, onStatus = () => {}, fetchQuotes = fetchCryptoQuotes } = {}) {
     this.onTicker = onTicker;
     this.onStatus = onStatus;
+    this.fetchQuotes = fetchQuotes;
     this.requests = [];
     this.timer = null;
     this.retryTimer = null;
@@ -168,12 +172,30 @@ export class CryptoMarketStream {
     if (this.closed || !this.requests.length || this.refreshing) return;
     this.refreshing = true;
     try {
-      const body = await fetchCryptoQuotes(this.requests);
+      const body = await this.fetchQuotes(this.requests);
       const quotes = Array.isArray(body?.quotes) ? body.quotes : [];
       if (!quotes.length) throw Object.assign(new Error("No crypto quotes returned."), { code: "crypto_provider_unavailable" });
-      quotes.forEach(quote => { if (quote?.ok !== false && validCryptoPrice(quote.price)) this.onTicker(String(quote.id || quote.normalizedSymbol || ""), quote); });
+      const expectedIds = new Set(this.requests.map(request => request.id));
+      const receivedIds = new Set();
+      quotes.forEach(quote => {
+        const id = String(quote?.id || quote?.normalizedSymbol || "");
+        if (!id) return;
+        receivedIds.add(id);
+        this.onTicker(id, quote);
+      });
+      const degraded = quotes.some(quote => quote?.ok === false || ["STALE", "OFFLINE"].includes(String(quote?.status || quote?.state || "").toUpperCase()))
+        || receivedIds.size < expectedIds.size;
+      if (degraded) {
+        this.onStatus({ state: "stale", reason: "shared market-data service returned partial or stale data" });
+        if (!this.closed && !this.retryTimer) {
+          const delay = Math.min(30_000, 2_000 * (2 ** Math.min(this.retryCount, 4)));
+          this.retryCount += 1;
+          this.retryTimer = setTimeout(() => { this.retryTimer = null; this.refresh(); }, delay);
+        }
+        return;
+      }
       this.retryCount = 0;
-      this.onStatus({ state: quotes.some(quote => quote.status === "STALE" || quote.status === "OFFLINE") ? "stale" : "live", reason: "shared market-data service" });
+      this.onStatus({ state: "live", reason: "shared market-data service" });
     } catch (error) {
       this.onStatus({ state: "stale", reason: error.message });
       if (!this.closed && !this.retryTimer) {

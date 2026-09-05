@@ -9,6 +9,13 @@ assert.ok((await readFile(resolve(root, "app.html"), "utf8")).includes("Pundi"))
 assert.equal(safeAssetPath(root, "/%2e%2e%2fpackage.json"), null);
 assert.equal(safeAssetPath(root, "/%2e%2e%2f%2e%2e%2fpackage.json"), null);
 
+const desktopMain = await readFile(resolve(process.cwd(), "desktop/main.cjs"), "utf8");
+const preload = await readFile(resolve(process.cwd(), "desktop/preload.cjs"), "utf8");
+const runtime = await readFile(resolve(process.cwd(), "src/lib/runtime.js"), "utf8");
+assert.match(desktopMain, /protocol === "https:" \|\| protocol === "mailto:"/);
+assert.match(preload, /isDesktop: true/);
+assert.match(runtime, /window\.pundiDesktop\?\.isDesktop/);
+
 const server = createStaticServer(root);
 await new Promise((resolveReady, reject) => { server.once("error", reject); server.listen(0, "127.0.0.1", resolveReady); });
 const { port } = server.address();

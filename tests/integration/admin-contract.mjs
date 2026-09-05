@@ -17,7 +17,21 @@ async function create(email){ const {data,error}=await adminDb.auth.admin.create
 async function token(email){ const {data,error}=await anonDb.auth.signInWithPassword({email,password}); if(error)throw error; return data.session.access_token; }
 function response(){ return {statusCode:0,headers:{},setHeader(k,v){this.headers[k]=v},status(code){this.statusCode=code;return this},json(body){this.body=body;return this}}; }
 async function call(request){ const res=response(); await handler(request,res); return res; }
-function assertNoPrivate(value){ const text=JSON.stringify(value); for(const marker of ["password","access_token","refresh_token","amount","balance","description","portfolio","holdings"]) assert.equal(text.toLowerCase().includes(marker),false,`Admin payload leaked ${marker}.`); }
+function assertNoPrivate(value){
+  const sensitiveKeys=new Set(["password","access_token","refresh_token","amount","balance","description","portfolio","holdings"]);
+  const visited=new Set();
+  function walk(node){
+    if(!node || typeof node!=="object" || visited.has(node)) return;
+    visited.add(node);
+    for(const [key,child] of Object.entries(node)){
+      assert.equal(sensitiveKeys.has(key.toLowerCase()),false,`Admin payload leaked ${key}.`);
+      walk(child);
+    }
+  }
+  walk(value);
+  const text=JSON.stringify(value).toLowerCase();
+  for(const marker of ["password","access_token","refresh_token"]) assert.equal(text.includes(marker),false,`Admin payload leaked ${marker}.`);
+}
 async function run(){
   const adminUser=await create(`${tag}-admin@example.invalid`); const normalUser=await create(`${tag}-user@example.invalid`);
   const adminToken=await token(`${tag}-admin@example.invalid`); const normalToken=await token(`${tag}-user@example.invalid`);

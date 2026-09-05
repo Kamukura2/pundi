@@ -7,7 +7,7 @@ import { formatMoneyInput, isMoneyField, parseMoneyInput } from "./src/data/mone
 import { CryptoMarketStream, convertCryptoPrice, fetchBinanceTicker, fetchCryptoQuotes, isCryptoAsset, normalizeCryptoSymbol, normalizeQuoteValueToIdr, parseCryptoPairInput, providerQuoteCurrency, resolveCryptoPair } from "./src/crypto/binance.js";
 import { SyncManager } from "./src/sync/sync-manager.js";
 import { fetchHoldingDividends, fetchHoldingQuote, fetchHoldingQuotes, fetchTradingBenchmark, fetchTradingQuote, fetchUsdIdrRate, isPriceStale, validateHoldingSymbol } from "./src/stocks/client.js";
-import { normalizeStockMapping, quantityForDisplay, quantityForStorage, quantityUnit } from "./src/stocks/holding.js";
+import { normalizeStockMapping, persistenceProvider, quantityForDisplay, quantityForStorage, quantityUnit, tradingQuoteKey } from "./src/stocks/holding.js";
 import { advanceDividendLifecycle, creditDividendToWallet, dividendEventYear, dividendGross, dividendNativeGross, dividendReceivables, mergeDividendEvents, projectedDividendForMonth, reconcileDividendState, reverseDividendCredit, summarizeDividends } from "./src/stocks/dividends.js";
 import { getAuthenticatedSession, getSupabase } from "./src/lib/supabase.js";
 import { applyOpeningPosition, applyTrade, archiveClosedTradingPositions, cashEvent, equityBenchmarkMetrics, performancePreview, performanceSeries, reconcileTradingPositions, removeTradingLedgerEntry, removeTradingPositionData, setTradingWalletBalance, tradingMetrics, tradingPositionCost, tradingPositionValue, tradingTargetSimulation, upsertDailySnapshot } from "./src/trading/model.js";
@@ -1446,7 +1446,7 @@ function handleCryptoTicker(requestId,quote){
  target.current=requestedPrice;
  target.priceSource=quote.provider||"market-data";
  target.priceStatus=quote.status||"STALE";
- target.priceAsOf=quote.asOf||quote.quoteTimestamp||new Date().toISOString();
+ target.priceAsOf=quote.asOf||quote.quoteTimestamp||null;
  target.lastPriceFetchAt=new Date().toISOString();
  target.changePercent=Number(quote.changePercent24h);
  updateCryptoPriceNodes(target.id);
@@ -1462,8 +1462,12 @@ async function refreshCryptoMarketData(){
  if(!requests.length)return;
  try{
   const body=await fetchCryptoQuotes(requests);
-  (body.quotes||[]).forEach(quote=>handleCryptoTicker(quote.id,quote));
-  setCryptoMarketStatus({state:(body.quotes||[]).some(quote=>quote.status==="STALE"||quote.status==="OFFLINE")?"stale":"live",reason:"Shared market data service"});
+  const quotes=body.quotes||[];
+  quotes.forEach(quote=>handleCryptoTicker(quote.id,quote));
+  const expectedIds=new Set(requests.map(request=>String(request.id)));
+  const receivedIds=new Set(quotes.map(quote=>String(quote?.id||quote?.normalizedSymbol||"")).filter(Boolean));
+  const degraded=quotes.some(quote=>quote?.ok===false||["STALE","OFFLINE"].includes(String(quote?.status||quote?.state||"").toUpperCase()))||receivedIds.size<expectedIds.size;
+  setCryptoMarketStatus({state:degraded?"stale":"live",reason:degraded?"Shared market data service returned partial or stale data":"Shared market data service"});
  }catch(error){setCryptoMarketStatus({state:"stale",reason:error.message});}
 }
 
@@ -1535,20 +1539,20 @@ async function refreshTradingPrices({silent=false,force=false}={}){
   const activePositions=state.tradingPositions.filter(position=>Number(position.quantity)>1e-9);
   const equityPositions=activePositions.filter(position=>!isCryptoAsset(position));
   const cryptoPositions=activePositions.filter(isCryptoAsset);
-  const quotes=new Map(),symbolMappings=new Map(equityPositions.map(position=>[String(position.providerSymbol||position.ticker).trim().toUpperCase(),position])),symbols=[...symbolMappings.keys()].filter(Boolean);
-  for(const symbol of symbols){
-   try{const mapping=symbolMappings.get(symbol)||{},quote=await fetchTradingQuote(symbol,{force,market:mapping.market||"NASDAQ",currency:mapping.currency||"USD"});quotes.set(symbol,quote);lastCoverage=quote.coverage||quote.provider;}
-   catch(error){quotes.set(symbol,{error});}
+  const quotes=new Map(),symbolMappings=new Map(equityPositions.map(position=>[tradingQuoteKey(position),position])),symbols=[...symbolMappings.keys()].filter(Boolean);
+  for(const quoteKey of symbols){
+   try{const mapping=symbolMappings.get(quoteKey)||{},symbol=String(mapping.providerSymbol||mapping.ticker).trim().toUpperCase(),quote=await fetchTradingQuote(symbol,{force,market:mapping.market||"NASDAQ",currency:mapping.currency||"USD"});quotes.set(quoteKey,quote);lastCoverage=quote.coverage||quote.provider;}
+   catch(error){quotes.set(quoteKey,{error});}
   }
   for(const position of equityPositions){
-   const symbol=String(position.providerSymbol||position.ticker).trim().toUpperCase(),quote=quotes.get(symbol);
+   const quote=quotes.get(tradingQuoteKey(position));
    if(quote&&!quote.error){position.current=Number(quote.price);position.priceSource=quote.provider;position.priceStatus=quote.status;position.priceAsOf=quote.asOf;position.lastPriceFetchAt=new Date().toISOString();updated++;}
    else{position.priceStatus=`saved price · ${quote?.error?.code||"provider unavailable"}`;position.lastPriceFetchAt=new Date().toISOString();failed++;}
   }
   const hasCryptoTrading=cryptoPositions.length>0||state.tradingLedger.some(row=>row.assetType==="crypto");
   const hasEquityBenchmark=equityPositions.length>0||state.tradingLedger.some(row=>!isCryptoAsset(row));
   if(hasEquityBenchmark){
-   try{const spy=quotes.get("SPY")||await fetchTradingQuote("SPY",{force});state.spyQuote={price:Number(spy.price),asOf:spy.asOf,provider:spy.provider};lastCoverage=spy.coverage||lastCoverage;}
+   try{const spy=quotes.get(tradingQuoteKey({market:"NASDAQ",currency:"USD",providerSymbol:"SPY"}))||await fetchTradingQuote("SPY",{force,market:"NASDAQ",currency:"USD"});state.spyQuote={price:Number(spy.price),asOf:spy.asOf,provider:spy.provider};lastCoverage=spy.coverage||lastCoverage;}
    catch(error){state.spyQuote={...(state.spyQuote||{}),error:error.message};}
    try{
     const history=await fetchTradingBenchmark(),bars=[...(history.bars||[])].sort((a,b)=>a.date.localeCompare(b.date));
@@ -1765,7 +1769,7 @@ addTickerBtn.onclick=()=>openSimple("Add Ticker",[
   try{
    const parsed=parseCryptoPairInput(ticker,values.quote||"USD"),resolved=await resolveCryptoPair(parsed.baseSymbol,parsed.requestedQuote,state.usdIdr),quote=resolved;
    if(state.stocks.some(row=>isCryptoAsset(row)&&row.ticker===parsed.baseSymbol)){alert(`${parsed.baseSymbol} already exists in this portfolio.`);return false;}
-   const current=Number(quote.price),row={id:createId(),ticker:parsed.baseSymbol,displaySymbol:parsed.baseSymbol,assetType:"crypto",market:"CRYPTO",provider:resolved.provider||"market-data",providerSymbol:resolved.providerSymbol||resolved.normalizedSymbol,currency:resolved.requestedQuote,quantity:Number(values.quantity),avg:Number(values.avg),current,manualCurrent:current,priceSource:resolved.provider||"market-data",priceStatus:resolved.status||"OFFLINE",priceAsOf:resolved.asOf||resolved.quoteTimestamp,lastPriceFetchAt:new Date().toISOString(),base:{},optimistic:{}};
+   const current=Number(quote.price),row={id:createId(),ticker:parsed.baseSymbol,displaySymbol:parsed.baseSymbol,assetType:"crypto",market:"CRYPTO",provider:persistenceProvider({assetType:"crypto",provider:resolved.provider}),providerSymbol:resolved.providerSymbol||resolved.normalizedSymbol,currency:resolved.requestedQuote,quantity:Number(values.quantity),avg:Number(values.avg),current,manualCurrent:current,priceSource:resolved.provider||"market-data",priceStatus:resolved.status||"OFFLINE",priceAsOf:resolved.asOf||resolved.quoteTimestamp,lastPriceFetchAt:new Date().toISOString(),base:{},optimistic:{}};
    YEARS.slice(1).forEach(year=>{row.base[year]=current;row.optimistic[year]=current;});
    state.stocks.push(row);syncCryptoMarketData();return `Crypto Investment asset added · ${parsed.baseSymbol}/${resolved.requestedQuote}`;
   }catch(error){alert(error.message);return false;}

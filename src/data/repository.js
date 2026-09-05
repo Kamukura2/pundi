@@ -1,5 +1,6 @@
 import { cacheGet, cachePut, mutationDelete, mutationList, mutationPut } from "../lib/idb.js";
 import { createEmptyState, createId, YEARS } from "./default-data.js";
+import { persistenceProvider } from "../stocks/holding.js";
 
 export const DATA_TABLES = [
   "profiles", "accounts", "transactions", "monthly_budgets", "yearly_expenses",
@@ -165,7 +166,7 @@ function stateToRows(state, userId, { dividendCreditAudit = true } = {}) {
     entrusted_funds: state.entrustedFunds.map((row,index) => owned({id:row.id,name:row.name,amount:Number(row.amount),deduction_source:row.source,is_settled:Boolean(row.settled),sort_order:Number(row.sortOrder??index),...stamp(row)})),
     clients: state.clients.map((row,index) => owned({id:row.id,name:row.name,monthly_retainer:Number(row.monthly),paid_this_month:Number(row.paid),previous_outstanding:Number(row.carry),status:row.status==="freeze"?"pending":row.status,client_type:row.clientType || "recurring",ending_paid:Boolean(row.endingPaid),sort_order:Number(row.sortOrder??index),tracking_month:row.trackingMonth||null,...stamp(row)})),
     stock_holdings: state.stocks.map(row => owned({
-      id:row.id,display_symbol:row.displaySymbol || row.ticker,market:row.market,asset_type:row.assetType||"equity",provider:row.provider,
+      id:row.id,display_symbol:row.displaySymbol || row.ticker,market:row.market,asset_type:row.assetType||"equity",provider:persistenceProvider(row),
       provider_symbol:row.providerSymbol || row.ticker,currency:row.currency,quantity:Number(row.quantity),
       avg_purchase_price:Number(row.avg),current_price:Number(row.current),manual_current_price:Number(row.manualCurrent ?? row.current),
       price_source:row.priceSource || "manual",price_status:row.priceStatus || "manual",

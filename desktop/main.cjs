@@ -18,6 +18,13 @@ function serveDist() {
   });
 }
 
+function isAllowedExternalUrl(value) {
+  try {
+    const protocol = new URL(value).protocol;
+    return protocol === "https:" || protocol === "mailto:";
+  } catch { return false; }
+}
+
 function createWindow() {
   const window = new BrowserWindow({
     width: 1440,
@@ -38,13 +45,13 @@ function createWindow() {
   const isLocalUrl = url => { try { return new URL(url).origin === desktopOrigin; } catch { return false; } };
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (isLocalUrl(url)) return { action: "allow" };
-    shell.openExternal(url).catch(() => {});
+    if (isAllowedExternalUrl(url)) shell.openExternal(url).catch(() => {});
     return { action: "deny" };
   });
   window.webContents.on("will-navigate", (event, url) => {
     if (isLocalUrl(url)) return;
     event.preventDefault();
-    shell.openExternal(url).catch(() => {});
+    if (isAllowedExternalUrl(url)) shell.openExternal(url).catch(() => {});
   });
   window.loadURL(`${desktopOrigin}/app.html?pundi_desktop=1`);
 }

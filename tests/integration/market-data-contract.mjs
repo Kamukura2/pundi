@@ -5,7 +5,7 @@ process.env.SUPABASE_ANON_KEY = "";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "";
 
 const service = await import("../../supabase/functions/market-data/index.js");
-const { quoteEquity, quoteCrypto, quoteFx, normalizeEquityMapping, parseCryptoInput, handleRequest, resetMarketDataTestState } = service;
+const { quoteEquity, quoteCrypto, quoteFx, marketStatus, normalizeEquityMapping, parseCryptoInput, handleRequest, resetMarketDataTestState } = service;
 
 const yahooBody = (symbol, price, stamp = Math.floor(Date.now() / 1000)) => ({
   chart: {
@@ -161,6 +161,57 @@ assert.equal(health.ok, true);
 assert.equal(typeof health.overall, "string");
 assert.ok(Array.isArray(health.checks));
 assert.equal(JSON.stringify(health).includes("API_KEY"), false);
+
+// Provider timestamps are authoritative; an unknown timestamp must never be reported as fresh.
+setProvider(async () => jsonResponse({ chart: { result: [{ meta: { regularMarketPrice: 77 }, indicators: { quote: [{ close: [77] }] } }], error: null } }));
+const unknownAge = await quoteEquity({ displaySymbol: "NOTIME", providerSymbol: "NOTIME", market: "NASDAQ", currency: "USD" }, { ignoreCache: true });
+assert.equal(unknownAge.asOf, null);
+assert.equal(unknownAge.status, "STALE");
+assert.equal(unknownAge.state, "STALE");
+
+// Derived IDR crypto must inherit a stale FX dependency state.
+resetMarketDataTestState();
+const originalNowValue = Date.now;
+setProvider(async url => jsonResponse(yahooBody("IDR=X", 17650)));
+await quoteFx({ ignoreCache: true });
+Date.now = () => originalNowValue() + 11 * 60 * 1000;
+try {
+  setProvider(async url => {
+    if (url.includes("indodax.com/api/ticker/fooidr")) return jsonResponse({ code: "not_found" }, 404);
+    if (url.includes("binance.vision/api/v3/ticker/24hr?symbol=FOOUSDT")) return jsonResponse(binanceBody(2));
+    if (url.includes("binance.vision")) return jsonResponse({ code: "not_found" }, 404);
+    throw new Error("simulated FX outage");
+  });
+  const staleFxDerived = await quoteCrypto({ symbol: "FOO", quote: "IDR" }, { ignoreCache: true });
+  assert.equal(staleFxDerived.status, "STALE");
+  assert.equal(staleFxDerived.state, "STALE");
+  assert.equal(staleFxDerived.fx?.state, "STALE");
+  assert.equal(staleFxDerived.errorClass, staleFxDerived.fx?.errorClass);
+} finally { Date.now = originalNowValue; }
+
+// Market session input must be validated and the public boundary must return JSON errors.
+assert.equal(marketStatus("IDX", "2026-09-07T03:00:00.000Z").session, "open");
+assert.equal(marketStatus("IDX", "2026-09-07T05:00:00.000Z").session, "closed"); // Monday 12:00 WIB lunch break
+assert.equal(marketStatus("IDX", "2026-09-11T04:30:00.000Z").session, "closed"); // Friday 11:30 WIB break
+assert.equal(marketStatus("IDX", "2026-09-11T07:00:00.000Z").session, "open"); // Friday 14:00 WIB second session
+assert.equal(marketStatus("NASDAQ", "2026-07-03T14:00:00.000Z").session, "closed"); // observed Independence Day
+assert.equal(marketStatus("NASDAQ", "2026-07-06T14:00:00.000Z").session, "open");
+assert.throws(() => marketStatus("UNKNOWN", Date.now()), error => error.code === "unsupported_market");
+assert.throws(() => marketStatus("IDX", "not-a-date"), error => error.code === "invalid_as_of");
+const badStatusResponse = await handleRequest(new Request("https://edge.test/market-data?action=marketStatus&market=IDX&asOf=not-a-date"));
+assert.equal(badStatusResponse.status, 400);
+assert.equal((await badStatusResponse.json()).code, "invalid_as_of");
+
+// Public health rate-limit overflow must be a structured 429, not a rejected promise.
+resetMarketDataTestState();
+setProvider(async url => {
+  if (url.includes("IDR%3DX") || url.includes("IDR=X")) return jsonResponse(yahooBody("IDR=X", 17650));
+  if (url.includes("indodax.com")) return jsonResponse(indodaxBody(100));
+  return jsonResponse(yahooBody("MARKET", 100));
+});
+for (let attempt = 0; attempt < 6; attempt++) assert.equal((await handleRequest(new Request("https://edge.test/market-data?action=health"))).status, 200);
+const limitedHealth = await handleRequest(new Request("https://edge.test/market-data?action=health"));
+assert.equal(limitedHealth.status, 429);
 
 // Restore process-global fetch for the runner.
 globalThis.fetch = originalFetch;

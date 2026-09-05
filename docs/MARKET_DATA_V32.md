@@ -71,9 +71,15 @@ Expired valid data is returned as `STALE` when available.
 
 `023_market_data_cache.sql` adds only a service cache table. It has no user ID,
 no financial row, no auth data, RLS enabled, no anon/authenticated grants, and
-service-role-only access. TTLs are 5 minutes for IDX, 2 minutes for US, 1 minute
-for crypto, and 10 minutes for FX. Provider batches are concurrency-limited to
-five workers.
+service-role-only access. `024_crypto_price_precision.sql` only widens price and
+execution numeric precision/scale to `numeric(28,10)`; it does not rewrite or
+delete rows. TTLs are 5 minutes for IDX, 2 minutes for US, 1 minute for crypto,
+and 10 minutes for FX. In-memory cache entries are LRU-bounded to 500 records;
+durable cache writes expire old rows and trim overflow. Public health has both a
+per-origin and global budget, and rate buckets are TTL/size bounded. Ad-hoc
+trading and crypto batch requests do not persist arbitrary symbols to durable
+cache. Provider batches are concurrency-limited to five workers and client
+batches are chunked at the Edge Function's 50-item limit.
 
 ## Deployment gate
 
@@ -89,7 +95,9 @@ powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:/Jense
 
 For the V3.2 run, migration `023_market_data_cache.sql` was direct-applied to
 `ndeycwoyjwyntjkgbzlz` after remote history/catalog checks and was verified by
-read-back. The function performs its own bearer-token validation because the
-endpoint is configured with `verify_jwt = false` for consistent custom
-error/state responses. Do not deploy while exact target project privileges are
+read-back. Before promoting the reviewer remediation, apply only the reviewed
+forward migration `024_crypto_price_precision.sql` through the same authorized
+SQL/query path and verify the altered column definitions by read-back. The
+function performs its own bearer-token validation because the endpoint is
+configured with `verify_jwt = false` for consistent custom error/state responses. Do not deploy while exact target project privileges are
 not verified.

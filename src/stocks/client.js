@@ -1,6 +1,6 @@
 import { getSupabase } from "../lib/supabase.js";
 import { apiUrl } from "../lib/runtime.js";
-import { invokeMarketData } from "../market-data/client.js";
+import { fetchHoldingQuotes as fetchMarketHoldingQuotes, invokeMarketData } from "../market-data/client.js";
 
 async function request(path, holdingId) {
   const supabase = await getSupabase();
@@ -25,7 +25,7 @@ async function authenticatedRequest(path) {
 }
 
 export const fetchHoldingQuote = holdingId => invokeMarketData({ action:"quote", holdingId });
-export const fetchHoldingQuotes = holdingIds => invokeMarketData({ action:"batchQuotes", holdingIds });
+export const fetchHoldingQuotes = (holdingIds, options) => fetchMarketHoldingQuotes(holdingIds, options);
 export const fetchHoldingDividends = holdingId => request("/api/stocks/dividends", holdingId);
 export const validateHoldingSymbol = holdingId => invokeMarketData({ action:"validateHolding", holdingId });
 export const fetchUsdIdrRate = ({force=false}={}) => invokeMarketData({ action:"fx", refresh:force?"1":"0" });
