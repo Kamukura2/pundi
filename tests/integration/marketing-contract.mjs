@@ -14,6 +14,8 @@ for (const page of pages) {
   assert.doesNotMatch(html, /testimonial|customers?\s*served|bank-grade|end-to-end encryption|automatic bank feeds/i);
 }
 const landing = read("landing.html");
+assert.ok(existsSync(resolve(root, "public/favicon.ico")));
+assert.equal(readFileSync(resolve(root, "public/favicon.ico")).equals(readFileSync(resolve(root, "public/icons/icon.ico"))), true);
 const scriptBlocks = /<script[^>]*>[\s\S]*?<\/script>/gi;
 for (const page of ["landing.html", "index.html"]) {
   const html = read(page);
