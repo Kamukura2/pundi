@@ -5,9 +5,15 @@ const buildId = process.env.PUNDI_BUILD_ID || process.env.VERCEL_GIT_COMMIT_SHA?
   try { return execFileSync("git", ["rev-parse", "--short=7", "HEAD"], { encoding:"utf8" }).trim(); }
   catch { return "local"; }
 })();
+const publicSupabaseUrl = process.env.VITE_SUPABASE_URL || process.env.PUNDI_SUPABASE_URL || process.env.SUPABASE_URL || "";
+const publicSupabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.PUNDI_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
 
 export default defineConfig({
-  define: { __PUNDI_BUILD_ID__: JSON.stringify(buildId) },
+  define: {
+    __PUNDI_BUILD_ID__: JSON.stringify(buildId),
+    __PUNDI_SUPABASE_URL__: JSON.stringify(publicSupabaseUrl),
+    __PUNDI_SUPABASE_ANON_KEY__: JSON.stringify(publicSupabaseAnonKey)
+  },
   build: {
     rollupOptions: {
       input: {

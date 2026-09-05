@@ -4,9 +4,9 @@ import { electricityHistoryEvents, electricityPeriods as calculateElectricityPer
 import { formatCryptoQuote, formatFiatCurrency } from "./src/data/currency-format.js";
 import { validateBackup } from "./src/data/repository.js";
 import { formatMoneyInput, isMoneyField, parseMoneyInput } from "./src/data/money-input.js";
-import { CryptoMarketStream, convertCryptoPrice, fetchBinanceTicker, isCryptoAsset, normalizeCryptoSymbol, normalizeQuoteValueToIdr, parseCryptoPairInput, providerQuoteCurrency, resolveCryptoPair } from "./src/crypto/binance.js";
+import { CryptoMarketStream, convertCryptoPrice, fetchBinanceTicker, fetchCryptoQuotes, isCryptoAsset, normalizeCryptoSymbol, normalizeQuoteValueToIdr, parseCryptoPairInput, providerQuoteCurrency, resolveCryptoPair } from "./src/crypto/binance.js";
 import { SyncManager } from "./src/sync/sync-manager.js";
-import { fetchHoldingDividends, fetchHoldingQuote, fetchTradingBenchmark, fetchTradingQuote, fetchUsdIdrRate, isPriceStale, validateHoldingSymbol } from "./src/stocks/client.js";
+import { fetchHoldingDividends, fetchHoldingQuote, fetchHoldingQuotes, fetchTradingBenchmark, fetchTradingQuote, fetchUsdIdrRate, isPriceStale, validateHoldingSymbol } from "./src/stocks/client.js";
 import { normalizeStockMapping, quantityForDisplay, quantityForStorage, quantityUnit } from "./src/stocks/holding.js";
 import { advanceDividendLifecycle, creditDividendToWallet, dividendEventYear, dividendGross, dividendNativeGross, dividendReceivables, mergeDividendEvents, projectedDividendForMonth, reconcileDividendState, reverseDividendCredit, summarizeDividends } from "./src/stocks/dividends.js";
 import { getAuthenticatedSession, getSupabase } from "./src/lib/supabase.js";
@@ -14,12 +14,12 @@ import { applyOpeningPosition, applyTrade, archiveClosedTradingPositions, cashEv
 import { historicalCryptoQuote } from "./src/trading/crypto-lifecycle.js";
 import { feedbackPayload } from "./src/feedback/contract.js";
 import { fetchCommerceAccount, fetchCommerceCatalog, fetchCommerceStatus, createCommerceCheckout, loadMidtransSnap } from "./src/commerce/client.js";
-import { apiUrl, isNativeRuntime } from "./src/lib/runtime.js";
+import { apiUrl, isAppRuntime } from "./src/lib/runtime.js";
 import { initializeNativeShell } from "./src/lib/native-shell.js";
 import { pundiIcon } from "./src/ui/pundi-icons.js";
 
 const BUILD_ID = __PUNDI_BUILD_ID__;
-const APP_VERSION = "8.7.2";
+const APP_VERSION = "8.8.0";
 
 const COLORS=["#7F66FF","#39C3FF","#FF8F63","#36D695","#F4C24F","#FF6EA8","#62C8FF","#8D7AFF"];
 const COMPANY_EXPENSE_TAG="Expense Perusahaan";
@@ -88,12 +88,13 @@ const qa=(s)=>[...document.querySelectorAll(s)];
 const hydrateIconSlots=()=>qa("[data-icon]").forEach(slot=>{if(!slot.querySelector(".pundi-icon"))slot.innerHTML=pundiIcon(slot.dataset.icon||"info");});
 hydrateIconSlots();
 const releaseIdentity=q("#releaseIdentity");
-if(releaseIdentity) releaseIdentity.textContent = `Pundi v8.7.2 · build ${BUILD_ID} · Beta`;
+if(releaseIdentity) releaseIdentity.textContent = `Pundi v8.8.0 · build ${BUILD_ID} · Beta`;
 const onboardingCard=q("#onboardingCard");
 const onboardingDismiss=q("[data-onboarding-dismiss]");
 const onboardingAddAccount=q("#onboardingAddAccount");
 const onboardingAddTransaction=q("#onboardingAddTransaction");
 const onboardingExploreAssets=q("#onboardingExploreAssets");
+const authCard=q(".auth-card");
 const feedbackModal=q("#feedbackModal");
 const feedbackForm=q("#feedbackForm");
 const feedbackCategory=q("#feedbackCategory");
@@ -659,7 +660,7 @@ function renderStocks(){
  stockWalletValue.textContent=fmt(Number(state.stockExtras?.walletUsd||0)*Number(state.usdIdr||0));
  if(typeof usdIdrRate!=="undefined"){
   const meta=state.usdIdrMeta;
-  const providerLabel=meta?.provider==="yahoo"?"YAHOO FINANCE":meta?.provider==="manual"?"MANUAL":meta?.error?"SAVED RATE · YAHOO UNAVAILABLE":"SAVED RATE · REFRESH YAHOO";
+  const providerLabel=meta?.provider==="yahoo"?"YAHOO FINANCE":meta?.provider==="open-er-api"?"OPEN ER-API":meta?.provider==="manual"?"MANUAL":meta?.error?"SAVED RATE · PROVIDER UNAVAILABLE":"SAVED RATE · REFRESH MARKET DATA";
   usdIdrRate.textContent=`1 USD = ${new Intl.NumberFormat("id-ID",{maximumFractionDigits:2}).format(Number(state.usdIdr||0))} IDR · ${providerLabel}`;
   usdIdrRate.title=meta?.asOf?`${providerLabel} · updated ${new Date(meta.asOf).toLocaleString("en-GB",{dateStyle:"medium",timeStyle:"short"})}`:"Last saved exchange rate";
  }
@@ -674,7 +675,7 @@ function renderStocks(){
   const cryptoPctAttr=crypto?`data-crypto-holding-pct="${s.id}"`:"";
   const cryptoStatusAttr=crypto?`data-crypto-holding-status="${s.id}"`:"";
   const pl=stockValue(s)-invested(s);
-  return `<tr><td data-label="Ticker"><input data-stock="${i}" data-field="ticker" value="${s.ticker}"></td><td data-label="Market"><select data-stock="${i}" data-field="market">${marketSelect}</select></td><td data-label="Provider Symbol"><input data-stock="${i}" data-field="providerSymbol" value="${s.providerSymbol||s.ticker}" ${crypto?"disabled":""}></td><td data-label="Currency"><input value="${s.currency}" title="Selected automatically from market" disabled></td><td data-label="Quantity"><div class="quantity-field"><input data-stock="${i}" data-field="quantity" type="number" min="0" step="${quantityStep}" value="${crypto?plainCryptoNumber(qty):qty}"><small>${unit}</small></div></td><td data-label="Average / Share"><input data-stock="${i}" data-field="avg" type="number" step="${priceStep}" value="${crypto?plainCryptoNumber(s.avg):s.avg}"></td><td data-label="Current / Fallback"><input data-stock="${i}" data-field="current" type="number" step="${priceStep}" value="${crypto?plainCryptoNumber(s.current):s.current}" title="${crypto?"Live Binance price in USDT":"Latest price. Edit only to set a manual fallback."}" ${crypto?`disabled ${cryptoCurrentAttr}`:""}></td><td data-label="Price State"><span class="price-state ${stale?'stale':''}" ${cryptoStatusAttr}>${stale?'STALE · ':''}${statusLabel}</span><small class="price-time">${stamp}</small></td><td data-label="Value" class="private" ${cryptoValueAttr}>${fmt(stockValue(s))}</td><td data-label="Profit / Loss" class="private holding-pl ${pl<0?"negative":pl>0?"positive":""}" ${cryptoPlAttr}><b>${fmt(pl)}</b><small ${cryptoPctAttr}>${percent(pl,invested(s))}</small></td><td class="stock-remove"><button class="icon-mini" data-del-stock="${i}" title="Remove" aria-label="Remove ${s.ticker}">${pundiIcon("trash")}</button></td></tr>`;
+  return `<tr><td data-label="Ticker"><input data-stock="${i}" data-field="ticker" value="${s.ticker}"></td><td data-label="Market"><select data-stock="${i}" data-field="market">${marketSelect}</select></td><td data-label="Provider Symbol"><input data-stock="${i}" data-field="providerSymbol" value="${s.providerSymbol||s.ticker}" ${crypto?"disabled":""}></td><td data-label="Currency"><input value="${s.currency}" title="Selected automatically from market" disabled></td><td data-label="Quantity"><div class="quantity-field"><input data-stock="${i}" data-field="quantity" type="number" min="0" step="${quantityStep}" value="${crypto?plainCryptoNumber(qty):qty}"><small>${unit}</small></div></td><td data-label="Average / Share"><input data-stock="${i}" data-field="avg" type="number" step="${priceStep}" value="${crypto?plainCryptoNumber(s.avg):s.avg}"></td><td data-label="Current / Fallback"><input data-stock="${i}" data-field="current" type="number" step="${priceStep}" value="${crypto?plainCryptoNumber(s.current):s.current}" title="${crypto?"Current shared market quote; direct IDR is preferred where supported":"Latest price. Edit only to set a manual fallback."}" ${crypto?`disabled ${cryptoCurrentAttr}`:""}></td><td data-label="Price State"><span class="price-state ${stale?'stale':''}" ${cryptoStatusAttr}>${stale?'STALE · ':''}${statusLabel}</span><small class="price-time">${stamp}</small></td><td data-label="Value" class="private" ${cryptoValueAttr}>${fmt(stockValue(s))}</td><td data-label="Profit / Loss" class="private holding-pl ${pl<0?"negative":pl>0?"positive":""}" ${cryptoPlAttr}><b>${fmt(pl)}</b><small ${cryptoPctAttr}>${percent(pl,invested(s))}</small></td><td class="stock-remove"><button class="icon-mini" data-del-stock="${i}" title="Remove" aria-label="Remove ${s.ticker}">${pundiIcon("trash")}</button></td></tr>`;
  }).join("");
  qa("[data-stock]").forEach(el=>el.onchange=()=>{
   const i=Number(el.dataset.stock),f=el.dataset.field,s=state.stocks[i];
@@ -1373,8 +1374,11 @@ function autoDueDate(source){
 function cryptoRows(){
  return [...state.stocks,...state.tradingPositions].filter(isCryptoAsset);
 }
+function cryptoMarketRequests(){
+ return cryptoRows().map(row=>({id:row.id,symbol:row.ticker,quote:row.currency}));
+}
 function cryptoProviderSymbols(){
- return [...new Set(cryptoRows().map(row=>String(row.providerSymbol||"").trim().toUpperCase()).filter(Boolean))];
+ return [...new Set(cryptoRows().map(row=>String(row.providerSymbol||row.ticker||"").trim().toUpperCase()).filter(Boolean))];
 }
 function setCryptoMarketStatus({state:status="offline",reason=""}={}){
  const element=q("#cryptoMarketStatus");
@@ -1382,11 +1386,11 @@ function setCryptoMarketStatus({state:status="offline",reason=""}={}){
  const label=status.toUpperCase();
  element.textContent=`CRYPTO ${label}`;
  element.className=`crypto-market-status crypto-status-${status}`;
- element.title=reason||`Binance market data ${label.toLowerCase()}`;
+ element.title=reason||`Shared market data service ${label.toLowerCase()}`;
 }
-function updateCryptoPriceNodes(providerSymbol){
- const pair=String(providerSymbol||"").toUpperCase();
- const stock=state.stocks.find(row=>String(row.providerSymbol||"").toUpperCase()===pair);
+function updateCryptoPriceNodes(key){
+ const normalized=String(key||"").toUpperCase();
+ const stock=state.stocks.find(row=>String(row.id)===String(key))||state.stocks.find(row=>String(row.providerSymbol||"").toUpperCase()===normalized);
  if(stock){
   const value=stockValue(stock),cost=invested(stock),pl=value-cost;
   qa(`[data-crypto-holding-current="${stock.id}"]`).forEach(element=>{if(document.activeElement!==element)element.value=plainCryptoNumber(stock.current);});
@@ -1395,7 +1399,7 @@ function updateCryptoPriceNodes(providerSymbol){
   qa(`[data-crypto-holding-pct="${stock.id}"]`).forEach(element=>element.textContent=percent(pl,cost));
   qa(`[data-crypto-holding-status="${stock.id}"]`).forEach(element=>element.textContent=String(stock.priceStatus||"STALE").toUpperCase());
  }
- const position=state.tradingPositions.find(row=>String(row.providerSymbol||"").toUpperCase()===pair);
+ const position=state.tradingPositions.find(row=>String(row.id)===String(key))||state.tradingPositions.find(row=>String(row.providerSymbol||"").toUpperCase()===normalized);
  if(position){
   const value=tradingPositionValue(position,state.usdIdr),cost=tradingPositionCost(position,state.usdIdr),pl=value-cost,pct=cost?pl/cost*100:0;
   qa(`[data-crypto-position-current="${position.id}"]`).forEach(element=>element.textContent=formatFiatCurrency(position.current,position.currency,{locale:"en-US",maximumFractionDigits:position.currency==="USDT"?8:4}));
@@ -1415,9 +1419,9 @@ function renderCryptoSummary(){
  }
  if(state.page==="stocks"&&state.stockView==="trading"){
   const metrics=tradingStats();
-  tradingEquity.textContent=fmt(metrics.equity,true);
-  tradingUnrealizedPl.textContent=`${metrics.unrealized>=0?"+":""}${fmt(metrics.unrealized,true)}`;
-  tradingTotalPl.textContent=`${metrics.realized>=0?"+":""}${fmt(metrics.realized,true)} · ${metrics.realizedReturn>=0?"+":""}${metrics.realizedReturn.toFixed(2)}%`;
+  tradingEquity.textContent=fmt(metrics.equity);
+  tradingUnrealizedPl.textContent=`${metrics.unrealized>=0?"+":""}${fmt(metrics.unrealized)}`;
+  tradingTotalPl.textContent=`${metrics.realized>=0?"+":""}${fmt(metrics.realized)} · ${metrics.realizedReturn>=0?"+":""}${metrics.realizedReturn.toFixed(2)}%`;
  }
  if(state.page==="accumulation")renderAccumulation();
  if(state.page==="prospect")renderProspect();
@@ -1428,55 +1432,66 @@ function scheduleCryptoSummary(){
  const run=()=>{cryptoSummaryFrame=null;renderCryptoSummary();};
  cryptoSummaryFrame=typeof requestAnimationFrame==="function"?requestAnimationFrame(run):setTimeout(run,250);
 }
-function handleCryptoTicker(providerSymbol,quote){
- if(!Number.isFinite(Number(quote?.price))||Number(quote.price)<=0)return;
- const sourceQuote=quote.sourceQuote||providerQuoteCurrency(providerSymbol);
- const apply=row=>{
-  const requestedPrice=convertCryptoPrice(quote.price,sourceQuote,row.currency,state.usdIdr);
-  if(!Number.isFinite(requestedPrice)||requestedPrice<=0)return;
-  row.current=requestedPrice;
-  row.priceSource="binance";
-  row.priceStatus=quote.status||"stale";
-  row.priceAsOf=quote.asOf||new Date().toISOString();
-  row.lastPriceFetchAt=new Date().toISOString();
-  row.changePercent=Number(quote.changePercent);
- };
- state.stocks.filter(row=>String(row.providerSymbol||"").toUpperCase()===String(providerSymbol).toUpperCase()).forEach(apply);
- state.tradingPositions.filter(row=>String(row.providerSymbol||"").toUpperCase()===String(providerSymbol).toUpperCase()).forEach(apply);
- updateCryptoPriceNodes(providerSymbol);
+function handleCryptoTicker(requestId,quote){
+ const target=cryptoRows().find(row=>String(row.id)===String(requestId))||cryptoRows().find(row=>String(row.providerSymbol||"").toUpperCase()===String(requestId).toUpperCase());
+ if(!target)return;
+ if(quote?.ok===false||!Number.isFinite(Number(quote?.price))||Number(quote.price)<=0){
+  target.priceStatus=quote?.state||"OFFLINE";
+  updateCryptoPriceNodes(target.id);
+  return;
+ }
+ const requestedQuote=String(quote.requestedQuote||target.currency||"").toUpperCase();
+ const requestedPrice=requestedQuote===String(target.currency||"").toUpperCase()?Number(quote.price):convertCryptoPrice(quote.price,quote.sourceQuote||providerQuoteCurrency(quote.normalizedSymbol||target.providerSymbol),target.currency,state.usdIdr);
+ if(!Number.isFinite(requestedPrice)||requestedPrice<=0){target.priceStatus="OFFLINE";updateCryptoPriceNodes(target.id);return;}
+ target.current=requestedPrice;
+ target.priceSource=quote.provider||"market-data";
+ target.priceStatus=quote.status||"STALE";
+ target.priceAsOf=quote.asOf||quote.quoteTimestamp||new Date().toISOString();
+ target.lastPriceFetchAt=new Date().toISOString();
+ target.changePercent=Number(quote.changePercent24h);
+ updateCryptoPriceNodes(target.id);
  scheduleCryptoSummary();
 }
 function syncCryptoMarketData(){
- const symbols=state.page==="stocks"?cryptoProviderSymbols():[];
+ const requests=state.page==="stocks"?cryptoMarketRequests():[];
  if(!cryptoMarketStream)cryptoMarketStream=new CryptoMarketStream({onTicker:handleCryptoTicker,onStatus:setCryptoMarketStatus});
- cryptoMarketStream.setSymbols(symbols);
+ cryptoMarketStream.setRequests(requests);
 }
 async function refreshCryptoMarketData(){
- const symbols=cryptoProviderSymbols();
- for(const symbol of symbols){
-  try{handleCryptoTicker(symbol,await fetchBinanceTicker(symbol));}
-  catch(error){setCryptoMarketStatus({state:"stale",reason:error.message});}
- }
+ const requests=cryptoMarketRequests();
+ if(!requests.length)return;
+ try{
+  const body=await fetchCryptoQuotes(requests);
+  (body.quotes||[]).forEach(quote=>handleCryptoTicker(quote.id,quote));
+  setCryptoMarketStatus({state:(body.quotes||[]).some(quote=>quote.status==="STALE"||quote.status==="OFFLINE")?"stale":"live",reason:"Shared market data service"});
+ }catch(error){setCryptoMarketStatus({state:"stale",reason:error.message});}
 }
 
 async function refreshStockPrices({silent=false}={}){
  if(!navigator.onLine)return;
  if(typeof refreshStocksBtn!=="undefined")refreshStocksBtn.disabled=true;
  if(normalizeStockMappings())await save();
+ const stocks=state.stocks.filter(row=>!isCryptoAsset(row));
  let updated=0,failed=0;
- for(const stock of state.stocks.filter(row=>!isCryptoAsset(row))){
-  try{
-   const quote=await fetchHoldingQuote(stock.id);
-   stock.current=Number(quote.price);stock.priceSource=quote.provider;stock.priceStatus=quote.status;
-   stock.priceAsOf=quote.asOf;stock.lastPriceFetchAt=new Date().toISOString();updated++;
-  }catch(error){
-   stock.priceStatus=error.code==="provider_plan_unavailable"?"API unavailable for current plan":`API error · ${error.code||"unavailable"}`;
-   stock.lastPriceFetchAt=new Date().toISOString();failed++;
+ try{
+  const body=await fetchHoldingQuotes(stocks.map(stock=>stock.id));
+  for(const stock of stocks){
+   const quote=(body.quotes||[]).find(item=>String(item.holdingId)===String(stock.id));
+   if(quote&&quote.ok!==false&&Number.isFinite(Number(quote.price))&&Number(quote.price)>0){
+    stock.current=Number(quote.price);stock.priceSource=quote.provider;stock.priceStatus=quote.status||"DELAYED";
+    stock.priceAsOf=quote.asOf||quote.quoteTimestamp;stock.lastPriceFetchAt=new Date().toISOString();updated++;
+   }else{
+    stock.priceStatus=quote?.state==="STALE"?"STALE · saved price":"OFFLINE · saved price";
+    stock.lastPriceFetchAt=new Date().toISOString();failed++;
+   }
   }
+ }catch(error){
+  stocks.forEach(stock=>{stock.priceStatus="OFFLINE · saved price";stock.lastPriceFetchAt=new Date().toISOString();});
+  failed=stocks.length;
  }
  save();renderAll();
  if(typeof refreshStocksBtn!=="undefined")refreshStocksBtn.disabled=false;
- if(!silent)toastMsg(`${updated} price${updated===1?"":"s"} updated${failed?`, ${failed} fallback`:""}`);
+ if(!silent)toastMsg(`${updated} price${updated===1?"":"s"} updated${failed?`, ${failed} saved price${failed===1?"":"s"} retained`:""}`);
 }
 
 async function refreshInvestmentDividends({silent=false,force=false}={}){
@@ -1520,9 +1535,9 @@ async function refreshTradingPrices({silent=false,force=false}={}){
   const activePositions=state.tradingPositions.filter(position=>Number(position.quantity)>1e-9);
   const equityPositions=activePositions.filter(position=>!isCryptoAsset(position));
   const cryptoPositions=activePositions.filter(isCryptoAsset);
-  const quotes=new Map(),symbols=[...new Set(equityPositions.map(position=>String(position.providerSymbol||position.ticker).trim().toUpperCase()).filter(Boolean))];
+  const quotes=new Map(),symbolMappings=new Map(equityPositions.map(position=>[String(position.providerSymbol||position.ticker).trim().toUpperCase(),position])),symbols=[...symbolMappings.keys()].filter(Boolean);
   for(const symbol of symbols){
-   try{const quote=await fetchTradingQuote(symbol,{force});quotes.set(symbol,quote);lastCoverage=quote.coverage||quote.provider;}
+   try{const mapping=symbolMappings.get(symbol)||{},quote=await fetchTradingQuote(symbol,{force,market:mapping.market||"NASDAQ",currency:mapping.currency||"USD"});quotes.set(symbol,quote);lastCoverage=quote.coverage||quote.provider;}
    catch(error){quotes.set(symbol,{error});}
   }
   for(const position of equityPositions){
@@ -1750,7 +1765,7 @@ addTickerBtn.onclick=()=>openSimple("Add Ticker",[
   try{
    const parsed=parseCryptoPairInput(ticker,values.quote||"USD"),resolved=await resolveCryptoPair(parsed.baseSymbol,parsed.requestedQuote,state.usdIdr),quote=resolved;
    if(state.stocks.some(row=>isCryptoAsset(row)&&row.ticker===parsed.baseSymbol)){alert(`${parsed.baseSymbol} already exists in this portfolio.`);return false;}
-   const current=Number(quote.price),row={id:createId(),ticker:parsed.baseSymbol,displaySymbol:parsed.baseSymbol,assetType:"crypto",market:"CRYPTO",provider:"binance",providerSymbol:resolved.providerSymbol,currency:resolved.requestedQuote,quantity:Number(values.quantity),avg:Number(values.avg),current,manualCurrent:current,priceSource:"binance",priceStatus:"stale",priceAsOf:resolved.asOf,lastPriceFetchAt:new Date().toISOString(),base:{},optimistic:{}};
+   const current=Number(quote.price),row={id:createId(),ticker:parsed.baseSymbol,displaySymbol:parsed.baseSymbol,assetType:"crypto",market:"CRYPTO",provider:resolved.provider||"market-data",providerSymbol:resolved.providerSymbol||resolved.normalizedSymbol,currency:resolved.requestedQuote,quantity:Number(values.quantity),avg:Number(values.avg),current,manualCurrent:current,priceSource:resolved.provider||"market-data",priceStatus:resolved.status||"OFFLINE",priceAsOf:resolved.asOf||resolved.quoteTimestamp,lastPriceFetchAt:new Date().toISOString(),base:{},optimistic:{}};
    YEARS.slice(1).forEach(year=>{row.base[year]=current;row.optimistic[year]=current;});
    state.stocks.push(row);syncCryptoMarketData();return `Crypto Investment asset added · ${parsed.baseSymbol}/${resolved.requestedQuote}`;
   }catch(error){alert(error.message);return false;}
@@ -1773,7 +1788,7 @@ addTradingPositionBtn.onclick=()=>openSimple("Add Trading Position",[
  if(crypto){
   try{
    const resolved=await resolveCryptoPair(parsed.baseSymbol,requestedQuote,state.usdIdr);
-   providerSymbol=resolved.providerSymbol;currency=resolved.requestedQuote;assetType="crypto";current=Number(resolved.price);priceSource="binance";priceStatus="stale";
+   providerSymbol=resolved.providerSymbol||resolved.normalizedSymbol;currency=resolved.requestedQuote;assetType="crypto";current=Number(resolved.price);priceSource=resolved.provider||"market-data";priceStatus=resolved.status||"OFFLINE";
   }catch(error){alert(error.message);return false;}
  }
  const reusable=state.tradingPositions.find(row=>row.ticker===canonicalTicker&&row.market===values.market&&Number(row.quantity)<=1e-9);
@@ -1989,7 +2004,7 @@ async function boot(){
  privacyBtn.innerHTML=pundiIcon(state.privacy?"eye-off":"eye");txDate.value=todayISO();updateModeToggleLabels();
  baseGrowth.value=state.baseGrowth;optimisticGrowth.value=state.optimisticGrowth;renderAll();applyLanguage();
  initializeNativeShell();
- if(!isNativeRuntime() && "serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{});
+ if(!isAppRuntime() && "serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{});
  try{
    const hashParams=new URLSearchParams(location.hash.replace(/^#/,"?"));
    const queryParams=new URLSearchParams(location.search);
@@ -2057,12 +2072,28 @@ function setAuthMode(mode){
  authModeToggle.hidden=forgot||recovery||expired||initializing;
  authModeToggle.textContent=signUp?"Already have an account? Sign in":"Don't have an account? Sign up";
  authError.className="auth-message error";
+ authPassword.removeAttribute("aria-invalid");
+ authCard?.classList.remove("auth-shake");
  if(!expired)authError.textContent="";
 }
 
 function setAuthMessage(kind,message){
  authError.className=`auth-message ${kind}`;
  authError.textContent=message;
+}
+
+function isCredentialFailure(error){
+ const message=String(error?.message||"").toLowerCase();
+ return Number(error?.status)===400||message.includes("invalid login credentials")||message.includes("invalid credentials")||message.includes("incorrect password");
+}
+
+function triggerAuthShake(){
+ if(!authCard)return;
+ authPassword.setAttribute("aria-invalid","true");
+ authCard.classList.remove("auth-shake");
+ void authCard.offsetWidth;
+ authCard.classList.add("auth-shake");
+ authPassword.focus({preventScroll:true});
 }
 
 function authErrorMessage(error, mode){
@@ -2123,7 +2154,10 @@ authForm.onsubmit=async event=>{
   }else{
    const user=await syncManager.connect(email,authPassword.value);await showSignedIn(user);
   }
- }catch(error){setAuthMessage("error",authErrorMessage(error,authMode))}
+ }catch(error){
+  setAuthMessage("error",authErrorMessage(error,authMode));
+  if(authMode==="signin"&&isCredentialFailure(error))triggerAuthShake();
+ }
  finally{authSubmit.disabled=false;if(authMode==="signup")authSubmit.textContent="Create account";else if(authMode==="forgot")authSubmit.textContent="Send reset link";else if(authMode==="recovery")authSubmit.textContent="Update password";else authSubmit.textContent="Sign in";}
 };
 

@@ -22,7 +22,7 @@ const docs = read("docs/ANDROID.md");
 const strings = read("android/app/src/main/res/values/strings.xml");
 const apkPath = resolve(root, "dist/android/pundi-android-alpha-v1.apk");
 
-assert.equal(packageJson.version, "8.7.2");
+assert.equal(packageJson.version, "8.8.0");
 assert.equal(packageJson.scripts["android:sync"], "npm run build && node scripts/prepare-android-web.mjs && npx cap sync android");
 assert.equal(packageJson.scripts["android:apk"], "npm run android:sync && node scripts/android-signing.mjs && node scripts/run-android-gradle.mjs && node scripts/collect-android-apk.mjs");
 assert.equal(packageJson.scripts["test:android"], "node tests/integration/android-contract.mjs");
@@ -39,21 +39,22 @@ for (const marker of [
 assert.doesNotMatch(capacitorConfig, /server\s*:\s*\{[^}]*url\s*:/s, "Native app must use bundled assets, not server.url");
 assert.match(androidGradle, /namespace\s*[=:]\s*["']online\.pundi\.app["']/);
 assert.match(androidGradle, /applicationId\s*["']online\.pundi\.app["']/);
-assert.match(androidGradle, /versionCode\s+80703/);
-assert.match(androidGradle, /versionName\s+["']8\.7\.2["']/);
+assert.match(androidGradle, /versionCode\s+80800/);
+assert.match(androidGradle, /versionName\s+["']8\.8\.0["']/);
 assert.match(strings, /<string name="app_name">Pundi<\/string>/);
 assert.match(manifest, /android:theme="@style\/AppTheme"/);
 assert.doesNotMatch(manifest, /Nook|CVFinance|cvfinance/i);
 
 for (const marker of ["https://app.pundi.online", "isNativePlatform", "apiUrl", "authRedirectOrigin"]) assert.match(runtime, new RegExp(marker.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")));
-for (const source of [app, sync, stocks, crypto, supabase]) assert.match(source, /apiUrl/);
+for (const source of [app, sync, stocks, supabase]) assert.match(source, /apiUrl/);
+assert.match(crypto, /fetchCryptoQuote|invokeMarketData/, "Crypto must use the shared market-data client");
 assert.match(nativeShell, /Browser\.open/);
 assert.match(nativeShell, /StatusBar/);
 assert.match(nativeShell, /App\.addListener/);
 assert.match(nativeShell, /__pundiHandleNativeBack/);
 assert.match(http, /https:\/\/localhost/);
 assert.match(configApi, /nativeCors/);
-assert.match(app, /!isNativeRuntime\(\).*serviceWorker/);
+assert.match(app, /if\(!isAppRuntime\(\).*serviceWorker/);
 assert.match(supabase, /apiUrl\("\/api\/config"\)/);
 assert.match(sync, /authRedirectOrigin\(\)/);
 assert.match(docs, /Android Alpha 1/);
@@ -68,9 +69,9 @@ const runBat = (script, args) => execFileSync(process.env.ComSpec || "cmd.exe", 
 const dump = runBat(analyzer, ["manifest", "application-id", apkPath]).trim();
 assert.equal(dump, "online.pundi.app");
 const versionName = runBat(analyzer, ["manifest", "version-name", apkPath]).trim();
-assert.equal(versionName, "8.7.2");
+assert.equal(versionName, "8.8.0");
 const versionCode = runBat(analyzer, ["manifest", "version-code", apkPath]).trim();
-assert.equal(versionCode, "80703");
+assert.equal(versionCode, "80800");
 const minSdk = runBat(analyzer, ["manifest", "min-sdk", apkPath]).trim();
 const targetSdk = runBat(analyzer, ["manifest", "target-sdk", apkPath]).trim();
 assert.equal(minSdk, "24");

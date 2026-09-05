@@ -1,15 +1,17 @@
 export const NATIVE_ORIGIN = "https://localhost";
+const LOOPBACK_ORIGIN = /^(?:https?:\/\/)(?:localhost|127\.0\.0\.1)(?::\d+)?$/;
 
 export function nativeCors(request, response, allowed = ["GET"]) {
   const origin = request.headers?.origin;
-  if (origin === NATIVE_ORIGIN) {
-    response.setHeader("Access-Control-Allow-Origin", NATIVE_ORIGIN);
+  const corsOrigin = origin === NATIVE_ORIGIN || LOOPBACK_ORIGIN.test(String(origin || "")) ? origin : null;
+  if (corsOrigin) {
+    response.setHeader("Access-Control-Allow-Origin", corsOrigin);
     response.setHeader("Access-Control-Allow-Headers", "Authorization, Cache-Control, Content-Type");
     response.setHeader("Access-Control-Allow-Methods", allowed.join(", "));
     response.setHeader("Vary", "Origin");
   }
   if (request.method === "OPTIONS") {
-    if (origin === NATIVE_ORIGIN) return response.status(204).end(), false;
+    if (corsOrigin) return response.status(204).end(), false;
     response.status(405).end();
     return false;
   }

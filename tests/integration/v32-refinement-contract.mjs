@@ -1,0 +1,51 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+
+const root = process.cwd();
+const read = file => fs.readFileSync(path.join(root, file), "utf8");
+const exists = file => fs.existsSync(path.join(root, file));
+const packageJson = JSON.parse(read("package.json"));
+const app = read("app.html");
+const iconSvg = read("public/icons/icon.svg");
+const manifest = JSON.parse(read("public/manifest.webmanifest"));
+
+assert.equal(packageJson.version, "8.8.0");
+assert.equal(packageJson.scripts["desktop:dist"], "npm run build && electron-builder --win portable");
+assert.match(app, /href="v3\.2\.css"/);
+assert.doesNotMatch(app, /class="mobile-nav/);
+assert.match(app, /class="mobile-add-transaction"[^>]*data-open-tx/);
+assert.match(app, /data-page="clients"[^>]*>[\s\S]*>Income<\/span>/);
+assert.match(app, /data-stock-workspace="investment"[\s\S]*data-icon="assets"/);
+assert.match(app, /data-stock-workspace="trading"[\s\S]*data-icon="trading"/);
+assert.match(read("v3.2.css"), /\.mobile-nav\{display:none!important\}/);
+assert.match(read("v3.2.css"), /\.mobile-add-transaction\{[\s\S]*position:fixed/);
+assert.match(read("v3.2.css"), /@keyframes pundi-auth-shake/);
+assert.match(read("app.js"), /function triggerAuthShake\(\)/);
+assert.match(read("app.js"), /authMode===\"signin\"&&isCredentialFailure/);
+assert.match(read("app.js"), /authConfirmField\.hidden=!\(signUp\|\|recovery\)/);
+assert.match(read("src/lib/runtime.js"), /function isDesktopRuntime/);
+assert.match(read("src/lib/runtime.js"), /function isAppRuntime/);
+assert.match(read("api/_lib/http.js"), /127\\.0\\.0\\.1/);
+assert.match(read("desktop/main.cjs"), /contextIsolation: true/);
+assert.match(read("desktop/main.cjs"), /127\.0\.0\.1/);
+assert.match(read("desktop/main.cjs"), /pundi_desktop=1/);
+assert.match(read("desktop/preload.cjs"), /contextBridge\.exposeInMainWorld/);
+assert.equal(manifest.icons.length >= 2, true);
+assert.deepEqual(manifest.icons.map(icon => icon.sizes), ["192x192", "512x512"]);
+assert.ok(exists("public/icons/icon.svg"));
+assert.ok(exists("public/icons/icon.ico"));
+assert.ok(exists("public/icons/icon-192.png"));
+assert.ok(exists("public/icons/icon-512.png"));
+assert.ok(exists("public/icons/pundi-app-icon-1024.png"));
+assert.ok(exists("desktop/pundi.ico"));
+assert.ok(exists("android/app/src/main/res/drawable/pundi_icon.png"));
+for (const density of ["mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"]) {
+  assert.ok(exists(`android/app/src/main/res/mipmap-${density}/ic_launcher.png`));
+  assert.ok(exists(`android/app/src/main/res/mipmap-${density}/ic_launcher_round.png`));
+  assert.ok(exists(`android/app/src/main/res/mipmap-${density}/ic_launcher_foreground.png`));
+}
+assert.match(iconSvg, /aria-label="Pundi logogram"/);
+assert.doesNotMatch(iconSvg, /wordmark/i);
+assert.doesNotMatch(iconSvg, /pundi\s+finance/i);
+console.log("Pundi V3.2 static contract PASS: mobile navigation, auth, naming, brand assets, and desktop shell");

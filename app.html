@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-  <title>Pundi v8.7.2 · Private finance workspace</title>
+  <title>Pundi v8.8.0 · Private finance workspace</title>
   <meta name="robots" content="noindex, nofollow, noarchive">
   <meta name="theme-color" content="#0D1B3D">
   <meta name="description" content="Private synchronized personal finance workspace for your accounts, cash flow, assets, and plans.">
@@ -13,11 +13,13 @@
   <meta name="apple-mobile-web-app-title" content="Pundi">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
+  <link rel="icon" type="image/x-icon" href="/icons/icon.ico">
   <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="mobile-drawer.css">
   <link rel="stylesheet" href="v3.1.css">
+  <link rel="stylesheet" href="v3.2.css">
 </head>
 <body class="auth-locked">
 <div class="app">
@@ -58,17 +60,6 @@
   </aside>
   <button id="mobileMenuBackdrop" class="mobile-menu-backdrop" type="button" aria-label="Close navigation" aria-hidden="true"></button>
 
-  <nav class="mobile-nav" aria-label="Mobile navigation">
-    <button type="button" class="mobile-nav-item active" data-page="accumulation" aria-label="Open Accumulation"><span class="nav-ic i-money" data-icon="overview"></span><small>Home</small></button>
-    <button type="button" class="mobile-nav-item" data-page="cashflow" aria-label="Open History"><span class="nav-ic i-chart" data-icon="transactions"></span><small>History</small></button>
-    <button type="button" class="mobile-nav-item" data-page="clients" aria-label="Open Income"><span class="nav-ic i-client" data-icon="income"></span><small>Income</small></button>
-    <button type="button" class="mobile-nav-item" data-page="stocks" aria-label="Open Assets"><span class="nav-ic i-stock" data-icon="assets"></span><small>Assets</small></button>
-    <button type="button" class="mobile-nav-add" data-open-tx aria-label="Record transaction" title="Record transaction"><span data-icon="plus"></span></button>
-    <button type="button" class="mobile-nav-item" data-page="expenses" aria-label="Open Expenses"><span class="nav-ic i-bill" data-icon="expenses"></span><small>Spend</small></button>
-    <button type="button" class="mobile-nav-item" data-page="electricity" aria-label="Open Electricity"><span class="nav-ic i-electric" data-icon="electricity"></span><small>Power</small></button>
-    <button type="button" class="mobile-nav-item" data-page="prospect" aria-label="Open Prospect"><span class="nav-ic i-rocket" data-icon="prospect"></span><small>Plan</small></button>
-    <button type="button" class="mobile-nav-item" data-page="insights" aria-label="Open Insights"><span class="nav-ic i-insight" data-icon="insights"></span><small>Read</small></button>
-  </nav>
 
   <main>
     <header class="topbar">
@@ -144,7 +135,7 @@
 
         <article class="panel">
           <div class="panel-head">
-            <div><p>Clients</p><h3>Payment Status</h3></div>
+            <div><p>Income</p><h3>Payment Status</h3></div>
             <button class="ghost-btn icon-only" data-go="clients" title="Open" aria-label="Open income" data-icon="arrow-up-right"></button>
           </div>
           <div id="paymentSummary" class="list"></div>
@@ -320,7 +311,7 @@
 
     <section id="clients" class="page">
       <div class="segmented workspace-tabs income-workspace-tabs" role="tablist" aria-label="Income workspace">
-        <button type="button" class="active" role="tab" aria-selected="true">Clients</button>
+        <button type="button" class="active" role="tab" aria-selected="true"><span class="tab-icon" data-icon="income"></span>Income</button>
       </div>
       <div class="toolbar">
         <span class="pill">Drag clients between recurring and ending sections</span>
@@ -356,8 +347,8 @@
 
     <section id="stocks" class="page">
       <div id="stockWorkspaceTabs" class="segmented workspace-tabs stock-workspace-tabs" role="tablist" aria-label="Assets workspace">
-        <button type="button" class="active" data-stock-workspace="investment" role="tab" aria-selected="true">Investment</button>
-        <button type="button" data-stock-workspace="trading" role="tab" aria-selected="false">Trading</button>
+        <button type="button" class="active" data-stock-workspace="investment" role="tab" aria-selected="true"><span class="tab-icon" data-icon="assets"></span>Investment</button>
+        <button type="button" data-stock-workspace="trading" role="tab" aria-selected="false"><span class="tab-icon" data-icon="trading"></span>Trading</button>
       </div>
 
       <div id="investment" class="stock-workspace-view active" data-stock-view="investment">
@@ -648,7 +639,7 @@
   </main>
 
   <button class="mobile-add-transaction" data-open-tx type="button" aria-label="Add transaction" title="Add transaction" data-icon="plus"></button>
-  <footer id="releaseIdentity" class="release-identity" aria-label="Release identity">Pundi v8.7.2 · Beta</footer>
+  <footer id="releaseIdentity" class="release-identity" aria-label="Release identity">Pundi v8.8.0 · Beta</footer>
 </div>
 
 <dialog id="txModal">

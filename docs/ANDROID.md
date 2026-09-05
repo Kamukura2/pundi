@@ -10,9 +10,9 @@ The APK is **bundled**. `npm run build` produces the normal multi-page Vite outp
 
 - App name: `Pundi`
 - Application/package ID: `online.pundi.app` (permanent)
-- Web/runtime version: `8.7.2`
-- Android `versionName`: `8.7.2`
-- Android `versionCode`: `80703`
+- Web/runtime version: `8.8.0`
+- Android `versionName`: `8.8.0`
+- Android `versionCode`: `80800`
 - Internal milestone: `Android Alpha 1`
 - Minimum SDK: `24`
 - Compile/target SDK: `36`
@@ -73,7 +73,7 @@ Alpha builds use a dedicated local-only signing key at `android/keystore/pundi-a
 
 A disposable AVD named `Pundi_Android_Alpha_Test` uses the Android 36 Google APIs x86_64 image and is started with `-no-window -no-audio -no-boot-anim -no-snapshot`. Hardware hypervisor support is present on the host. The canonical APK installed through ADB with `Success`; package `online.pundi.app` launched `MainActivity` in the headless emulator, and filtered logcat showed no Pundi crash, ANR, or fatal exception.
 
-Runtime evidence from the prior closeout covered the bundled Pundi sign-in gate, authenticated dashboard, session persistence, navigation, account/data surface, import/export, offline/recovery, logout, Feedback ownership/cleanup, valid/invalid backup handling, and zero residue. This release adds the authenticated Data & Sync `Bantuan & Legal` section with fixed Privacy, Terms, and Support HTTPS links; the existing native shell routes cross-origin anchors through Capacitor Browser and does not append session credentials. The rebuilt `8.7.2` APK installed and launched on `Pundi_Android_Alpha_Test`; the current headless AVD returned to the sign-in gate after the prior smoke session expired, so an authenticated Privacy tap, external browser target, and return-to-app session assertion were not recorded in this run.
+Runtime evidence from the prior closeout covered the bundled Pundi sign-in gate, authenticated dashboard, session persistence, navigation, account/data surface, import/export, offline/recovery, logout, Feedback ownership/cleanup, valid/invalid backup handling, and zero residue. This release adds the authenticated Data & Sync `Bantuan & Legal` section with fixed Privacy, Terms, and Support HTTPS links; the existing native shell routes cross-origin anchors through Capacitor Browser and does not append session credentials. The rebuilt `8.8.0` APK installed and launched on `Pundi_Android_Alpha_Test`; the current headless AVD returned to the sign-in gate after the prior smoke session expired, so an authenticated Privacy tap, external browser target, and return-to-app session assertion were not recorded in this run.
 
 The Android SDK emulator and image were installed with command-line tools only. ADB responsiveness, package/activity launch, authenticated login, session persistence, logout, core navigation, keyboard, export/share, import-picker, and offline recovery are verified above. The production normal-user smoke readiness contract no longer uses generic Playwright `networkidle`: it uses `domcontentloaded`, explicit visible auth controls, bounded authenticated dashboard markers, and retains the existing Auth, navigation, session, logout, and `401/403` assertions. The Windows scheduled task still requires separate fresh `Last Result: 0` evidence; direct runner PASS does not substitute for scheduled-task PASS.
 
