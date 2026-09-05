@@ -179,12 +179,12 @@ export class CryptoMarketStream {
       const receivedIds = new Set();
       quotes.forEach(quote => {
         const id = String(quote?.id || quote?.normalizedSymbol || "");
-        if (!id) return;
+        if (!id || !expectedIds.has(id)) return;
         receivedIds.add(id);
         this.onTicker(id, quote);
       });
       const degraded = quotes.some(quote => quote?.ok === false || ["STALE", "OFFLINE"].includes(String(quote?.status || quote?.state || "").toUpperCase()))
-        || receivedIds.size < expectedIds.size;
+        || [...expectedIds].some(id => !receivedIds.has(id));
       if (degraded) {
         this.onStatus({ state: "stale", reason: "shared market-data service returned partial or stale data" });
         if (!this.closed && !this.retryTimer) {

@@ -71,4 +71,20 @@ assert.equal(statuses.at(-1)?.state, "stale");
 assert.ok(stream.retryTimer);
 stream.stop();
 
-console.log(JSON.stringify({ status: "PASS", checks: ["crypto-persistence-mapping", "precision-migration", "batch-chunking", "quote-key", "stream-partial-failure"] }));
+const filteredTickers = [];
+const filteredStatuses = [];
+const filteredStream = new CryptoMarketStream({
+  fetchQuotes: async () => ({ quotes: [
+    { id: "ok", ok: true, price: 10, status: "LIVE" },
+    { id: "unexpected", ok: true, price: 99, status: "LIVE" }
+  ] }),
+  onTicker: (id, quote) => filteredTickers.push([id, quote]),
+  onStatus: status => filteredStatuses.push(status)
+});
+filteredStream.setRequests([{ id: "ok", symbol: "BTC", quote: "USD" }, { id: "missing", symbol: "ETH", quote: "USD" }]);
+for (let attempt = 0; attempt < 20 && !filteredStatuses.some(status => status.state === "stale"); attempt++) await new Promise(resolve => setTimeout(resolve, 5));
+assert.deepEqual(filteredTickers.map(([id]) => id), ["ok"]);
+assert.equal(filteredStatuses.at(-1)?.state, "stale");
+filteredStream.stop();
+
+console.log(JSON.stringify({ status: "PASS", checks: ["crypto-persistence-mapping", "precision-migration", "batch-chunking", "quote-key", "stream-partial-failure", "stream-identity-filter"] }));
