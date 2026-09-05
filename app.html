@@ -335,11 +335,11 @@
 
       <div class="client-lanes">
         <article class="panel client-lane recurring-lane">
-          <div class="panel-head"><div><p>Projected income</p><h3>Recurring Clients</h3></div><span id="recurringClientCount" class="lane-count">0</span></div>
+          <div class="panel-head"><div><h3>Income This Month</h3></div><span id="recurringClientCount" class="lane-count">0</span></div>
           <div id="recurringClientGrid" class="client-grid" data-client-type="recurring"></div>
         </article>
         <article class="panel client-lane ending-lane">
-          <div class="panel-head"><div><p>Final payment only</p><h3>Ending Clients</h3></div><span id="endingClientCount" class="lane-count">0</span></div>
+          <div class="panel-head"><div><h3>Outstanding</h3></div><span id="endingClientCount" class="lane-count">0</span></div>
           <div id="endingClientGrid" class="client-grid" data-client-type="ending"></div>
         </article>
       </div>
@@ -460,10 +460,10 @@
       <div class="trading-page-tools">
         <button id="resetTradingBtn" class="danger-btn" type="button">↺ Reset All Trading</button>
       </div>
-      <div class="trading-hero-grid">
+      <div class="trading-summary-grid">
         <article class="hero-card trading-equity-hero">
           <div class="hero-chip">ACTIVE PORTFOLIO</div>
-          <small>Total Trading Equity</small>
+          <small>Total Portfolio</small>
           <div id="tradingEquity" class="hero-value private">Rp0</div>
           <div class="trading-equity-metrics">
             <span><small>STARTING FUNDS</small><b id="tradingContributions" class="private">Rp0</b></span>
@@ -473,7 +473,16 @@
           </div>
         </article>
 
-        <article class="panel trading-benchmark-panel">
+        <article class="panel trading-allocation-panel">
+          <div class="panel-head"><div><p>Portfolio mix</p><h3>Allocation</h3></div></div>
+          <div class="trading-allocation-content">
+            <div id="tradingAllocationDonut"></div>
+            <div id="tradingAllocationLegend" class="legend"></div>
+          </div>
+        </article>
+      </div>
+
+      <article class="panel trading-benchmark-panel">
           <div class="panel-head">
             <div><p>Performance benchmark</p><h3>Portfolio vs S&amp;P 500 / SPY</h3></div>
             <button id="refreshTradingBtn" class="ghost-btn icon-only" type="button" title="Refresh Trading prices" aria-label="Refresh Trading prices" data-icon="refresh"></button>
@@ -490,7 +499,6 @@
             <button type="button" data-trading-range="ALL">ALL</button>
           </div>
         </article>
-      </div>
 
       <article class="panel trading-wallet-panel">
         <div class="panel-head">
@@ -687,7 +695,7 @@
     <div class="account-line"><span>Signed in as</span><b id="accountEmail">—</b></div>
     <section class="account-settings" aria-labelledby="accountSettingsTitle">
       <p id="accountSettingsTitle">Account settings</p>
-      <div class="account-summary"><span>Created</span><b id="accountCreatedAt">—</b><span>Plan</span><b id="accountPlan">Free</b><span>Status</span><b id="accountStatus">Active</b></div>
+      <div class="account-summary account-plan-summary"><span>Plan</span><div><b id="accountPlan">Free</b><small id="accountPlanDetail">Free</small></div></div>
       <section class="commerce-account" aria-labelledby="commerceAccountTitle">
         <p id="commerceAccountTitle">Purchase &amp; access</p>
         <div id="commerceStatus" class="account-commerce-status" role="status">Checking available offers…</div>
@@ -702,7 +710,6 @@
         <small id="passwordChangeMessage" class="form-error" role="status"></small>
         <button id="changePasswordBtn" class="primary-btn" type="submit">Change password</button>
       </form>
-      <button id="deleteAccountBtn" class="danger-btn" type="button">Delete my account</button>
       <small id="accountSettingsMessage" class="form-error" role="status"></small>
     </section>
     <div class="mobile-more">
@@ -715,23 +722,10 @@
         <button class="ghost-btn" type="button" data-page="insights"><span data-icon="insights"></span>Insights</button>
       </div>
     </div>
-    <section class="account-settings" aria-labelledby="legalSupportTitle">
-      <p id="legalSupportTitle">Bantuan &amp; Legal</p>
-      <div class="account-links">
-        <a class="text-link" href="https://pundi.online/privacy" target="_blank" rel="noopener noreferrer">Privasi</a>
-        <a class="text-link" href="https://pundi.online/terms" target="_blank" rel="noopener noreferrer">Ketentuan</a>
-        <a class="text-link" href="https://pundi.online/support" target="_blank" rel="noopener noreferrer">Bantuan</a>
-      </div>
-    </section>
-    <div class="data-actions">
-      <button id="exportBackupBtn" class="ghost-btn" type="button">Export JSON backup</button>
-      <button id="importBackupBtn" class="ghost-btn" type="button">Import JSON backup</button>
-      <button id="legacyImportBtn" class="ghost-btn" type="button" hidden>Import v6.3.1 local data</button>
-      <button id="seedDataBtn" class="ghost-btn" type="button">Load MVP seed data</button>
+    <div class="account-actions">
       <button id="installPwaBtn" class="primary-btn" type="button" hidden>Install Pundi</button>
       <button id="logoutBtn" class="danger-btn" type="button">Sign out</button>
     </div>
-    <input id="backupFile" type="file" accept="application/json,.json" hidden>
   </div>
 </dialog>
 

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 const app=await readFile("app.js","utf8");
 const admin=await readFile("admin/admin.js","utf8");
-for (const marker of ["authSubmit.disabled=true","electricityTopUpSubmitting","electricityTopUpSubmit.disabled=true","changePasswordBtn.disabled=true","deleteAccountBtn.disabled=true","authMode===\"signup\"","set_plan","set_entitlement"]) assert.match(app+admin,new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")),`missing pending guard ${marker}`);
+for (const marker of ["authSubmit.disabled=true","electricityTopUpSubmitting","electricityTopUpSubmit.disabled=true","changePasswordBtn.disabled=true","authMode===\"signup\"","set_plan","set_entitlement"]) assert.match(app+admin,new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")),`missing pending guard ${marker}`);
 assert.match(app,/finally\{/);
 assert.match(app,/if\(electricityTopUpSubmitting\)return/);
 assert.match(app,/if\(authMode===\"signup\"\|\|authMode===\"recovery\"\)/);

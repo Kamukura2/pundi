@@ -1,8 +1,8 @@
-import { createEmptyState, createId, createMvpSeed, readLegacyLocalStorage, YEARS } from "./src/data/default-data.js";
+import { createEmptyState, createId, YEARS } from "./src/data/default-data.js";
 import { annualExpenseBreakdown, annualOperatingPerformance, buildMonthlyTimeline, buildProjection, getBudgetProgress, getClientOutstanding, getClientPaidThisMonth, getCurrentNetWorth, getEndingClients, getEntrustedDeduction, getFixedIncome, getReceivableClients, getRecurringClients, getTotalOutstanding, getTotalPaid, getYearlyProjectionTotal, monthKey, monthlyBudgetRemaining, recordedExpenseForBudget, remainingYearExpenseBreakdown, remainingYearIncomeBreakdown } from "./src/data/finance-model.js";
 import { electricityHistoryEvents, electricityPeriods as calculateElectricityPeriods, latestElectricityBalance, parseTopUpAmount } from "./src/data/electricity-model.js";
 import { formatCryptoQuote, formatFiatCurrency } from "./src/data/currency-format.js";
-import { validateBackup } from "./src/data/repository.js";
+
 import { formatMoneyInput, isMoneyField, parseMoneyInput } from "./src/data/money-input.js";
 import { CryptoMarketStream, convertCryptoPrice, fetchBinanceTicker, fetchCryptoQuotes, isCryptoAsset, normalizeCryptoSymbol, normalizeQuoteValueToIdr, parseCryptoPairInput, providerQuoteCurrency, resolveCryptoPair } from "./src/crypto/binance.js";
 import { SyncManager } from "./src/sync/sync-manager.js";
@@ -17,6 +17,8 @@ import { fetchCommerceAccount, fetchCommerceCatalog, fetchCommerceStatus, create
 import { apiUrl, isAppRuntime } from "./src/lib/runtime.js";
 import { initializeNativeShell } from "./src/lib/native-shell.js";
 import { pundiIcon } from "./src/ui/pundi-icons.js";
+import { accountPlanPresentation } from "./src/entitlements/resolver.js";
+import { tickerIcon } from "./src/ui/ticker-icons.js";
 
 const BUILD_ID = __PUNDI_BUILD_ID__;
 const APP_VERSION = "8.8.0";
@@ -114,6 +116,11 @@ const commerceStatus=q("#commerceStatus");
 const commerceCatalog=q("#commerceCatalog");
 const commerceEntitlements=q("#commerceEntitlements");
 const commerceOrders=q("#commerceOrders");
+const accountPlanElement=q("#accountPlan");
+const accountPlanDetailElement=q("#accountPlanDetail");
+const accountSettingsMessageElement=q("#accountSettingsMessage");
+const tradingAllocationDonutElement=q("#tradingAllocationDonut");
+const tradingAllocationLegendElement=q("#tradingAllocationLegend");
 let commerceCatalogState=null;
 let commerceRefreshBusy=false;
 const PUNDI_FALLBACK_CATALOG=[{product:"PUNDI",sku:"PUNDI_PRO_LIFETIME",name:"Pundi Pro Lifetime",description:"One-time account-owned Pro access. The same Pundi account restores it on supported clients; no recurring charge.",entitlement:"pundi_pro_lifetime",purchase_type:"lifetime",duration_days:null,amount:49000,currency:"IDR",active:true}];
@@ -189,7 +196,7 @@ const ID_TRANSLATIONS={
  "Total Expense This Month":"Total Pengeluaran Bulan Ini","Expense Categories":"Kategori Pengeluaran","Expense Channels":"Channel Pengeluaran","Channel Mix":"Komposisi Channel","Budget Pace":"Laju Anggaran","Transactions":"Transaksi","Monthly Budget":"Anggaran Bulanan","Yearly Expense":"Pengeluaran Tahunan","Events":"Acara",
  "Remaining Expense This Year":"Sisa Pengeluaran Tahun Ini","Dynamic estimate from this month through December. History is tracking only and excluded from projection.":"Estimasi dinamis dari bulan ini sampai Desember. Riwayat hanya untuk pencatatan dan tidak masuk proyeksi.",
  "Monthly Remaining":"Sisa Bulanan","Events + Credit":"Acara + Kredit","Editable Budgets":"Anggaran yang Dapat Diedit","Category Breakdown":"Rincian Kategori","Credit Card & PayLater":"Kartu Kredit & PayLater","Entrusted Funds":"Titipan Dana","Non-recurring liability":"Kewajiban non-berulang","Budget Tag":"Tag Anggaran","Cash Balance":"Saldo Kas","Settled":"Selesai","Active":"Aktif",
- "Paid Items":"Item Lunas","Paid This Month":"Dibayar Bulan Ini","Outstanding":"Belum Dibayar","Fixed Monthly":"Tetap Bulanan","Recurring Clients":"Klien Berulang","Ending Clients":"Klien Berakhir","Estimated Income This Year":"Estimasi Pemasukan Tahun Ini","Outstanding Now":"Piutang Saat Ini",
+ "Paid Items":"Item Lunas","Paid This Month":"Dibayar Bulan Ini","Outstanding":"Belum Dibayar","Income This Month":"Pendapatan Bulan Ini","Fixed Monthly":"Tetap Bulanan","Estimated Income This Year":"Estimasi Pemasukan Tahun Ini","Outstanding Now":"Piutang Saat Ini",
  "Fixed Yearly":"Tetap Tahunan","Expense Perusahaan":"Expense Perusahaan","Capital record only":"Pencatatan modal saja",
  "Total Portfolio Value":"Total Nilai Portofolio","Invested":"Modal","Unrealized":"Belum Direalisasi","Starting Funds":"Modal Awal","Allocation":"Alokasi","Holdings":"Kepemilikan","Target prices":"Target harga","Budget":"Anggaran","Optional liquid assets":"Aset likuid opsional","Netcash & USD Wallet":"Netcash & Dompet USD","Included in total assets":"Masuk ke total aset",
  "Latest Meter Balance":"Sisa Token Terbaru","Average Daily Usage":"Rata-rata Harian","Estimated Monthly Cost":"Estimasi Biaya Bulanan","Meter Readings":"Catatan Meter","Electricity History":"Riwayat Listrik","Top Up Amount":"Jumlah Top Up","Add Top Up":"Tambah Top Up","Cancel":"Batal","Reading":"Catatan","TOP UP":"TOP UP",
@@ -258,14 +265,14 @@ function donut(entries,label){
  const r=76,c=2*Math.PI*r; let off=0;
  const parts=entries.map((e,i)=>{
   const len=e[1]/total*c;
-  const s=`<circle data-tip="${e[0]}" data-value="${e[1]}" cx="120" cy="120" r="${r}" fill="none" stroke="${COLORS[i%COLORS.length]}" stroke-width="24" stroke-linecap="round" stroke-dasharray="${Math.max(0,len-5)} ${c-len+5}" stroke-dashoffset="${-off}" transform="rotate(-90 120 120)" style="cursor:pointer"/>`;
+  const s=`<circle data-tip="${escapeHtml(e[0])}" data-value="${e[1]}" cx="120" cy="120" r="${r}" fill="none" stroke="${COLORS[i%COLORS.length]}" stroke-width="24" stroke-linecap="round" stroke-dasharray="${Math.max(0,len-5)} ${c-len+5}" stroke-dashoffset="${-off}" transform="rotate(-90 120 120)" style="cursor:pointer"/>`;
   off+=len; return s;
  }).join("");
  return `<svg class="donut-svg" viewBox="0 0 240 240">${parts}<circle class="donut-hole" cx="120" cy="120" r="56"></circle><text class="donut-label" x="120" y="112" text-anchor="middle">Total</text><text class="donut-total" x="120" y="130" text-anchor="middle">${label}</text></svg>`;
 }
-function legend(entries){
+function legend(entries,{showTickerIcons=false}={}){
  const total=entries.reduce((a,x)=>a+x[1],0)||1;
- return entries.map((e,i)=>`<div class="legend-row"><i class="dot" style="background:${COLORS[i%COLORS.length]}"></i><span>${e[0]}</span><b class="metric-idr private">${fmt(e[1])}</b><b>${(e[1]/total*100).toFixed(1)}%</b></div>`).join("");
+ return entries.map((e,i)=>`<div class="legend-row ${showTickerIcons?"ticker-legend-row":""}">${showTickerIcons?tickerIcon(e[0]):`<i class="dot" style="background:${COLORS[i%COLORS.length]}"></i>`}<span>${escapeHtml(e[0])}</span><b class="metric-idr private">${fmt(e[1])}</b><b>${(e[1]/total*100).toFixed(1)}%</b></div>`).join("");
 }
 function line(vals,labels=[],light=false){
  const w=920,h=280,p=28,min=Math.min(...vals),max=Math.max(...vals),rg=max-min||1;
@@ -621,8 +628,8 @@ function renderClients(){
  const card=(c)=>{const i=state.clients.indexOf(c),ending=c.clientType==="ending",outstanding=clientOutstanding(c),paid=ending?c.endingPaid:outstanding===0,visual=ending?(paid?"ending-paid":"ending-unpaid"):paid?"paid":"outstanding",statusIcon=ending?"flag":paid?"check":"clock",statusText=paid?"PAID":fmt(outstanding),meta=ending?(paid?"Final payment completed":"Final payment pending"):`Paid this month: ${fmt(getClientPaidThisMonth(c))} · Previous: ${fmt(c.carry)}`;return `<div class="client-card ${visual} ${ending?"ending":"recurring"}" data-client-id="${c.id}" title="Drag card to reorder or move between sections"><div class="status-icon ${paid?"paid":"pending"}" title="${ending?`ending client · ${paid?"paid":"unpaid"}`:paid?"paid":"outstanding"}">${pundiIcon(statusIcon)}</div><h4>${escapeHtml(c.name)}</h4><small>${ending?"Final payment":"Recurring monthly"} · ${fmt(c.monthly)}</small><strong class="private client-outstanding-copy ${paid?"is-paid":"is-due"}">${statusText}</strong><small class="client-payment-meta private">${meta}</small><div class="client-actions"><button class="icon-mini" data-edit-client="${i}" title="Edit" aria-label="Edit client">${pundiIcon("edit")}</button><button class="icon-mini" data-status-client="${i}" title="Status" aria-label="Change client status">${pundiIcon("target")}</button><button class="icon-mini" data-remove-client="${i}" title="Remove" aria-label="Remove client">${pundiIcon("trash")}</button></div></div>`;};
  const recurring=[...recurringClients()].sort((a,b)=>Number(a.sortOrder||0)-Number(b.sortOrder||0)),ending=[...endingClients()].sort((a,b)=>Number(a.sortOrder||0)-Number(b.sortOrder||0));
  recurringClientCount.textContent=recurring.length;endingClientCount.textContent=ending.length;
- recurringClientGrid.innerHTML=recurring.map(card).join("")||emptyLane("No recurring clients");
- endingClientGrid.innerHTML=ending.map(card).join("")||emptyLane("No ending clients");
+ recurringClientGrid.innerHTML=recurring.map(card).join("")||emptyLane("No income this month yet");
+ endingClientGrid.innerHTML=ending.map(card).join("")||emptyLane("No outstanding payments yet");
  qa("[data-edit-client]").forEach(b=>b.onclick=()=>editClient(Number(b.dataset.editClient)));
  qa("[data-status-client]").forEach(b=>b.onclick=()=>changeClientStatus(Number(b.dataset.statusClient)));
  qa("[data-remove-client]").forEach(b=>b.onclick=()=>{state.clients.splice(Number(b.dataset.removeClient),1); save(); renderAll();});
@@ -651,7 +658,7 @@ function renderStocks(){
  if(Number(state.stockExtras?.netcashIdr||0)>0)entries.push(["Netcash",Number(state.stockExtras.netcashIdr)]);
  if(Number(state.stockExtras?.walletUsd||0)>0)entries.push(["USD Wallet",Number(state.stockExtras.walletUsd)*Number(state.usdIdr)]);
  stockDonut.innerHTML=donut(entries,fmt(gross,true));
- stockLegend.innerHTML=legend(entries);
+ stockLegend.innerHTML=legend(entries,{showTickerIcons:true});
  stockValueTrend.innerHTML=line(YEARS.map(year=>netPortfolio(year,"base")),YEARS.map(year=>String(year)),true);
  stockNetcashIdr.value=Number(state.stockExtras?.netcashIdr||0)||"";
  stockWalletUsd.value=Number(state.stockExtras?.walletUsd||0)||"";
@@ -675,7 +682,7 @@ function renderStocks(){
   const cryptoPctAttr=crypto?`data-crypto-holding-pct="${s.id}"`:"";
   const cryptoStatusAttr=crypto?`data-crypto-holding-status="${s.id}"`:"";
   const pl=stockValue(s)-invested(s);
-  return `<tr><td data-label="Ticker"><input data-stock="${i}" data-field="ticker" value="${s.ticker}"></td><td data-label="Market"><select data-stock="${i}" data-field="market">${marketSelect}</select></td><td data-label="Provider Symbol"><input data-stock="${i}" data-field="providerSymbol" value="${s.providerSymbol||s.ticker}" ${crypto?"disabled":""}></td><td data-label="Currency"><input value="${s.currency}" title="Selected automatically from market" disabled></td><td data-label="Quantity"><div class="quantity-field"><input data-stock="${i}" data-field="quantity" type="number" min="0" step="${quantityStep}" value="${crypto?plainCryptoNumber(qty):qty}"><small>${unit}</small></div></td><td data-label="Average / Share"><input data-stock="${i}" data-field="avg" type="number" step="${priceStep}" value="${crypto?plainCryptoNumber(s.avg):s.avg}"></td><td data-label="Current / Fallback"><input data-stock="${i}" data-field="current" type="number" step="${priceStep}" value="${crypto?plainCryptoNumber(s.current):s.current}" title="${crypto?"Current shared market quote; direct IDR is preferred where supported":"Latest price. Edit only to set a manual fallback."}" ${crypto?`disabled ${cryptoCurrentAttr}`:""}></td><td data-label="Price State"><span class="price-state ${stale?'stale':''}" ${cryptoStatusAttr}>${stale?'STALE · ':''}${statusLabel}</span><small class="price-time">${stamp}</small></td><td data-label="Value" class="private" ${cryptoValueAttr}>${fmt(stockValue(s))}</td><td data-label="Profit / Loss" class="private holding-pl ${pl<0?"negative":pl>0?"positive":""}" ${cryptoPlAttr}><b>${fmt(pl)}</b><small ${cryptoPctAttr}>${percent(pl,invested(s))}</small></td><td class="stock-remove"><button class="icon-mini" data-del-stock="${i}" title="Remove" aria-label="Remove ${s.ticker}">${pundiIcon("trash")}</button></td></tr>`;
+  return `<tr><td data-label="Ticker"><div class="holding-ticker-cell">${tickerIcon(s.ticker)}<input data-stock="${i}" data-field="ticker" value="${s.ticker}"></div></td><td data-label="Market"><select data-stock="${i}" data-field="market">${marketSelect}</select></td><td data-label="Provider Symbol"><input data-stock="${i}" data-field="providerSymbol" value="${s.providerSymbol||s.ticker}" ${crypto?"disabled":""}></td><td data-label="Currency"><input value="${s.currency}" title="Selected automatically from market" disabled></td><td data-label="Quantity"><div class="quantity-field"><input data-stock="${i}" data-field="quantity" type="number" min="0" step="${quantityStep}" value="${crypto?plainCryptoNumber(qty):qty}"><small>${unit}</small></div></td><td data-label="Average / Share"><input data-stock="${i}" data-field="avg" type="number" step="${priceStep}" value="${crypto?plainCryptoNumber(s.avg):s.avg}"></td><td data-label="Current / Fallback"><input data-stock="${i}" data-field="current" type="number" step="${priceStep}" value="${crypto?plainCryptoNumber(s.current):s.current}" title="${crypto?"Current shared market quote; direct IDR is preferred where supported":"Latest price. Edit only to set a manual fallback."}" ${crypto?`disabled ${cryptoCurrentAttr}`:""}></td><td data-label="Price State"><span class="price-state ${stale?'stale':''}" ${cryptoStatusAttr}>${stale?'STALE · ':''}${statusLabel}</span><small class="price-time">${stamp}</small></td><td data-label="Value" class="private" ${cryptoValueAttr}>${fmt(stockValue(s))}</td><td data-label="Profit / Loss" class="private holding-pl ${pl<0?"negative":pl>0?"positive":""}" ${cryptoPlAttr}><b>${fmt(pl)}</b><small ${cryptoPctAttr}>${percent(pl,invested(s))}</small></td><td class="stock-remove"><button class="icon-mini" data-del-stock="${i}" title="Remove" aria-label="Remove ${s.ticker}">${pundiIcon("trash")}</button></td></tr>`;
  }).join("");
  qa("[data-stock]").forEach(el=>el.onchange=()=>{
   const i=Number(el.dataset.stock),f=el.dataset.field,s=state.stocks[i];
@@ -826,6 +833,7 @@ function renderTrading(){
  const hasCryptoTrading=state.tradingPositions.some(isCryptoAsset)||state.tradingLedger.some(row=>row.assetType==="crypto");
  const hasEquityBenchmark=state.tradingPositions.some(row=>!isCryptoAsset(row))||state.tradingLedger.some(row=>!isCryptoAsset(row));
  const metrics=tradingStats();
+ renderTradingAllocation();
  const compactMobile=window.matchMedia("(max-width:680px)").matches;
  const money=value=>fmt(value,compactMobile);
  const latestSell=[...state.tradingLedger].filter(row=>row.type==="sell").sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.__createdAt||"").localeCompare(String(a.__createdAt||"")))[0];
@@ -865,7 +873,7 @@ function renderTrading(){
   const status=position.priceStatus||"saved";
   const crypto=isCryptoAsset(position),currentUsd=crypto?"":formatFiatCurrency(position.current,"USD",{locale:"en-US",maximumFractionDigits:4}),currentLabel=crypto?formatFiatCurrency(position.current,position.currency,{locale:"en-US",maximumFractionDigits:position.currency==="USDT"?8:4}):currentUsd;
   const quoteUnit=crypto?position.currency:"";
-  return `<article class="trading-position-card" data-trading-position="${position.id}"><div class="trading-position-head"><div><h4>${escapeHtml(position.ticker)}</h4><small>${position.market} · ${position.currency} · ${Number(position.quantity).toLocaleString("en-US",{maximumFractionDigits:8})} ${crypto?"units":"shares"}</small></div><span class="trading-position-state ${isPriceStale(position)?"stale":""}" ${crypto?`data-crypto-position-status="${position.id}"`:""}>${escapeHtml(status)}</span></div><div class="trading-current-price"><small>CURRENT PRICE</small><strong class="private" ${crypto?`data-crypto-position-current="${position.id}"`:""}>${currentLabel}</strong></div><div class="trading-position-value"><span><small>POSITION VALUE</small><b class="private" ${crypto?`data-crypto-position-value="${position.id}"`:""}>${money(value)}</b></span><span class="${pl<0?"negative":pl>0?"positive":""}"><b class="private" ${crypto?`data-crypto-position-pl="${position.id}"`:""}>${pl>=0?"+":""}${money(pl)}</b><small ${crypto?`data-crypto-position-pct="${position.id}"`:""}>${pct>=0?"+":""}${pct.toFixed(2)}%</small></span></div><div class="trading-position-meta"><span><small>AVG / SHARE</small><b>${crypto?formatFiatCurrency(position.avg,position.currency,{locale:"en-US",maximumFractionDigits:position.currency==="USDT"?8:4}):plainNumber(position.avg)} ${quoteUnit}</b></span><span><small>TARGET PRICE</small><b>${position.targetPrice?crypto?formatFiatCurrency(position.targetPrice,position.currency,{locale:"en-US",maximumFractionDigits:position.currency==="USDT"?8:4}):plainNumber(position.targetPrice):"—"}</b></span><span><small>INVESTED</small><b class="private">${money(cost)}</b></span></div><div class="trading-position-actions"><button class="buy" type="button" data-trading-buy="${position.id}">BUY MORE</button><button class="sell" type="button" data-trading-sell="${position.id}" ${Number(position.quantity)<=0?"disabled":""}>SELL</button><button class="delete" type="button" data-trading-delete="${position.id}">DELETE</button></div><small class="price-time">${escapeHtml(quoteTime)}</small></article>`;
+  return `<article class="trading-position-card" data-trading-position="${position.id}"><div class="trading-position-head"><div class="trading-position-title">${tickerIcon(position.ticker)}<div><h4>${escapeHtml(position.ticker)}</h4><small>${position.market} · ${position.currency} · ${Number(position.quantity).toLocaleString("en-US",{maximumFractionDigits:8})} ${crypto?"units":"shares"}</small></div></div><span class="trading-position-state ${isPriceStale(position)?"stale":""}" ${crypto?`data-crypto-position-status="${position.id}"`:""}>${escapeHtml(status)}</span></div><div class="trading-current-price"><small>CURRENT PRICE</small><strong class="private" ${crypto?`data-crypto-position-current="${position.id}"`:""}>${currentLabel}</strong></div><div class="trading-position-value"><span><small>POSITION VALUE</small><b class="private" ${crypto?`data-crypto-position-value="${position.id}"`:""}>${money(value)}</b></span><span class="${pl<0?"negative":pl>0?"positive":""}"><b class="private" ${crypto?`data-crypto-position-pl="${position.id}"`:""}>${pl>=0?"+":""}${money(pl)}</b><small ${crypto?`data-crypto-position-pct="${position.id}"`:""}>${pct>=0?"+":""}${pct.toFixed(2)}%</small></span></div><div class="trading-position-meta"><span><small>AVG / SHARE</small><b>${crypto?formatFiatCurrency(position.avg,position.currency,{locale:"en-US",maximumFractionDigits:position.currency==="USDT"?8:4}):plainNumber(position.avg)} ${quoteUnit}</b></span><span><small>TARGET PRICE</small><b>${position.targetPrice?crypto?formatFiatCurrency(position.targetPrice,position.currency,{locale:"en-US",maximumFractionDigits:position.currency==="USDT"?8:4}):plainNumber(position.targetPrice):"—"}</b></span><span><small>INVESTED</small><b class="private">${money(cost)}</b></span></div><div class="trading-position-actions"><button class="buy" type="button" data-trading-buy="${position.id}">BUY MORE</button><button class="sell" type="button" data-trading-sell="${position.id}" ${Number(position.quantity)<=0?"disabled":""}>SELL</button><button class="delete" type="button" data-trading-delete="${position.id}" title="Delete this Trading position">${pundiIcon("trash")}</button></div><small class="price-time">${escapeHtml(quoteTime)}</small></article>`;
  }).join(""):`<div class="trading-empty"><b>No active Trading position</b><span>Add one only when you want to track a separate trading portfolio.</span></div>`;
 
  const ledger=[...state.tradingLedger].sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.__createdAt||"").localeCompare(String(a.__createdAt||"")));
@@ -1409,6 +1417,20 @@ function updateCryptoPriceNodes(key){
   qa(`[data-crypto-position-status="${position.id}"]`).forEach(element=>element.textContent=String(position.priceStatus||"STALE").toUpperCase());
  }
 }
+function renderTradingAllocation(){
+ if(!tradingAllocationDonutElement||!tradingAllocationLegendElement)return;
+ const metrics=tradingStats(),positions=state.tradingPositions.filter(position=>Number(position.quantity)>1e-9);
+ const entries=positions.map(position=>[position.displaySymbol||position.ticker,tradingPositionValue(position,state.usdIdr)]);
+ if(Number(metrics.wallet.idr)>0)entries.push(["Netcash",Number(metrics.wallet.idr)]);
+ if(Number(metrics.wallet.usd)>0)entries.push(["USD Wallet",Number(metrics.wallet.usd)*Number(state.usdIdr||0)]);
+ if(!entries.length){
+  tradingAllocationDonutElement.innerHTML=`<div class="allocation-empty"><b>No allocation yet</b><span>Add Trading funds or an active position to see the portfolio mix.</span></div>`;
+  tradingAllocationLegendElement.innerHTML="";
+  return;
+ }
+ tradingAllocationDonutElement.innerHTML=donut(entries,fmt(metrics.equity,true));
+ tradingAllocationLegendElement.innerHTML=legend(entries,{showTickerIcons:true});
+}
 function renderCryptoSummary(){
  if(state.page==="stocks"&&state.stockView==="investment"){
   const grossHoldings=holdingsPortfolio(),inv=state.stocks.reduce((sum,row)=>sum+invested(row),0),pl=grossHoldings-inv;
@@ -1422,6 +1444,7 @@ function renderCryptoSummary(){
   tradingEquity.textContent=fmt(metrics.equity);
   tradingUnrealizedPl.textContent=`${metrics.unrealized>=0?"+":""}${fmt(metrics.unrealized)}`;
   tradingTotalPl.textContent=`${metrics.realized>=0?"+":""}${fmt(metrics.realized)} · ${metrics.realizedReturn>=0?"+":""}${metrics.realizedReturn.toFixed(2)}%`;
+  renderTradingAllocation();
  }
  if(state.page==="accumulation")renderAccumulation();
  if(state.page==="prospect")renderProspect();
@@ -1929,8 +1952,15 @@ syncManager=new SyncManager({onState:applyCloudState,onStatus:updateSyncStatus})
 
 const commerceMoney=(amount,currency="IDR")=>new Intl.NumberFormat("id-ID",{style:"currency",currency,maximumFractionDigits:0}).format(Number(amount||0)).replace(/\u00a0/g,"");
 const commerceDate=value=>value?new Date(value).toLocaleString(state.language==="id"?"id-ID":"en-GB",{dateStyle:"medium",timeStyle:"short"}):"—";
+function renderAccountPlan(account={}){
+ const presentation=accountPlanPresentation(account);
+ if(accountPlanElement){accountPlanElement.textContent=presentation.label;accountPlanElement.dataset.plan=presentation.key;}
+ if(accountPlanDetailElement)accountPlanDetailElement.textContent=presentation.detail;
+ return presentation;
+}
 function renderCommerceAccount(account){
- const entitlements=(account?.entitlements||[]).filter(item=>item.status==="active");
+ renderAccountPlan(account);
+ const entitlements=(account?.entitlements||[]).filter(item=>item.status==="active"&&(!item.expires_at||Date.parse(item.expires_at)>Date.now()));
  const orders=account?.orders||[];
  const entitlementRows=entitlements.map(item=>{
   const expiry=item.expires_at?` · until ${escapeHtml(commerceDate(item.expires_at))}`:"";
@@ -1951,12 +1981,14 @@ async function refreshCommerce(){
  if(commerceRefreshBusy)return;
  commerceRefreshBusy=true;
  try{
-  const catalog=await fetchCommerceCatalog();
-  renderCommerceCatalog(catalog);
-  const account=await fetchCommerceAccount();
-  renderCommerceAccount(account);
- }catch(error){
-  commerceStatus.textContent=error.message||"Purchase status unavailable.";
+  const [catalogResult,accountResult]=await Promise.allSettled([fetchCommerceCatalog(),fetchCommerceAccount()]);
+  if(catalogResult.status==="fulfilled")renderCommerceCatalog(catalogResult.value);
+  else{renderCommerceCatalog(null);commerceStatus.textContent="Offers are temporarily unavailable. Your current plan is unchanged.";}
+  if(accountResult.status==="fulfilled")renderCommerceAccount(accountResult.value);
+  else{
+   commerceEntitlements.innerHTML="<p class=\"account-commerce-muted\">Purchase history is temporarily unavailable. Your current plan is unchanged.</p>";
+   commerceOrders.innerHTML="";
+  }
  }finally{commerceRefreshBusy=false;}
 }
 const wait=(ms)=>new Promise(resolve=>setTimeout(resolve,ms));
@@ -1977,7 +2009,7 @@ async function startCommerceCheckout(sku,button){
   const checkout=await createCommerceCheckout(sku);
   const snap=await loadMidtransSnap(checkout.client_key,checkout.environment);
   snap.pay(checkout.token,{onSuccess:async()=>{commerceStatus.textContent="Payment submitted. Verifying with Midtrans…";await verifyCommerceOrder(checkout.order_id);await refreshCommerce();},onPending:async()=>{commerceStatus.textContent="Payment is pending. Access activates after provider verification.";await verifyCommerceOrder(checkout.order_id);await refreshCommerce();},onError:async()=>{commerceStatus.textContent="Payment was not completed.";await verifyCommerceOrder(checkout.order_id);await refreshCommerce();},onClose:async()=>{commerceStatus.textContent="Checkout closed. No access is granted until payment is verified.";await refreshCommerce();}});
- }catch(error){commerceStatus.textContent=error.message||"Checkout unavailable.";}
+ }catch(error){commerceStatus.textContent="Checkout is temporarily unavailable. Your current plan is unchanged.";}
  finally{button.disabled=false;}
 }
 
@@ -1987,11 +2019,8 @@ async function showSignedIn(user){
  accountEmail.textContent=user.email||"Private account";
  try{
   const account=await syncManager.accountMetadata();
-  accountCreatedAt.textContent=account.created_at?new Date(account.created_at).toLocaleDateString():"—";
-  accountPlan.textContent=account.subscription?.plan||"free";
-  accountStatus.textContent=account.account_status||"active";
- }catch(error){accountSettingsMessage.textContent="Account settings unavailable.";}
- legacyImportBtn.hidden=!readLegacyLocalStorage();
+  renderAccountPlan(account);
+ }catch(error){accountSettingsMessageElement.textContent="Account settings unavailable.";}
  renderOnboarding(user.id);
  if(!validUsdIdr(state.usdIdr)){
   state.usdIdr=DEFAULT_USD_IDR;
@@ -2171,7 +2200,11 @@ authForm.onsubmit=async event=>{
  finally{authSubmit.disabled=false;if(authMode==="signup")authSubmit.textContent="Create account";else if(authMode==="forgot")authSubmit.textContent="Send reset link";else if(authMode==="recovery")authSubmit.textContent="Update password";else authSubmit.textContent="Sign in";}
 };
 
-dataBtn.onclick=async()=>{dataModal.showModal();try{const account=await syncManager.accountMetadata();accountCreatedAt.textContent=account.created_at?new Date(account.created_at).toLocaleDateString():"—";accountPlan.textContent=account.subscription?.plan||"free";accountStatus.textContent=account.account_status||"active";await refreshCommerce();}catch(error){accountSettingsMessage.textContent="Account settings unavailable.";}};
+dataBtn.onclick=async()=>{
+ dataModal.showModal();accountSettingsMessageElement.textContent="";
+ try{renderAccountPlan(await syncManager.accountMetadata());await refreshCommerce();}
+ catch{accountSettingsMessageElement.textContent="Account settings unavailable. Your current plan is unchanged.";}
+};
 syncStatus.onclick=()=>dataModal.showModal();
 changePasswordForm.onsubmit=async event=>{
  event.preventDefault();passwordChangeMessage.textContent="";
@@ -2181,38 +2214,6 @@ changePasswordForm.onsubmit=async event=>{
  try{await syncManager.changePassword(newPassword.value);changePasswordForm.reset();passwordChangeMessage.textContent="Password changed successfully.";}
  catch(error){passwordChangeMessage.textContent="Unable to change password. Please try again.";}
  finally{changePasswordBtn.disabled=false;}
-};
-deleteAccountBtn.onclick=async()=>{
- accountSettingsMessage.textContent="";
- const typed=prompt("This permanently deletes your Pundi account and all its finance data. Type DELETE to continue.");
- if(typed!=="DELETE"){accountSettingsMessage.textContent="Account deletion cancelled. Type DELETE exactly to continue.";return;}
- if(!confirm("Final confirmation: permanently delete this Pundi account and all owned data? This cannot be undone."))return;
- deleteAccountBtn.disabled=true;
- try{await syncManager.deleteAccount("DELETE");for(const key of Object.keys(localStorage))if(/^pundi-|^cvfinance-/i.test(key))localStorage.removeItem(key);location.reload();}
- catch(error){accountSettingsMessage.textContent=error.message||"Account deletion failed.";deleteAccountBtn.disabled=false;}
-};
-exportBackupBtn.onclick=()=>syncManager.downloadBackup(state);
-importBackupBtn.onclick=()=>backupFile.click();
-backupFile.onchange=async()=>{
- const file=backupFile.files[0];if(!file)return;
- try{
-  const parsed=JSON.parse(await file.text());validateBackup(parsed);
-  if(!confirm("Replace all cloud data with this backup?"))return;
-  await syncManager.importBackup(file);dataModal.close();toastMsg("Backup imported");
- }catch(error){alert(error.message)}finally{backupFile.value="";}
-};
-legacyImportBtn.onclick=async()=>{
- const legacy=readLegacyLocalStorage();if(!legacy)return alert("No v6 local data found on this device.");
- if(!confirm("Replace cloud data with the v6.3.1 data stored in this browser?"))return;
- try{await syncManager.replaceAll(legacy);dataModal.close();toastMsg("Local data migrated")}
- catch(error){alert(error.message)}
-};
-seedDataBtn.onclick=async()=>{
- if(state.accounts.length)return alert("Cloud data already exists. Seed was not applied.");
- try{
-  const supabase=await getSupabase();const {error}=await supabase.rpc("seed_cvfinance_mvp");if(error)throw error;
-  await syncManager.handleRemoteChange();dataModal.close();toastMsg("MVP seed loaded");
- }catch(error){alert(error.message)}
 };
 logoutBtn.onclick=()=>{if(fxRefreshTimer)clearInterval(fxRefreshTimer);if(tradingRefreshTimer)clearInterval(tradingRefreshTimer);cryptoMarketStream?.stop();syncManager.signOut();};
 refreshStocksBtn.onclick=()=>refreshMarkets();

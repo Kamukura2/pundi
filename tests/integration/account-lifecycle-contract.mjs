@@ -18,9 +18,8 @@ assert.match(app, /updatePassword|changePassword/);
 assert.match(app, /Set new password/);
 assert.match(app, /authPassword\.closest\("label"\)\.hidden=forgot/);
 assert.match(html, /id=\"changePasswordForm\"/);
-assert.match(html, /id=\"deleteAccountBtn\"/);
-assert.match(app, /prompt\([\s\S]*Type DELETE/);
-assert.match(app, /confirm\([\s\S]*Final confirmation/);
+assert.doesNotMatch(html, /id=\"deleteAccountBtn\"/);
+assert.doesNotMatch(app, /deleteAccountBtn|Type DELETE|Final confirmation/);
 assert.match(api, /auth\.getUser/);
 assert.match(api, /user\.id/);
 assert.match(api, /confirmation !== \"DELETE\"/);
@@ -35,4 +34,4 @@ for (const table of ["profiles","accounts","transactions","monthly_budgets","yea
 assert.match(sync, /clearUserScopedState\(userId\)/);
 assert.match(sync, /signOut\(\{ scope:\"local\" \}\)/);
 assert.doesNotMatch(app + sync + api, /console\.log\([^\n]*(password|token|Authorization)/i);
-console.log("Account lifecycle contract PASS: recovery, password change, settings, authenticated self-delete, confirmation, admin protection, cascade schema, and local cleanup");
+console.log("Account lifecycle contract PASS: recovery, password change, production account surface, authenticated self-delete API, admin protection, cascade schema, and local cleanup");

@@ -17,7 +17,7 @@ const ICONS = {
   calendar: '<rect x="4" y="5.5" width="16" height="15" rx="2.2"/><path d="M8 3.5v4M16 3.5v4M4 9.5h16"/><path d="M8 13h0M12 13h0M16 13h0M8 17h0M12 17h0" stroke="var(--pundi-icon-accent)" stroke-width="2.2"/>',
   pin: '<path d="M12 21s6-5.3 6-10.6a6 6 0 1 0-12 0C6 15.7 12 21 12 21Z"/><circle cx="12" cy="10.4" r="2.1" fill="var(--pundi-icon-accent)" stroke="none"/>',
   ledger: '<path d="M6 4.5h12a2 2 0 0 1 2 2v13H7a2 2 0 0 1-2-2V6.5a2 2 0 0 1 2-2Z"/><path d="M8.5 8h8M8.5 12h8M8.5 16h5"/><path d="M5 17.5H3.8A1.8 1.8 0 0 1 2 15.7V6.5A2 2 0 0 1 4 4.5" stroke="var(--pundi-icon-accent)" stroke-width="1.8"/>',
-  flag: '<path d="M6 21V4"/><path d="M6 5c4-2.3 7.2 2.3 12 0v8c-4.8 2.3-8-2.3-12 0" fill="var(--pundi-icon-accent)" stroke="currentColor" stroke-width="1.5"/>',
+  flag: '<path d="M6 20V4.5h11.5l-2.4 3.4 2.4 3.4H6Z" fill="var(--pundi-icon-accent)" stroke="none"/><path d="M6 4v17" stroke="currentColor" stroke-width="1.7"/>',
   check: '<circle cx="12" cy="12" r="8.5" fill="var(--pundi-icon-accent)" stroke="none"/><path d="m8 12.2 2.5 2.5 5.5-5.7" stroke="currentColor" stroke-width="2"/>',
   clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.2 2" stroke="var(--pundi-icon-accent)" stroke-width="2"/>',
   warning: '<path d="m12 3 9 17H3L12 3Z" fill="var(--pundi-icon-accent)" stroke="currentColor" stroke-width="1.4"/><path d="M12 8v5M12 16.5h0" stroke="currentColor" stroke-width="1.9"/>',
@@ -57,7 +57,7 @@ const ALIASES = {
 };
 
 const ACCENTS = {
-  overview: '#72d6ff', transactions: '#8fa5ff', income: '#55e3b0', expenses: '#ff9a87', assets: '#b2a4ff', trading: '#7be4ff', electricity: '#ffd166', prospect: '#74c6ff', insights: '#ff9acb', settings: '#b7c8e9', pro: '#ffd166', account: '#8fd8ff', cash: '#55e3b0', bank: '#8fa5ff', wallet: '#74c6ff', calendar: '#ffd166', warning: '#ffb45c', info: '#8fa5ff', edit: '#8fa5ff', trash: '#ff8f9d', refresh: '#8fd8ff', plus: '#ffffff', minus: '#ff9a87', arrow: '#8fd8ff', arrowUp: '#55e3b0', arrowDown: '#ff9a87', chevronDown: '#b7c8ff', close: '#ff9aab', eye: '#8fd8ff', eyeOff: '#ff9aab', sun: '#ffd166', moon: '#b7c8ff', target: '#b2a4ff', support: '#8fd8ff', deposit: '#55e3b0', outflow: '#ff9a87', pulse: '#8fd8ff', shield: '#8fd8ff', sparkle: '#ff9acb', bolt: '#ffd166', card: '#8fa5ff', search: '#8fd8ff', menu: '#8fd8ff', lock: '#8fd8ff', ledger: '#8fa5ff', flag: '#ffd166', check: '#55e3b0', clock: '#ffd166', pin: '#ff9a87'
+  overview: '#72d6ff', transactions: '#8fa5ff', income: '#55e3b0', expenses: '#ff9a87', assets: '#b2a4ff', trading: '#7be4ff', electricity: '#ffd166', prospect: '#74c6ff', insights: '#ff9acb', settings: '#b7c8e9', pro: '#ffd166', account: '#8fd8ff', cash: '#55e3b0', bank: '#8fa5ff', wallet: '#74c6ff', calendar: '#ffd166', warning: '#ffb45c', info: '#8fa5ff', edit: '#8fa5ff', trash: '#ff8f9d', refresh: '#8fd8ff', plus: '#ffffff', minus: '#ff9a87', arrow: '#8fd8ff', arrowUp: '#55e3b0', arrowDown: '#ff9a87', chevronDown: '#b7c8ff', close: '#ff9aab', eye: '#8fd8ff', eyeOff: '#ff9aab', sun: '#ffd166', moon: '#b7c8ff', target: '#b2a4ff', support: '#8fd8ff', deposit: '#55e3b0', outflow: '#ff9a87', pulse: '#8fd8ff', shield: '#8fd8ff', sparkle: '#ff9acb', bolt: '#ffd166', card: '#8fa5ff', search: '#8fd8ff', menu: '#8fd8ff', lock: '#8fd8ff', ledger: '#8fa5ff', flag: '#ffffff', check: '#55e3b0', clock: '#ffd166', pin: '#ff9a87'
 };
 
 export function normalizePundiIconName(value) {
