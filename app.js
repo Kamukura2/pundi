@@ -872,8 +872,8 @@ function renderTrading(){
   const quoteTime=position.priceAsOf?new Date(position.priceAsOf).toLocaleString("en-GB",{dateStyle:"medium",timeStyle:"short"}):"Waiting for API quote";
   const status=position.priceStatus||"saved";
   const crypto=isCryptoAsset(position),currentUsd=crypto?"":formatFiatCurrency(position.current,"USD",{locale:"en-US",maximumFractionDigits:4}),currentLabel=crypto?formatFiatCurrency(position.current,position.currency,{locale:"en-US",maximumFractionDigits:position.currency==="USDT"?8:4}):currentUsd;
-  const quoteUnit=crypto?position.currency:"";
-  return `<article class="trading-position-card" data-trading-position="${position.id}"><div class="trading-position-head"><div class="trading-position-title">${tickerIcon(position.ticker)}<div><h4>${escapeHtml(position.ticker)}</h4><small>${position.market} · ${position.currency} · ${Number(position.quantity).toLocaleString("en-US",{maximumFractionDigits:8})} ${crypto?"units":"shares"}</small></div></div><span class="trading-position-state ${isPriceStale(position)?"stale":""}" ${crypto?`data-crypto-position-status="${position.id}"`:""}>${escapeHtml(status)}</span></div><div class="trading-current-price"><small>CURRENT PRICE</small><strong class="private" ${crypto?`data-crypto-position-current="${position.id}"`:""}>${currentLabel}</strong></div><div class="trading-position-value"><span><small>POSITION VALUE</small><b class="private" ${crypto?`data-crypto-position-value="${position.id}"`:""}>${money(value)}</b></span><span class="${pl<0?"negative":pl>0?"positive":""}"><b class="private" ${crypto?`data-crypto-position-pl="${position.id}"`:""}>${pl>=0?"+":""}${money(pl)}</b><small ${crypto?`data-crypto-position-pct="${position.id}"`:""}>${pct>=0?"+":""}${pct.toFixed(2)}%</small></span></div><div class="trading-position-meta"><span><small>AVG / SHARE</small><b>${crypto?formatFiatCurrency(position.avg,position.currency,{locale:"en-US",maximumFractionDigits:position.currency==="USDT"?8:4}):plainNumber(position.avg)} ${quoteUnit}</b></span><span><small>TARGET PRICE</small><b>${position.targetPrice?crypto?formatFiatCurrency(position.targetPrice,position.currency,{locale:"en-US",maximumFractionDigits:position.currency==="USDT"?8:4}):plainNumber(position.targetPrice):"—"}</b></span><span><small>INVESTED</small><b class="private">${money(cost)}</b></span></div><div class="trading-position-actions"><button class="buy" type="button" data-trading-buy="${position.id}">BUY MORE</button><button class="sell" type="button" data-trading-sell="${position.id}" ${Number(position.quantity)<=0?"disabled":""}>SELL</button><button class="delete" type="button" data-trading-delete="${position.id}" title="Delete this Trading position">${pundiIcon("trash")}</button></div><small class="price-time">${escapeHtml(quoteTime)}</small></article>`;
+  const quoteUnit=crypto?position.currency:"",displayQuantity=quantityForDisplay(position),displayQuantityUnit=quantityUnit(position.market);
+  return `<article class="trading-position-card" data-trading-position="${position.id}"><div class="trading-position-head"><div class="trading-position-title">${tickerIcon(position.ticker)}<div><h4>${escapeHtml(position.ticker)}</h4><small>${position.market} · ${position.currency}</small></div></div><span class="trading-position-state ${isPriceStale(position)?"stale":""}" ${crypto?`data-crypto-position-status="${position.id}"`:""}>${escapeHtml(status)}</span></div><div class="trading-current-price"><small>CURRENT PRICE</small><strong class="private" ${crypto?`data-crypto-position-current="${position.id}"`:""}>${currentLabel}</strong></div><div class="trading-position-value"><span><small>POSITION VALUE</small><b class="private" ${crypto?`data-crypto-position-value="${position.id}"`:""}>${money(value)}</b></span><span class="${pl<0?"negative":pl>0?"positive":""}"><b class="private" ${crypto?`data-crypto-position-pl="${position.id}"`:""}>${pl>=0?"+":""}${money(pl)}</b><small ${crypto?`data-crypto-position-pct="${position.id}"`:""}>${pct>=0?"+":""}${pct.toFixed(2)}%</small></span></div><div class="trading-position-meta"><span><small>QTY (LOT / SHARES)</small><b>${plainNumber(displayQuantity)} ${displayQuantityUnit}</b></span><span><small>AVG / SHARE</small><b>${crypto?formatFiatCurrency(position.avg,position.currency,{locale:"en-US",maximumFractionDigits:position.currency==="USDT"?8:4}):plainNumber(position.avg)} ${quoteUnit}</b></span><span><small>TARGET PRICE</small><b>${position.targetPrice?crypto?formatFiatCurrency(position.targetPrice,position.currency,{locale:"en-US",maximumFractionDigits:position.currency==="USDT"?8:4}):plainNumber(position.targetPrice):"—"}</b></span><span><small>INVESTED</small><b class="private">${money(cost)}</b></span></div><div class="trading-position-actions"><button class="buy" type="button" data-trading-buy="${position.id}">BUY MORE</button><button class="sell" type="button" data-trading-sell="${position.id}" ${Number(position.quantity)<=1e-9?"disabled":""}>SELL</button><button class="edit" type="button" data-trading-edit="${position.id}">EDIT QTY</button><button class="delete" type="button" data-trading-delete="${position.id}" title="Delete this Trading position">${pundiIcon("trash")}</button></div><small class="price-time">${escapeHtml(quoteTime)}</small></article>`;
  }).join(""):`<div class="trading-empty"><b>No active Trading position</b><span>Add one only when you want to track a separate trading portfolio.</span></div>`;
 
  const ledger=[...state.tradingLedger].sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.__createdAt||"").localeCompare(String(a.__createdAt||"")));
@@ -904,12 +904,13 @@ function renderTrading(){
 }
 
 function handleTradingPositionAction(event){
- const button=event.target.closest("button[data-trading-buy],button[data-trading-sell],button[data-trading-delete]");
+ const button=event.target.closest("button[data-trading-buy],button[data-trading-sell],button[data-trading-edit],button[data-trading-delete]");
  if(!button||!tradingPositions.contains(button))return;
  event.preventDefault();event.stopPropagation();
  if(button.disabled)return toastMsg("No open shares available to sell");
  if(button.dataset.tradingBuy)return openTradingExecution(button.dataset.tradingBuy,"buy");
  if(button.dataset.tradingSell)return openTradingExecution(button.dataset.tradingSell,"sell");
+ if(button.dataset.tradingEdit)return openTradingPositionEditor(button.dataset.tradingEdit);
  const position=state.tradingPositions.find(row=>row.id===button.dataset.tradingDelete);if(!position)return;
  if(!confirm(`Delete ${position.ticker} and its Trading ledger records?\n\nUse SELL instead when this is a real closed trade. Delete is only for an incorrect input.`))return;
  const cleaned=removeTradingPositionData({positions:state.tradingPositions,ledger:state.tradingLedger,snapshots:state.tradingSnapshots},position.id);
@@ -970,19 +971,41 @@ function openTradingBalanceEditor(currency="USD"){
  });
 }
 
+function openTradingPositionEditor(positionId){
+ const position=state.tradingPositions.find(row=>row.id===positionId);if(!position)return;
+ const linked=state.tradingLedger.filter(row=>row.positionId===position.id&&["opening","buy","sell"].includes(row.type));
+ if(linked.some(row=>row.type!=="opening")){alert("This position already has BUY/SELL history. Use BUY MORE or SELL to change its quantity without rewriting the ledger.");return;}
+ const opening=linked.find(row=>row.type==="opening");
+ if(!opening){alert("This position has no opening record and cannot be edited safely.");return;}
+ openSimple(`Edit ${position.ticker} Holding`,[
+  {key:"quantity",label:"Qty (Lot / Shares)",type:"number",step:"any",inputmode:"decimal",marketAwareQuantity:true,quantityMarket:position.market,value:quantityForDisplay(position),helper:"IDX: lot (1 lot = 100 shares) · US: shares"},
+  {key:"avg",label:`Entry Price / Share (${position.currency})`,type:"number",step:"any",inputmode:"decimal",value:position.avg}
+ ],values=>{
+  const displayedQuantity=Number(values.quantity),quantity=quantityForStorage(position.market,displayedQuantity),average=Number(values.avg);
+  if(!(displayedQuantity>0)||!Number.isFinite(quantity)||!(average>=0)){alert("Enter a valid quantity and entry price.");return false;}
+  if(position.market==="IDX"&&!Number.isInteger(displayedQuantity)){alert("IDX quantity must be a whole number of lots.");return false;}
+  Object.assign(position,{quantity,avg:average});
+  const replacement=applyOpeningPosition({position,date:opening.date,fxRate:opening.fxRate||state.usdIdr,id:opening.id});
+  state.tradingLedger[state.tradingLedger.indexOf(opening)]={...replacement,__createdAt:opening.__createdAt};
+  recordTradingSnapshot();
+  return {message:`${position.ticker} quantity updated`};
+ });
+}
+
 function openTradingExecution(positionId,type){
  const position=state.tradingPositions.find(row=>row.id===positionId);if(!position)return;
  if(type==="sell"&&!(Number(position.quantity)>0)){toastMsg("No open shares available to sell");return;}
  openSimple(type==="sell"?`Sell ${position.ticker}`:`Buy More ${position.ticker}`,[
-  {key:"quantity",label:`Shares${type==="sell"?` · max ${plainNumber(position.quantity)}`:""}`,type:"number",step:"any",inputmode:"decimal",value:type==="sell"?position.quantity:""},
+  {key:"quantity",label:`Qty (Lot / Shares)${type==="sell"?` · max ${plainNumber(quantityForDisplay(position))} ${quantityUnit(position.market)}`:""}`,type:"number",step:"any",inputmode:"decimal",marketAwareQuantity:true,quantityMarket:position.market,value:type==="sell"?quantityForDisplay(position):"",helper:"IDX: lot (1 lot = 100 shares) · US: shares"},
   {key:"price",label:`Execution Price / Share (${position.currency}) · editable`,type:"number",step:"any",inputmode:"decimal",value:position.current},
   {key:"fxRate",label:"USD/IDR Rate Used",type:"number",step:"any",inputmode:"decimal",value:state.usdIdr},
   {key:"date",label:"Execution Date",type:"date",value:todayISO()}
  ],values=>{
-  const wallet=tradingStats().wallet,nativeCost=Number(values.quantity)*Number(values.price);
+  const quantity=quantityForStorage(position.market,Number(values.quantity)),wallet=tradingStats().wallet,nativeCost=quantity*Number(values.price);
+  if(!(Number(values.quantity)>0)||!Number.isFinite(quantity)||(position.market==="IDX"&&!Number.isInteger(Number(values.quantity)))){alert(position.market==="IDX"?"IDX quantity must be a whole number of lots.":"Enter a valid quantity.");return false;}
   if(type==="buy"&&nativeCost>Number(position.currency==="USD"?wallet.usd:wallet.idr)+1e-8){alert(`Insufficient ${position.currency} Trading wallet. Add funds first.`);return false;}
   try{
-   const entry=applyTrade({position,type,quantity:values.quantity,price:values.price,date:values.date,fxRate:values.fxRate,id:createId()});entry.__createdAt=new Date().toISOString();state.tradingLedger.push(entry);
+   const entry=applyTrade({position,type,quantity,price:values.price,date:values.date,fxRate:values.fxRate,id:createId()});entry.__createdAt=new Date().toISOString();state.tradingLedger.push(entry);
    position.current=Number(values.price);position.manualCurrent=Number(values.price);position.priceSource="execution";position.priceStatus=type==="sell"?"sold":"manual";position.priceAsOf=new Date().toISOString();
    const closedState=archiveClosedTradingPositions({positions:state.tradingPositions,ledger:state.tradingLedger});
    const fullyClosed=closedState.closedPositionIds.includes(position.id);
@@ -1208,6 +1231,13 @@ function openSimple(title,fields,callback){
    if(field.hideForCrypto)wrapper.hidden=crypto;
    if(field.cryptoOnly)wrapper.hidden=!crypto;
    if(field.cryptoLabel&&label)label.textContent=crypto?field.cryptoLabel:field.label;
+   if(field.marketAwareQuantity&&field.key==="quantity"){
+    const fieldMarket=String(field.quantityMarket||market).toUpperCase(),fieldCrypto=fieldMarket==="CRYPTO";
+    const input=wrapper.querySelector("input");
+    if(input)input.step=fieldMarket==="IDX"?"1":field.step||"any";
+    const helper=wrapper.querySelector("small");
+    if(helper)helper.textContent=fieldMarket==="IDX"?"IDX: lot (1 lot = 100 shares)":fieldCrypto?"Crypto: units":"US: shares";
+   }
   });
   if(crypto&&q("#sf_ticker")&&q("#sf_quote")){
     try{
@@ -1809,15 +1839,16 @@ addTickerBtn.onclick=()=>openSimple("Add Ticker",[
 addTradingPositionBtn.onclick=()=>openSimple("Add Trading Position",[
  {key:"ticker",label:"Ticker",cryptoLabel:"Crypto Symbol",placeholder:"BTC",helper:"Enter BTC, ETH, SOL, etc."},{key:"market",label:"Market",options:["IDX","NASDAQ","NYSE","CRYPTO"],value:"NASDAQ"},
  {key:"quote",label:"Quote Currency",options:["USD","IDR","USDT"],value:"USD",cryptoOnly:true},
- {key:"quantity",label:"Quantity (Crypto supports fractions)",type:"number",step:".00000001"},{key:"avg",label:"Entry Price / Unit",type:"number",step:".00000001"},
+ {key:"quantity",label:"Qty (Lot / Shares)",type:"number",step:"any",inputmode:"decimal",marketAwareQuantity:true,helper:"IDX: lot (1 lot = 100 shares) · US: shares · Crypto: units"},{key:"avg",label:"Entry Price / Unit",type:"number",step:".00000001"},
  {key:"date",label:"Opening Date",type:"date",value:todayISO()}
 ],async values=>{
  const ticker=String(values.ticker||"").trim().toUpperCase(),crypto=values.market==="CRYPTO";
  if(!(Number(values.quantity)>0)||!(Number(values.avg)>=0)){alert("Enter a valid quantity and entry price.");return false;}
+ if(values.market==="IDX"&&!Number.isInteger(Number(values.quantity))){alert("IDX quantity must be a whole number of lots.");return false;}
  const parsed=crypto?parseCryptoPairInput(ticker,values.quote||"USD"):null;
  const canonicalTicker=parsed?.baseSymbol||ticker, historicalQuote=crypto?historicalCryptoQuote(canonicalTicker,{positions:state.tradingPositions,ledger:state.tradingLedger}):null, requestedQuote=historicalQuote||parsed?.requestedQuote||"USD";
  if(state.tradingPositions.some(row=>row.ticker===canonicalTicker&&row.market===values.market&&Number(row.quantity)>1e-9)){alert(`${canonicalTicker}${crypto?` already exists in this portfolio.`:" already has an active Trading position."}`);return false;}
- let providerSymbol=canonicalTicker,currency=crypto?requestedQuote:"USD",assetType="equity",current=Number(values.avg),priceSource="saved entry",priceStatus="waiting for API";
+ let providerSymbol=canonicalTicker,currency=crypto?requestedQuote:values.market==="IDX"?"IDR":"USD",assetType="equity",current=Number(values.avg),priceSource="saved entry",priceStatus="waiting for API";
  if(crypto){
   try{
    const resolved=await resolveCryptoPair(parsed.baseSymbol,requestedQuote,state.usdIdr);
@@ -1826,7 +1857,7 @@ addTradingPositionBtn.onclick=()=>openSimple("Add Trading Position",[
  }
  const reusable=state.tradingPositions.find(row=>row.ticker===canonicalTicker&&row.market===values.market&&Number(row.quantity)<=1e-9);
  if(reusable)state.tradingLedger=state.tradingLedger.map(row=>row.positionId===reusable.id?{...row,positionId:null}:row);
- const position={id:reusable?.id||createId(),ticker:canonicalTicker,displaySymbol:canonicalTicker,assetType,providerSymbol,market:values.market,currency,quantity:Number(values.quantity),avg:Number(values.avg),current,manualCurrent:current,targetPrice:0,stopLoss:0,priceSource,priceStatus,priceAsOf:crypto?new Date().toISOString():null,lastPriceFetchAt:null,__createdAt:reusable?.__createdAt||new Date().toISOString()};
+ const position={id:reusable?.id||createId(),ticker:canonicalTicker,displaySymbol:canonicalTicker,assetType,providerSymbol,market:values.market,currency,quantity:quantityForStorage(values.market,Number(values.quantity)),avg:Number(values.avg),current,manualCurrent:current,targetPrice:0,stopLoss:0,priceSource,priceStatus,priceAsOf:crypto?new Date().toISOString():null,lastPriceFetchAt:null,__createdAt:reusable?.__createdAt||new Date().toISOString()};
  if(reusable)Object.assign(reusable,position);else state.tradingPositions.push(position);
  state.tradingLedger.push({...applyOpeningPosition({position,date:values.date,fxRate:state.usdIdr,id:createId()}),__createdAt:new Date().toISOString()});recordTradingOpeningSnapshot(position,values.date);syncCryptoMarketData();queueMicrotask(()=>refreshTradingPrices({silent:true,force:true}));
 });

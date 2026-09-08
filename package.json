@@ -15,6 +15,7 @@
     "test:v33": "node tests/integration/v33-product-contract.mjs",
     "test:market-data": "node tests/integration/market-data-contract.mjs",
     "test:reviewer-regression": "node tests/integration/reviewer-regression-contract.mjs",
+    "test:trading-quantity": "node tests/integration/trading-quantity-contract.mjs",
     "audit:market-data": "node scripts/audit-public-providers.mjs",
     "probe:market-data": "node scripts/live-market-data-probe.mjs",
     "preview": "vite preview",

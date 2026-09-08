@@ -1053,6 +1053,15 @@ h1,h2,h3,h4,h5,h6,.title-wrap h1,.panel-head h3{font-family:'Pundi Heading','Man
  .mobile-nav button{min-height:46px}
 }
 
+/* Trading quantity visibility: keep the four metrics readable on narrow cards. */
+.trading-position-meta{grid-template-columns:repeat(4,minmax(0,1fr))}
+.trading-position-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
+.trading-position-actions .edit{color:#5b79e8;border-color:color-mix(in srgb,#5b79e8 32%,var(--line));background:color-mix(in srgb,var(--surface) 90%,#5b79e8 10%)}
+@media(max-width:720px){
+ .trading-position-meta{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+ .trading-position-actions{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+
 /* v8.1.0 mobile workspace redesign and navigation unification */
 .workspace-tabs{display:grid;width:min(430px,100%);margin:0 0 22px;padding:6px}
 .workspace-tabs button{min-width:0;font-weight:900;letter-spacing:.01em;cursor:pointer}
