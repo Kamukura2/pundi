@@ -3,8 +3,10 @@ import { resolveAuthorizedHolding, resolveAuthorizedUser } from "../_lib/holding
 import { apiError, method } from "../_lib/http.js";
 import { fetchQuote, fetchUsdIdrQuote, validateMapping } from "../_lib/providers.js";
 import { enforceRateLimit } from "../_lib/rate-limit.js";
+import { handlePublicFx } from "../_lib/public-fx.js";
 
 export default async function handler(request, response) {
+  if (String(request.query?.__route || "") === "public_fx") return handlePublicFx(request, response);
   if (!method(request, response)) return;
   try {
     if (String(request.query?.__route || "") === "fx") {

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import handler from "../../api/public/fx/usd-idr.js";
+import handler from "../../api/stocks/quote.js";
 
 const originalFetch = globalThis.fetch;
 const now = Math.floor(Date.now() / 1000);
@@ -31,6 +31,7 @@ function responseCapture() {
 }
 async function call(request) {
   const { response, state } = responseCapture();
+  request.query = { __route:"public_fx", ...(request.query || {}) };
   await handler(request, response);
   return state;
 }

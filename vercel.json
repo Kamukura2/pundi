@@ -28,6 +28,10 @@
       "destination": "/api/feedback?__route=acquisition"
     },
     {
+      "source": "/api/public/fx/usd-idr",
+      "destination": "/api/stocks/quote?__route=public_fx"
+    },
+    {
       "source": "/api/stocks/fx",
       "destination": "/api/stocks/quote?__route=fx"
     },
