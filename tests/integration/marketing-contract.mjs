@@ -46,9 +46,11 @@ for (const [route, file] of publicRoutes) {
 }
 
 const updates = read("updates.html");
-assert.match(updates, /Public website · R3/i);
-assert.match(updates, /Owner-review candidate · not deployed/i);
-assert.match(updates, /Pundi 8\.7\.2/i);
+const updateText = updates.replace(/<[^>]+>/g, " ");
+assert.match(updateText, /Public website · R3/i);
+assert.match(updateText, /Public website release · 8 September 2026/i);
+assert.doesNotMatch(updateText, /preview|not deployed|local website/i);
+assert.match(updateText, /Pundi 8\.8\.0/i);
 const support = read("support.html");
 assert.match(support, /Beta feedback/i);
 assert.match(support, /supportpundi@gmail\.com/i);
