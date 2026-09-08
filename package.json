@@ -24,6 +24,7 @@
     "beta:status": "node scripts/beta-status.mjs",
     "growth:status": "node scripts/growth-status.mjs",
     "test:marketing": "node tests/integration/marketing-contract.mjs",
+    "test:public-fx": "node tests/integration/public-fx-contract.mjs",
     "test:acquisition": "node tests/integration/acquisition-contract.mjs",
     "test:metric-semantics": "node tests/integration/metric-semantics-contract.mjs",
     "test:isolation": "node tests/integration/supabase-isolation.mjs",

@@ -1,0 +1,1 @@
+(()=>{let locale='id';try{const saved=localStorage.getItem('pundi-public-region');locale=saved==='US'?'en':saved==='ID'?'id':navigator.language.toLowerCase()==='en-us'?'en':'id';}catch{}document.documentElement.lang=locale;document.documentElement.dataset.locale=locale;})();

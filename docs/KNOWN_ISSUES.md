@@ -5,12 +5,12 @@ This file lists verified product limitations or owner decisions only. No confirm
 ## Product limitations
 
 - Signup remains open during controlled beta; invitations are distributed selectively by the owner rather than enforced by invite-code infrastructure.
-- The dedicated support mailbox has not been published. Users should use in-app Feedback.
+- The public support mailbox is `supportpundi@gmail.com`; users may also use in-app Feedback.
 
 ## Owner decisions
 
 - Payment and pricing are not part of this beta milestone.
-- Formal support mailbox and operator/legal identity remain owner decisions.
+- Public support mailbox provisioning is complete for the approved `supportpundi@gmail.com` contact.
 
 ## Confirmed defects
 

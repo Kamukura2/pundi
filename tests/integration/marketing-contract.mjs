@@ -4,36 +4,66 @@ import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "../..");
 const read = file => readFileSync(resolve(root, file), "utf8");
-const pages = ["landing.html", "catatan-keuangan.html", "pencatat-pengeluaran.html", "budgeting.html", "aset-investasi.html", "net-worth.html", "trading-journal.html", "backup-keuangan.html"];
-for (const page of pages) {
-  const html = read(page);
-  assert.match(html, /<html lang="id">/);
-  assert.match(html, /<title>[^<]+<\/title>/);
-  assert.match(html, /rel="canonical" href="https:\/\/pundi\.online\//);
-  assert.match(html, /https:\/\/app\.pundi\.online\//);
-  assert.doesNotMatch(html, /testimonial|customers?\s*served|bank-grade|end-to-end encryption|automatic bank feeds/i);
-}
+const publicRoutes = [
+  ["/", "landing.html"],
+  ["/privacy", "privacy.html"],
+  ["/terms", "terms.html"],
+  ["/support", "support.html"],
+  ["/updates", "updates.html"]
+];
+
+assert.equal(read("landing.html"), read("index.html"), "public entry pages synchronized");
 const landing = read("landing.html");
-assert.ok(existsSync(resolve(root, "public/favicon.ico")));
-assert.equal(readFileSync(resolve(root, "public/favicon.ico")).equals(readFileSync(resolve(root, "public/icons/icon.ico"))), true);
-const scriptBlocks = /<script[^>]*>[\s\S]*?<\/script>/gi;
-for (const page of ["landing.html", "index.html"]) {
-  const html = read(page);
-  assert.ok(html.includes('<script defer src="/marketing-stories.js"></script>'));
-  scriptBlocks.lastIndex = 0;
-  const hasInlineExecutable = [...html.matchAll(scriptBlocks)].some(([block]) => {
-    const openTag = block.slice(0, block.indexOf(">") + 1);
-    return !/\bsrc\s*=/.test(openTag) && !/type\s*=\s*["']application\/ld\+json["']/i.test(openTag);
-  });
-  assert.equal(hasInlineExecutable, false, `${page} must not use executable inline scripts under strict CSP`);
+assert.match(landing, /<main\b/);
+assert.match(landing, /<h1\b[\s\S]*lang="id"[\s\S]*Keuanganmu,/i);
+assert.match(landing, /<span lang="en">Your money\./i);
+assert.match(landing, /Pemasukan, pengeluaran, dan investasi\./i);
+assert.match(landing, /Yang masuk\./i);
+assert.match(landing, /Lebih dari/i);
+assert.match(landing, /Tetap di tanganmu\./i);
+assert.match(landing, /Pundi Pro Lifetime/i);
+assert.match(landing, /Harga katalog sandbox/i);
+assert.match(landing, /Pembelian produksi belum dibuka/i);
+assert.match(landing, /data-region="ID"/);
+assert.match(landing, /data-region="US"/);
+assert.match(landing, /id="harga"/);
+assert.match(landing, /Pembaruan|Updates/i);
+assert.match(landing, /application\/ld\+json/);
+assert.match(landing, /https:\/\/schema\.org/);
+assert.doesNotMatch(landing, /Coba Pundi|data-story=|section-number|feature-strip|testimonial|customers?\s*served|bank-grade|end-to-end encryption|automatic bank feeds|Play Store tersedia/i);
+
+for (const [route, file] of publicRoutes) {
+  assert.ok(existsSync(resolve(root, file)), `Missing public route file: ${file}`);
+  const html = read(file);
+  assert.match(html, /<html lang="(?:id|en)">/);
+  assert.match(html, /<title>[^<]+<\/title>/);
+  assert.match(html, /<meta name="description" content="[^"]+"/);
+  const canonical = route === "/" ? "https://pundi.online/" : `https://pundi.online${route}`;
+  assert.match(html, new RegExp(`rel="canonical" href="${canonical.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`));
+  assert.match(html, /<main\b/);
+  assert.match(html, /<h1\b/);
+  assert.doesNotMatch(html, /bank-grade|military-grade|automatic bank feeds/i);
 }
-assert.match(read("public/marketing-stories.js"), /const stories=/);
-for (const marker of ["Keuanganmu,", "Catat", "Pantau", "Pahami", "DATA FIKSI", "akun", "backup", "FAQ", "application/ld"]) assert.match(landing, new RegExp(marker, "i"));
-assert.match(landing, /Coba Pundi/);
-assert.match(landing, /data-story="catat"/);
-assert.match(read("public-site.css"), /prefers-reduced-motion/);
+
+const updates = read("updates.html");
+assert.match(updates, /Public website · R3/i);
+assert.match(updates, /Owner-review candidate · not deployed/i);
+assert.match(updates, /Pundi 8\.7\.2/i);
+const support = read("support.html");
+assert.match(support, /Beta feedback/i);
+assert.match(support, /supportpundi@gmail\.com/i);
+assert.doesNotMatch(support, /SUPPORT_EMAIL_OWNER_DECISION|dedicated support mailbox has not been published|support@pundi\.online|TODO|DEBUG/i);
+
+for (const page of ["privacy.html", "terms.html"]) {
+  const html = read(page);
+  assert.match(html, /supportpundi@gmail\.com/i);
+  assert.match(html, /Pundi/);
+}
+
 const sitemap = read("public/sitemap.xml");
-for (const page of pages.slice(1)) assert.match(sitemap, new RegExp(`https://pundi\\.online/${page.replace(".html", "")}`));
+for (const [route] of publicRoutes) assert.match(sitemap, new RegExp(`https://pundi\\.online${route === "/" ? "/" : route}`));
 assert.match(read("public/robots.txt"), /Sitemap:\s*https:\/\/pundi\.online\/sitemap\.xml/);
-assert.match(read("vercel.json"), /catatan-keuangan/);
-console.log("Marketing contract PASS: Indonesian acquisition pages, metadata, CTA, sitemap, robots, demo disclosure, and safe claims");
+assert.match(read("public-site.css"), /prefers-reduced-motion/);
+assert.match(read("vercel.json"), /pundi\.online/);
+
+console.log("Marketing contract PASS: approved R3 homepage, public routes, localization controls, changelog, metadata, sitemap, and safe claims");

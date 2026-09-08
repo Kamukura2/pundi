@@ -1,0 +1,23 @@
+import assert from 'node:assert/strict';
+import {readFileSync,writeFileSync,existsSync} from 'node:fs';
+import {execFileSync} from 'node:child_process';
+const base='C:/JensenBot/Tooling/PundiWebAstraLaunch';
+const read=f=>readFileSync(f,'utf8');
+const html=read('landing.html');
+assert.equal(read('index.html'),html,'entry pages synchronized');
+for(const marker of ['PUNDI_PRO_LIFETIME','49000'])assert.ok(read('app.js').includes(marker));
+const catalog=JSON.parse(read(base+'/evidence/public-catalog.json')).catalog;
+assert.equal(catalog.production,false);assert.equal(catalog.environment,'sandbox');
+assert.ok(catalog.products.some(p=>p.sku==='PUNDI_PRO_LIFETIME'&&p.amount===49000&&p.purchase_type==='lifetime'));
+assert.match(html,/KATALOG SANDBOX/);assert.match(html,/Pembelian produksi belum dibuka/);
+assert.doesNotMatch(html,/createCommerceCheckout|app\.midtrans\.com|bank-grade|military-grade|testimoni|Play Store tersedia/);
+assert.match(html,/rel="canonical" href="https:\/\/pundi.online\/"/);
+assert.match(html,/og:image.*https:\/\/pundi.online\/media\/pundi-social.png/);
+const schema=JSON.parse(html.match(/<script type="application\/ld\+json">([^<]+)<\/script>/)[1]);assert.equal(schema['@context'],'https://schema.org');assert.equal(schema.name,'Pundi');assert.ok(!schema.offers,'no unapproved production pricing schema');
+const protectedPaths=['app.js','app.html','src','api','supabase','android','styles.css','public-site.css','public/sw.js','public/robots.txt','public/sitemap.xml','public/icons','public/fonts','package.json','package-lock.json','vite.config.js','vercel.json'];
+const diff=execFileSync('git',['diff','--name-only','HEAD','--',...protectedPaths],{encoding:'utf8'}).trim();assert.equal(diff,'','protected code unchanged');
+const media=['dashboard.png','income.png','investments.png','market.png','mobile.png','pundi-social.png'];media.forEach(f=>assert.ok(existsSync('public/media/'+f),f));
+const changed=execFileSync('git',['diff','--name-only'],{encoding:'utf8'}).trim().split('\n').filter(Boolean);
+const scanFiles=[...new Set([...changed,'launch.css'])];const deny=[/-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/,/\b(?:ghp_|github_pat_|sk_live_)[A-Za-z0-9_]{16,}/,/eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}/];
+for(const f of scanFiles){const s=read(f.trim());deny.forEach(re=>assert.ok(!re.test(s),'secret-like material in '+f));}
+const report={pass:true,pricing:'live public sandbox catalog verified; production=false',schema:'valid, no Offer',protectedCode:'identical to HEAD',changedScopeSecretScan:{files:scanFiles,findings:0},media,productionDeployment:false};writeFileSync(base+'/evidence/launch-contract.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));

@@ -50,7 +50,7 @@ No further Auth, SMTP, DNS, or runtime changes are required for this cutover.
 
 - `/privacy` describes account email, user-entered finance data, Supabase Auth, Resend transactional email, hosting, export/backup, and account deletion without unsupported compliance/security guarantees.
 - `/terms` states as-is availability, user responsibility for accuracy/account access, non-advice boundaries, acceptable use, and deletion/termination.
-- `/support` directs beta users to the in-app feedback path and clearly marks `SUPPORT_EMAIL_OWNER_DECISION`; no nonexistent mailbox is advertised.
+- `/support` directs beta users to `supportpundi@gmail.com` and the in-app feedback path; no private mailbox is advertised.
 
 These are baseline product documents and are not jurisdiction-specific legal advice. Owner/operator legal identity should be formalized before commercial terms or paid launch.
 
