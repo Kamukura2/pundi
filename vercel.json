@@ -37,6 +37,11 @@
     },
     {
       "source": "/",
+      "has": [{ "type": "host", "value": "auth.pundi.online" }],
+      "destination": "/app.html"
+    },
+    {
+      "source": "/",
       "has": [{ "type": "host", "value": "app.pundi.online" }],
       "destination": "/app.html"
     },

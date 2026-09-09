@@ -48,7 +48,10 @@ const vercel = read("vercel.json");
 assert.match(vercel, /pundi\.online/);
 assert.match(vercel, /www\.pundi\.online/);
 assert.match(vercel, /auth\/reset-password/);
-assert.doesNotMatch(vercel, /auth\.pundi\.online/);
+assert.match(
+  vercel,
+  /"source":\s*"\/"[\s\S]*?"type":\s*"host"[\s\S]*?"value":\s*"auth\.pundi\.online"[\s\S]*?"destination":\s*"\/app\.html"/
+);
 
 const robots = read("public/robots.txt");
 assert.match(robots, /Disallow:\s*\/app/);
