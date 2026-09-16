@@ -114,7 +114,7 @@ select,input,.search{height:42px;padding:0 12px;border-radius:14px;border:1px so
 .list-ic{width:42px;height:42px;border-radius:14px;background:var(--surface);display:grid;place-items:center}
 .list-meta b{display:block;font-size:15px}.list-meta small{display:block;color:var(--muted);margin-top:3px}
 .list-value{font-weight:800;white-space:nowrap}
-.electricity-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.electricity-history-row{border:1px solid transparent}.electricity-history-topup{background:linear-gradient(135deg,rgba(52,200,139,.16),rgba(34,199,184,.08)),var(--surface2);border-color:rgba(52,200,139,.28)}.electricity-history-topup .list-ic{color:var(--green);background:rgba(52,200,139,.14);font-weight:900}.electricity-history-topup .list-meta b,.electricity-history-topup .list-value{color:var(--green)}.electricity-history-topup .list-value{font-variant-numeric:tabular-nums}.electricity-history-anomaly{background:linear-gradient(135deg,rgba(255,109,126,.16),rgba(255,155,94,.08)),var(--surface2);border-color:rgba(255,109,126,.3)}.electricity-history-anomaly .list-ic,.electricity-history-anomaly .list-meta b{color:var(--red)}
+.electricity-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.electricity-history-row{grid-template-columns:42px minmax(0,1fr) auto auto;border:1px solid transparent}.electricity-history-row .electricity-delete{color:var(--red)}.electricity-history-topup{background:linear-gradient(135deg,rgba(52,200,139,.16),rgba(34,199,184,.08)),var(--surface2);border-color:rgba(52,200,139,.28)}.electricity-history-topup .list-ic{color:var(--green);background:rgba(52,200,139,.14);font-weight:900}.electricity-history-topup .list-meta b,.electricity-history-topup .list-value{color:var(--green)}.electricity-history-topup .list-value{font-variant-numeric:tabular-nums}.electricity-history-anomaly{background:linear-gradient(135deg,rgba(255,109,126,.16),rgba(255,155,94,.08)),var(--surface2);border-color:rgba(255,109,126,.3)}.electricity-history-anomaly .list-ic,.electricity-history-anomaly .list-meta b{color:var(--red)}
 .donut-layout{display:grid;grid-template-columns:250px 1fr;gap:18px;align-items:center}
 .donut-layout.vertical{grid-template-columns:1fr}
 .donut-svg{width:240px;height:240px;display:block;margin:auto}
@@ -188,7 +188,7 @@ td input,td select{width:100%;min-width:90px}
 dialog{border:0;padding:0;background:transparent}
 dialog::backdrop{background:rgba(2,8,18,.66);backdrop-filter:blur(6px)}
 .modal{width:min(92vw,500px);padding:22px;border-radius:28px;background:var(--surface);color:var(--text);display:grid;gap:14px;box-shadow:var(--shadow)}
-.modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.modal-actions button{width:100%}.form-error{min-height:18px;color:var(--red);font-size:12px}.auth-message{min-height:18px;font-size:12px}.auth-message.success{color:var(--green)}.auth-message.error{color:var(--red)}.input-suffix{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}.input-suffix b{padding:0 4px;color:var(--muted);font-size:13px}
+.modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.modal-actions button{width:100%}.form-error{min-height:18px;color:var(--red);font-size:12px}.auth-message{min-height:18px;font-size:12px}.auth-message.success{color:var(--green)}.auth-message.error{color:var(--red)}.auth-remember{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px}.auth-remember input{width:16px;height:16px;margin:0}.input-suffix{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}.input-suffix b{padding:0 4px;color:var(--muted);font-size:13px}
 .form-grid{display:grid;gap:14px}
 label{display:grid;gap:7px;font-size:12px;color:var(--muted);font-weight:700}
 .manage-account-row{display:grid;grid-template-columns:1fr 140px 38px;gap:10px;align-items:center;margin-bottom:10px}
@@ -277,7 +277,7 @@ main{padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-rig
 .toolbar{display:grid;grid-template-columns:1fr;align-items:stretch;gap:10px;margin-bottom:12px}.toolbar-actions{width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto}.toolbar-actions select{width:100%}.toolbar .pill{max-width:100%;white-space:normal;line-height:1.35}
 .segmented{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;padding:4px;border-radius:15px}.segmented button{padding:9px 8px;border-radius:11px;font-size:13px}
 select,input,.search{width:100%;min-width:0;height:46px;padding:0 12px;border-radius:13px;font-size:14px}.search{min-width:0}
-.list{gap:8px}.list-row{grid-template-columns:36px minmax(0,1fr);gap:10px;padding:11px;border-radius:16px}.list-ic{width:36px;height:36px;border-radius:12px;font-size:14px}.list-meta{min-width:0}.list-meta b{font-size:13px;overflow-wrap:anywhere}.list-meta small{font-size:11px;overflow-wrap:anywhere}.list-value{grid-column:2;text-align:left;font-size:13px;white-space:normal}
+.list{gap:8px}.list-row{grid-template-columns:36px minmax(0,1fr);gap:10px;padding:11px;border-radius:16px}.electricity-history-row{grid-template-columns:36px minmax(0,1fr) auto auto}.electricity-history-row .list-value{grid-column:auto;text-align:right}.list-ic{width:36px;height:36px;border-radius:12px;font-size:14px}.list-meta{min-width:0}.list-meta b{font-size:13px;overflow-wrap:anywhere}.list-meta small{font-size:11px;overflow-wrap:anywhere}.list-value{grid-column:2;text-align:left;font-size:13px;white-space:normal}
 .panel .donut-svg,.hero-card .donut-svg{width:min(218px,68vw);height:min(218px,68vw)}.donut-layout{gap:12px}.legend{gap:7px}.legend-row{grid-template-columns:8px minmax(0,1fr) auto;gap:7px;padding:9px 10px;border-radius:14px;font-size:11px}.legend-row .icon-mini{grid-column:3}.metric-idr{min-width:0;max-width:120px;white-space:normal;overflow-wrap:anywhere}
 .progress-row{padding:12px;border-radius:16px}.progress-top{align-items:flex-start}.progress-top small{max-width:58%;text-align:right;white-space:normal;overflow-wrap:anywhere;font-size:10px}
 .tile,.client-card,.year-card,.brief-item,.signal-item{padding:14px;border-radius:17px}.tile h4,.client-card h4,.year-card h4{font-size:17px}.tile strong,.client-card strong,.year-card strong{font-size:23px;margin-top:10px}.tile small,.client-card small,.year-card small{font-size:11px;overflow-wrap:anywhere}
@@ -1185,7 +1185,7 @@ h1,h2,h3,h4,h5,h6,.title-wrap h1,.panel-head h3{font-family:'Pundi Heading','Man
  .dividend-history-row{grid-template-columns:repeat(2,minmax(0,1fr))}.dividend-history-row .danger-btn{grid-column:1/-1}
 }
 @media(max-width:680px){
- .electricity-actions{width:100%;display:grid;grid-template-columns:1fr 1fr}.electricity-actions .top-up-btn,.electricity-actions .primary-btn{width:100%;min-width:0;padding-left:10px;padding-right:10px}.electricity-history-row{grid-template-columns:38px minmax(0,1fr) auto;gap:8px;padding:11px}.electricity-history-row .list-ic{width:38px;height:38px}.electricity-history-row .list-meta b{font-size:13px}.electricity-history-row .list-meta small{font-size:10px}.electricity-history-row .list-value{font-size:12px;white-space:nowrap}
+ .electricity-actions{width:100%;display:grid;grid-template-columns:1fr 1fr}.electricity-actions .top-up-btn,.electricity-actions .primary-btn{width:100%;min-width:0;padding-left:10px;padding-right:10px}.electricity-history-row{grid-template-columns:38px minmax(0,1fr) auto auto;gap:8px;padding:11px}.electricity-history-row .list-ic{width:38px;height:38px}.electricity-history-row .list-meta b{font-size:13px}.electricity-history-row .list-meta small{font-size:10px}.electricity-history-row .list-value{grid-column:auto;text-align:right;font-size:12px;white-space:nowrap}
  .stock-workspace-tabs{position:sticky;top:6px;z-index:28;margin-bottom:13px;border-radius:14px;background:color-mix(in srgb,var(--surface2) 92%,transparent);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
  .stock-workspace-tabs button{font-size:12px;padding:9px 7px}
  .investment-wallet-panel{margin-top:10px;padding:14px!important;border-radius:19px}.investment-wallet-panel .panel-head{display:grid;grid-template-columns:1fr;gap:8px}.investment-wallet-panel .head-actions{display:grid;grid-template-columns:minmax(0,1fr) repeat(3,34px);gap:6px;width:100%}.investment-wallet-panel .fx-rate{min-width:0;padding:7px;font-size:7px;white-space:normal;overflow-wrap:anywhere}.investment-wallet-panel .primary-btn{grid-column:1/-1;height:36px;font-size:10px}.investment-wallet-grid{grid-template-columns:1fr!important;gap:8px}
@@ -1200,7 +1200,15 @@ h1,h2,h3,h4,h5,h6,.title-wrap h1,.panel-head h3{font-family:'Pundi Heading','Man
 .commerce-account>p{font-weight:700;margin:0 0 8px}
 .account-commerce-status,.account-commerce-muted{display:block;color:var(--muted);font-size:12px;line-height:1.45}
 .commerce-catalog,.commerce-entitlements,.commerce-orders{display:grid;gap:8px;margin-top:10px}
-.commerce-product,.commerce-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:var(--surface2)}
+.story-card.insight-coffee-budget{background:linear-gradient(135deg,#a7efe0,#48c9c1 52%,#4079d9)}
+.account-security{margin-top:18px;border-top:1px solid var(--border);padding-top:14px}
+.account-security summary{display:flex;align-items:center;gap:10px;cursor:pointer;list-style:none;font-weight:800}
+.account-security summary::-webkit-details-marker{display:none}
+.account-security summary .security-summary-label{margin-left:auto;color:var(--muted);font-size:12px;font-weight:600}
+.account-security summary .security-chevron{font-size:18px;line-height:1;transition:transform .18s ease}
+.account-security[open] summary .security-chevron{transform:rotate(180deg)}
+.account-security .form-grid{margin-top:14px}
+
 .commerce-product>div:first-child,.commerce-row>span{min-width:0;display:grid;gap:3px}
 .commerce-product strong,.commerce-row b{font-size:12px}
 .commerce-product small,.commerce-row small{display:block;color:var(--muted);font-size:10px;overflow-wrap:anywhere}

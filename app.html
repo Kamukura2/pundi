@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-  <title>Pundi v8.8.0 · Private finance workspace</title>
+  <title>Pundi</title>
   <meta name="robots" content="noindex, nofollow, noarchive">
   <meta name="theme-color" content="#0D1B3D">
   <meta name="description" content="Private synchronized personal finance workspace for your accounts, cash flow, assets, and plans.">
@@ -647,7 +647,7 @@
   </main>
 
   <button class="mobile-add-transaction" data-open-tx type="button" aria-label="Add transaction" title="Add transaction" data-icon="plus"></button>
-  <footer id="releaseIdentity" class="release-identity" aria-label="Release identity">Pundi v8.8.0 · Beta</footer>
+  <footer id="releaseIdentity" class="release-identity" aria-label="Release version">Version 8.8.1 (build)</footer>
 </div>
 
 <dialog id="txModal">
@@ -703,13 +703,15 @@
         <div id="commerceEntitlements" class="commerce-entitlements"></div>
         <div id="commerceOrders" class="commerce-orders"></div>
       </section>
-      <h4>Security</h4>
-      <form id="changePasswordForm" class="form-grid">
-        <label>New password<input id="newPassword" type="password" autocomplete="new-password" minlength="6" required></label>
-        <label>Confirm new password<input id="confirmNewPassword" type="password" autocomplete="new-password" minlength="6" required></label>
-        <small id="passwordChangeMessage" class="form-error" role="status"></small>
-        <button id="changePasswordBtn" class="primary-btn" type="submit">Change password</button>
-      </form>
+      <details id="securityDetails" class="account-security">
+        <summary><span>Security</span><span class="security-summary-label">Change password</span><span class="security-chevron" aria-hidden="true">⌄</span></summary>
+        <form id="changePasswordForm" class="form-grid">
+          <label>New password<input id="newPassword" type="password" autocomplete="new-password" minlength="6" required></label>
+          <label>Confirm new password<input id="confirmNewPassword" type="password" autocomplete="new-password" minlength="6" required></label>
+          <small id="passwordChangeMessage" class="form-error" role="status"></small>
+          <button id="changePasswordBtn" class="primary-btn" type="submit">Change password</button>
+        </form>
+      </details>
       <small id="accountSettingsMessage" class="form-error" role="status"></small>
     </section>
     <div class="mobile-more">
@@ -749,6 +751,7 @@
     <label>Email<input id="authEmail" type="email" autocomplete="username" required></label>
     <label>Password<input id="authPassword" type="password" autocomplete="current-password" minlength="6" required></label>
     <label id="authConfirmField" hidden>Confirm Password<input id="authConfirm" type="password" autocomplete="new-password" minlength="6"></label>
+    <label class="auth-remember"><input id="authKeepLoggedIn" type="checkbox" checked> <span>Keep me logged in</span></label>
     <button id="authSubmit" class="primary-btn" type="submit">Sign in</button>
     <button id="authForgotPassword" class="text-link" type="button">Forgot password?</button>
     <button id="authRecoveryCancel" class="text-link" type="button" hidden>Cancel password reset</button>

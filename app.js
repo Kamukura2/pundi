@@ -1,6 +1,6 @@
 import { createEmptyState, createId, YEARS } from "./src/data/default-data.js";
 import { annualExpenseBreakdown, annualOperatingPerformance, buildMonthlyTimeline, buildProjection, getBudgetProgress, getClientOutstanding, getClientPaidThisMonth, getCurrentNetWorth, getEndingClients, getEntrustedDeduction, getFixedIncome, getReceivableClients, getRecurringClients, getTotalOutstanding, getTotalPaid, getYearlyProjectionTotal, monthKey, monthlyBudgetRemaining, recordedExpenseForBudget, remainingYearExpenseBreakdown, remainingYearIncomeBreakdown } from "./src/data/finance-model.js";
-import { electricityHistoryEvents, electricityPeriods as calculateElectricityPeriods, latestElectricityBalance, parseTopUpAmount } from "./src/data/electricity-model.js";
+import { electricityHistoryEvents, electricityPeriods as calculateElectricityPeriods, latestElectricityBalance, parseTopUpAmount, removeElectricityEvent } from "./src/data/electricity-model.js";
 import { formatCryptoQuote, formatFiatCurrency } from "./src/data/currency-format.js";
 
 import { formatMoneyInput, isMoneyField, parseMoneyInput } from "./src/data/money-input.js";
@@ -9,7 +9,7 @@ import { SyncManager } from "./src/sync/sync-manager.js";
 import { fetchHoldingDividends, fetchHoldingQuote, fetchHoldingQuotes, fetchTradingBenchmark, fetchTradingQuote, fetchUsdIdrRate, isPriceStale, validateHoldingSymbol } from "./src/stocks/client.js";
 import { normalizeStockMapping, persistenceProvider, quantityForDisplay, quantityForStorage, quantityUnit, tradingQuoteKey } from "./src/stocks/holding.js";
 import { advanceDividendLifecycle, creditDividendToWallet, dividendEventYear, dividendGross, dividendNativeGross, dividendReceivables, mergeDividendEvents, projectedDividendForMonth, reconcileDividendState, reverseDividendCredit, summarizeDividends } from "./src/stocks/dividends.js";
-import { getAuthenticatedSession, getSupabase } from "./src/lib/supabase.js";
+import { clearAuthStorage, getAuthenticatedSession, getSupabase, keepSessionEnabled, setKeepSessionEnabled } from "./src/lib/supabase.js";
 import { applyOpeningPosition, applyTrade, archiveClosedTradingPositions, cashEvent, equityBenchmarkMetrics, performancePreview, performanceSeries, reconcileTradingPositions, removeTradingLedgerEntry, removeTradingPositionData, setTradingWalletBalance, tradingMetrics, tradingPositionCost, tradingPositionValue, tradingTargetSimulation, upsertDailySnapshot } from "./src/trading/model.js";
 import { historicalCryptoQuote } from "./src/trading/crypto-lifecycle.js";
 import { feedbackPayload } from "./src/feedback/contract.js";
@@ -21,7 +21,7 @@ import { accountPlanPresentation } from "./src/entitlements/resolver.js";
 import { tickerIcon } from "./src/ui/ticker-icons.js";
 
 const BUILD_ID = __PUNDI_BUILD_ID__;
-const APP_VERSION = "8.8.0";
+const APP_VERSION = "8.8.1";
 
 const COLORS=["#7F66FF","#39C3FF","#FF8F63","#36D695","#F4C24F","#FF6EA8","#62C8FF","#8D7AFF"];
 const COMPANY_EXPENSE_TAG="Expense Perusahaan";
@@ -40,6 +40,7 @@ state.theme=localStorage.getItem("pundi-theme-cache")||"dark";
 state.language=localStorage.getItem("pundi-language-cache")||"en";
 state.stockView=localStorage.getItem("pundi-stock-view-cache")==="trading"?"trading":"investment";
 let syncManager;
+let saveInFlight=Promise.resolve();
 let authMode="signin";
 const RECOVERY_ROUTE="/auth/reset-password";
 const RECOVERY_PENDING_KEY="pundi-recovery-pending";
@@ -83,20 +84,26 @@ const percent=(value,base,{absolute=false}={})=>{
  const shown=absolute?Math.abs(normalized):normalized;
  return `${shown>0&&!absolute?"+":""}${shown.toFixed(2)}%`;
 };
-const save=(options)=>syncManager?.persist(state,options);
+const save=(options)=>{
+ const pending=syncManager?.persist(state,options);
+ if(pending)saveInFlight=Promise.resolve(pending).catch(()=>{});
+ return pending;
+};
 const saveSettings=()=>save();
 const q=(s)=>document.querySelector(s);
 const qa=(s)=>[...document.querySelectorAll(s)];
 const hydrateIconSlots=()=>qa("[data-icon]").forEach(slot=>{if(!slot.querySelector(".pundi-icon"))slot.innerHTML=pundiIcon(slot.dataset.icon||"info");});
 hydrateIconSlots();
 const releaseIdentity=q("#releaseIdentity");
-if(releaseIdentity) releaseIdentity.textContent = `Pundi v8.8.0 · build ${BUILD_ID} · Beta`;
+if(releaseIdentity) releaseIdentity.textContent = `Version ${APP_VERSION} (build ${BUILD_ID})`;
 const onboardingCard=q("#onboardingCard");
 const onboardingDismiss=q("[data-onboarding-dismiss]");
 const onboardingAddAccount=q("#onboardingAddAccount");
 const onboardingAddTransaction=q("#onboardingAddTransaction");
 const onboardingExploreAssets=q("#onboardingExploreAssets");
 const authCard=q(".auth-card");
+const authKeepLoggedIn=q("#authKeepLoggedIn");
+if(authKeepLoggedIn) authKeepLoggedIn.checked=keepSessionEnabled();
 const feedbackModal=q("#feedbackModal");
 const feedbackForm=q("#feedbackForm");
 const feedbackCategory=q("#feedbackCategory");
@@ -112,6 +119,7 @@ const electricityTopUpError=q("#electricityTopUpError");
 const electricityTopUpSubmit=q("#electricityTopUpSubmit");
 const electricityTopUpCancel=q("#electricityTopUpCancel");
 let electricityTopUpSubmitting=false;
+const electricityDeletePendingIds=new Set();
 const commerceStatus=q("#commerceStatus");
 const commerceCatalog=q("#commerceCatalog");
 const commerceEntitlements=q("#commerceEntitlements");
@@ -1048,8 +1056,24 @@ function renderElectricityHistory(){
   const anomaly=!topUp&&anomalousReadingIds.has(event.id);
   const value=topUp?`+${Number(event.amount||0).toFixed(2)} kWh`:`${plainNumber(Number(event.remaining||0))} kWh`;
   const label=topUp?"TOP UP":anomaly?"Reading · REVIEW":"Reading";
-  return `<div class="list-row electricity-history-row ${topUp?"electricity-history-topup":anomaly?"electricity-history-anomaly":"electricity-history-reading"}"><div class="list-ic">${pundiIcon(topUp?"plus":anomaly?"warning":"electricity")}</div><div class="list-meta"><b>${label}</b><small>${escapeHtml(event.date)} · ${escapeHtml(event.time)}</small></div><div class="list-value private">${value}</div></div>`;
+  const eventKey=`${event.eventType}:${event.id}`;
+  return `<div class="list-row electricity-history-row ${topUp?"electricity-history-topup":anomaly?"electricity-history-anomaly":"electricity-history-reading"}"><div class="list-ic">${pundiIcon(topUp?"plus":anomaly?"warning":"electricity")}</div><div class="list-meta"><b>${label}</b><small>${escapeHtml(event.date)} · ${escapeHtml(event.time)}</small></div><div class="list-value private">${value}</div><button class="icon-mini electricity-delete" data-delete-electricity="${escapeHtml(event.id)}" data-electricity-type="${event.eventType}" data-electricity-key="${escapeHtml(eventKey)}" title="Delete ${topUp?"top up":"reading"}" aria-label="Delete electricity ${topUp?"top up":"reading"}">${pundiIcon("trash")}</button></div>`;
  }).join(""): `<div class="list-row"><div class="list-ic">${pundiIcon("info")}</div><div class="list-meta"><b>No electricity activity yet</b><small>Add a physical reading or top up to start the history.</small></div></div>`;
+ qa("[data-delete-electricity]").forEach(button=>button.onclick=()=>{
+  const eventType=button.dataset.electricityType,id=button.dataset.deleteElectricity,key=button.dataset.electricityKey||`${eventType}:${id}`;
+  if(electricityDeletePendingIds.has(key))return;
+  const collection=eventType==="topup"?state.electricityTopups:state.electricity;
+  const event=Array.isArray(collection)?collection.find(row=>String(row.id)===String(id)):null;
+  if(!event)return;
+  const noun=eventType==="topup"?"top up":"meter reading";
+  if(!confirm(`Delete this electricity ${noun}?\n\nThis updates the balance, usage chart, totals, and history.`))return;
+  electricityDeletePendingIds.add(key);
+  if(!removeElectricityEvent(state,id,eventType)){electricityDeletePendingIds.delete(key);return;}
+  const pendingSave=save();
+  renderAll();
+  toastMsg(`${noun[0].toUpperCase()+noun.slice(1)} deleted`);
+  Promise.resolve(pendingSave).catch(()=>{}).finally(()=>electricityDeletePendingIds.delete(key));
+ });
 }
 function renderElectricity(){
  const periods=electricityPeriods(), latest=periods.at(-1);
@@ -1166,7 +1190,7 @@ function renderInsights(){
  const insightData=[
   {asset:"wallet",tone:runway>=6?"green":runway>=3?"yellow":"red",eyebrow:"Cash runway",title:`${runway.toFixed(1)} months of runway`,text:`Current liquid balance after entrusted funds is ${fmt(netAccountTotal())}; remaining monthly obligations are ${fmt(budgetRemaining())}.`},
   {asset:"clients",tone:collected>=80?"green":collected>=50?"yellow":"red",eyebrow:"Client collection",title:`${collected.toFixed(0)}% collected`,text:totalOutstanding()?`${fmt(totalOutstanding())} is still outstanding from recurring and ending clients.`:"All client payments are collected. Good job!"},
-  {asset:"coffee",tone:coffeePct>100?"red":coffeePct>75?"yellow":"green",eyebrow:"Coffee check",title:coffeePct>100?"Coffee is over budget":coffeePct>75?"Coffee is getting expensive":"Coffee spending is controlled",text:`Coffee usage is ${coffeePct.toFixed(0)}% of its default monthly budget.`},
+  {asset:"coffee-budget",tone:coffeePct>100?"red":coffeePct>75?"yellow":"green",eyebrow:"Coffee check",title:coffeePct>100?"Coffee is over budget":coffeePct>75?"Coffee is getting expensive":"Coffee spending is controlled",text:`Coffee usage is ${coffeePct.toFixed(0)}% of its default monthly budget.`},
   {asset:"electricity",tone:latestElectric?.status==="anomaly"?"red":electricDelta>5?"red":electricDelta<-5?"green":"blue",eyebrow:"Electricity trend",title:!latestElectric?"More readings needed":latestElectric.status==="anomaly"?"Review latest reading":electricDelta<-5?"Electricity is decreasing — good job!":electricDelta>5?"Electricity usage is rising":"Electricity is stable",text:latestElectric?.status==="anomaly"?`Latest physical reading is above the effective prior balance by ${Math.abs(latestElectric.rawUsed).toFixed(2)} kWh. Add the missing top-up or correct the reading.`:latestElectric?`Latest pace is ${latestElectric.daily.toFixed(1)} kWh/day (${electricDelta>=0?"+":""}${electricDelta.toFixed(1)}% versus the prior interval).`:"Add at least two readings to unlock a usage trend."},
   {asset:"calendar",tone:expenseDelta>5?"red":expenseDelta<-5?"green":"orange",eyebrow:"History trend",title:previousExpense?`Recorded expense ${expenseDelta>=0?"rose":"fell"} ${Math.abs(expenseDelta).toFixed(0)}%`:"Expense baseline is building",text:`History recorded ${fmt(thisExpense)} this month. It updates pacing only and is not deducted twice.`},
   {asset:"stocks",tone:pl<0?"red":"green",eyebrow:"Investment P/L",title:`${pl<0?"Down":"Up"} ${fmt(Math.abs(pl))} · ${percent(pl,holdingsInvested,{absolute:true})}`,text:`Investment holdings are ${fmt(holdingsPortfolio())} against ${fmt(holdingsInvested)} invested. Optional Netcash and Wallet are assets, not P/L.`},
@@ -1258,17 +1282,29 @@ function openSimple(title,fields,callback){
  q("#sf_ticker")?.addEventListener("change",syncSimpleFields);
  q("#sf_ticker")?.addEventListener("blur",syncSimpleFields);
  syncSimpleFields();
+ let submitting=false;
  simpleForm.onsubmit=async(e)=>{
   e.preventDefault();
-  const obj={};
-  fields.forEach(f=>{
-   const el=q("#sf_"+f.key);
-   obj[f.key]=isMoneyField(f)?parseMoneyInput(el.value):f.type==="number"?Number(el.value):el.value;
-  });
-  const result=await callback(obj);
-  if(result===false)return;
-  simpleModal.close();
-  save(); renderAll(); toastMsg(typeof result==="string"?result:result?.message||"Saved");
+  if(submitting)return;
+  submitting=true;
+  const submitButton=simpleForm.querySelector("button[type=submit]");
+  if(submitButton)submitButton.disabled=true;
+  try{
+   await saveInFlight;
+   const obj={};
+   fields.forEach(f=>{
+    const el=q("#sf_"+f.key);
+    obj[f.key]=isMoneyField(f)?parseMoneyInput(el.value):f.type==="number"?Number(el.value):el.value;
+   });
+   const result=await callback(obj);
+   if(result===false)return;
+   simpleModal.close();
+   const pendingSave=save(); renderAll(); toastMsg(typeof result==="string"?result:result?.message||"Saved");
+   await pendingSave;
+  }finally{
+   submitting=false;
+   if(submitButton)submitButton.disabled=false;
+  }
  };
  simpleModal.showModal();
 }
@@ -2001,9 +2037,16 @@ function renderCommerceAccount(account){
  commerceEntitlements.innerHTML=entitlements.length?`<h4>Active access</h4>${entitlementRows}`:"<p class=\"account-commerce-muted\">No active paid entitlement on this account.</p>";
  commerceOrders.innerHTML=orders.length?`<h4>Purchase history</h4>${orderRows}`:"<p class=\"account-commerce-muted\">No purchases yet.</p>";
 }
-function renderCommerceCatalog(catalog){
+function renderCommerceCatalog(catalog,account=null){
+ const presentation=account?accountPlanPresentation(account):null;
+ const ownsLifetime=presentation?.key==="lifetime";
  const checkoutAvailable=Boolean(catalog?.configured&&(catalog.products||[]).length);
  commerceCatalogState=checkoutAvailable?catalog:{...(catalog||{}),configured:false,products:PUNDI_FALLBACK_CATALOG};
+ if(ownsLifetime){
+  commerceStatus.textContent="Premium · Lifetime Access. Your account already owns Pundi Pro Lifetime.";
+  commerceCatalog.innerHTML="";
+  return;
+ }
  commerceStatus.textContent=checkoutAvailable?(catalog.production?"Production checkout is available. Payment is verified server-side before access is granted.":"Sandbox checkout is available for testing only."):"Pundi Pro Lifetime · Rp49.000 · one-time account purchase. Checkout is unavailable until provider activation; your free account remains available.";
  commerceCatalog.innerHTML=commerceCatalogState.products.map(item=>`<div class="commerce-product"><span class="commerce-product-icon">${pundiIcon(item.sku==="PUNDI_PRO_LIFETIME"?"pro":"card")}</span><div><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.description||"Account entitlement")}</small></div><div><b>${escapeHtml(commerceMoney(item.amount,item.currency))}</b><button class="primary-btn commerce-buy" type="button" data-commerce-sku="${escapeHtml(item.sku)}" ${checkoutAvailable?"":"disabled"}>${checkoutAvailable?"Buy":"Coming soon"}</button></div></div>`).join("");
  qa("[data-commerce-sku]").forEach(button=>button.onclick=()=>startCommerceCheckout(button.dataset.commerceSku,button));
@@ -2013,10 +2056,11 @@ async function refreshCommerce(){
  commerceRefreshBusy=true;
  try{
   const [catalogResult,accountResult]=await Promise.allSettled([fetchCommerceCatalog(),fetchCommerceAccount()]);
-  if(catalogResult.status==="fulfilled")renderCommerceCatalog(catalogResult.value);
-  else{renderCommerceCatalog(null);commerceStatus.textContent="Offers are temporarily unavailable. Your current plan is unchanged.";}
-  if(accountResult.status==="fulfilled")renderCommerceAccount(accountResult.value);
-  else{
+  const account=accountResult.status==="fulfilled"?accountResult.value:null;
+  if(account)renderCommerceAccount(account);
+  if(catalogResult.status==="fulfilled")renderCommerceCatalog(catalogResult.value,account);
+  else{renderCommerceCatalog(null,account);commerceStatus.textContent="Offers are temporarily unavailable. Your current plan is unchanged.";}
+  if(!account){
    commerceEntitlements.innerHTML="<p class=\"account-commerce-muted\">Purchase history is temporarily unavailable. Your current plan is unchanged.</p>";
    commerceOrders.innerHTML="";
   }
@@ -2168,16 +2212,18 @@ function triggerAuthShake(){
 
 function authErrorMessage(error, mode){
  const message=String(error?.message||"").toLowerCase();
+ if(mode==="signin"&&isCredentialFailure(error))return "Email atau password salah.";
+ if(mode==="recovery")return message.includes("expired")||message.includes("invalid")||message.includes("otp")||message.includes("code")?"This password reset link is invalid or has expired.":"Unable to complete password recovery. Request a new reset link and try again.";
  if(message.includes("password should be")||message.includes("password must")||message.includes("weak password")||message.includes("password is too"))return "Password does not meet Supabase password requirements.";
  if(message.includes("network")||message.includes("fetch")||message.includes("timeout"))return "Network error. Check your connection and try again.";
- if(message.includes("expired")||message.includes("invalid")||message.includes("otp")||message.includes("code"))return "This password reset link is invalid or has expired.";
- if(mode==="recovery")return "Unable to complete password recovery. Request a new reset link and try again.";
  if(message.includes("already registered")||message.includes("already been registered"))return "An account with this email already exists. Try signing in.";
  if(message.includes("invalid email")||message.includes("email address"))return "Enter a valid email address.";
  if(message.includes("password")&&message.includes("6"))return "Password must be at least 6 characters.";
+ if(mode==="signin")return "Email atau password salah.";
  return mode==="signup"?"Unable to create account. Please check your details and try again.":"Unable to sign in. Check your email and password.";
 }
 
+if(authKeepLoggedIn) authKeepLoggedIn.onchange=()=>setKeepSessionEnabled(authKeepLoggedIn.checked);
 authModeToggle.onclick=()=>setAuthMode(authMode==="signup"?"signin":"signup");
 authForgotPassword.onclick=()=>setAuthMode("forgot");
 authRecoveryCancel.onclick=async()=>{
