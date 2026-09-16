@@ -3,6 +3,23 @@ import { cacheGet, cachePut } from "./idb.js";
 import { apiUrl } from "./runtime.js";
 
 let clientPromise;
+const KEEP_ME_LOGGED_IN_KEY = "pundi-keep-me-logged-in";
+const volatileAuthStorage = new Map();
+const authStorageKeys = new Set();
+
+export function keepSessionEnabled() {
+  return localStorage.getItem(KEEP_ME_LOGGED_IN_KEY) !== "0";
+}
+
+export function setKeepSessionEnabled(enabled) {
+  localStorage.setItem(KEEP_ME_LOGGED_IN_KEY, enabled ? "1" : "0");
+  if (!enabled) clearAuthStorage();
+}
+
+export function clearAuthStorage() {
+  for (const key of authStorageKeys) localStorage.removeItem(key);
+  volatileAuthStorage.clear();
+}
 
 function builtPublicConfig() {
   const supabaseUrl = typeof __PUNDI_SUPABASE_URL__ === "string" ? __PUNDI_SUPABASE_URL__.trim() : "";
