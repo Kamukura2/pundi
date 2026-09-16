@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Budget signal illustration">
+  <defs>
+    <linearGradient id="meter" x1="24" y1="28" x2="224" y2="226" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#75F0D1"/>
+      <stop offset=".52" stop-color="#33BFFF"/>
+      <stop offset="1" stop-color="#6570F5"/>
+    </linearGradient>
+    <linearGradient id="coin" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#FFE58A"/>
+      <stop offset="1" stop-color="#FF9D6C"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="170%">
+      <feDropShadow dx="0" dy="10" stdDeviation="9" flood-color="#172754" flood-opacity=".18"/>
+    </filter>
+  </defs>
+  <g filter="url(#shadow)">
+    <path d="M34 154c0-63 43-114 96-114s96 51 96 114" fill="none" stroke="url(#meter)" stroke-linecap="round" stroke-width="26"/>
+    <path d="M48 155c0-50 35-90 82-90s82 40 82 90" fill="none" stroke="#fff" stroke-linecap="round" stroke-opacity=".28" stroke-width="5"/>
+    <circle cx="130" cy="154" r="16" fill="#fff" fill-opacity=".92"/>
+    <path d="M130 154l46-51" fill="none" stroke="#fff" stroke-linecap="round" stroke-width="9"/>
+    <path d="M165 103h20v20" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="9"/>
+    <circle cx="69" cy="190" r="24" fill="url(#coin)"/>
+    <circle cx="69" cy="190" r="14" fill="none" stroke="#fff" stroke-opacity=".68" stroke-width="4"/>
+    <path d="M69 179v22M62 185h9a5 5 0 0 1 0 10h-9" fill="none" stroke="#fff" stroke-linecap="round" stroke-width="4"/>
+    <circle cx="191" cy="185" r="30" fill="#FF7AA5"/>
+    <circle cx="191" cy="185" r="18" fill="none" stroke="#fff" stroke-opacity=".72" stroke-width="4"/>
+    <path d="M191 171v28M182 178h11a7 7 0 0 1 0 14h-11" fill="none" stroke="#fff" stroke-linecap="round" stroke-width="4"/>
+  </g>
+</svg>

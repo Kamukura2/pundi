@@ -1200,7 +1200,12 @@ h1,h2,h3,h4,h5,h6,.title-wrap h1,.panel-head h3{font-family:'Pundi Heading','Man
 .commerce-account>p{font-weight:700;margin:0 0 8px}
 .account-commerce-status,.account-commerce-muted{display:block;color:var(--muted);font-size:12px;line-height:1.45}
 .commerce-catalog,.commerce-entitlements,.commerce-orders{display:grid;gap:8px;margin-top:10px}
-.story-card.insight-coffee-budget{background:linear-gradient(135deg,#a7efe0,#48c9c1 52%,#4079d9)}
+.story-card.insight-budget-signal{background:linear-gradient(135deg,#3d65e8,#218dff 52%,#27c6ba)}
+.story-card.insight-budget-signal img{object-fit:contain;filter:drop-shadow(0 10px 16px rgba(13,27,61,.18))}
+.expense-feature-panel #addYearlyBtn,.expense-feature-panel #addEventBtn{width:50px;min-width:50px;height:50px;padding:0;border:0;border-radius:16px;display:grid;place-items:center;background:linear-gradient(135deg,#2678ff,#3b55dc 58%,#168fe8)!important;color:#fff;box-shadow:0 12px 24px rgba(37,101,231,.32)}
+.expense-feature-panel #addYearlyBtn:hover,.expense-feature-panel #addEventBtn:hover{transform:translateY(-1px);box-shadow:0 15px 28px rgba(37,101,231,.4)}
+.expense-feature-panel #addYearlyBtn:focus-visible,.expense-feature-panel #addEventBtn:focus-visible{outline:3px solid rgba(57,195,255,.62);outline-offset:3px}
+.expense-feature-panel #addYearlyBtn .pundi-icon,.expense-feature-panel #addEventBtn .pundi-icon{width:28px;height:28px}
 .account-security{margin-top:18px;border-top:1px solid var(--border);padding-top:14px}
 .account-security summary{display:flex;align-items:center;gap:10px;cursor:pointer;list-style:none;font-weight:800}
 .account-security summary::-webkit-details-marker{display:none}

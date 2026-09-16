@@ -131,6 +131,7 @@ const tradingAllocationDonutElement=q("#tradingAllocationDonut");
 const tradingAllocationLegendElement=q("#tradingAllocationLegend");
 let commerceCatalogState=null;
 let commerceRefreshBusy=false;
+let latestAccountPlanPresentation=null;
 const PUNDI_FALLBACK_CATALOG=[{product:"PUNDI",sku:"PUNDI_PRO_LIFETIME",name:"Pundi Pro Lifetime",description:"One-time account-owned Pro access. The same Pundi account restores it on supported clients; no recurring charge.",entitlement:"pundi_pro_lifetime",purchase_type:"lifetime",duration_days:null,amount:49000,currency:"IDR",active:true}];
 const hasActiveEditor=()=>{
  const active=document.activeElement;
@@ -1190,13 +1191,13 @@ function renderInsights(){
  const insightData=[
   {asset:"wallet",tone:runway>=6?"green":runway>=3?"yellow":"red",eyebrow:"Cash runway",title:`${runway.toFixed(1)} months of runway`,text:`Current liquid balance after entrusted funds is ${fmt(netAccountTotal())}; remaining monthly obligations are ${fmt(budgetRemaining())}.`},
   {asset:"clients",tone:collected>=80?"green":collected>=50?"yellow":"red",eyebrow:"Client collection",title:`${collected.toFixed(0)}% collected`,text:totalOutstanding()?`${fmt(totalOutstanding())} is still outstanding from recurring and ending clients.`:"All client payments are collected. Good job!"},
-  {asset:"coffee-budget",tone:coffeePct>100?"red":coffeePct>75?"yellow":"green",eyebrow:"Coffee check",title:coffeePct>100?"Coffee is over budget":coffeePct>75?"Coffee is getting expensive":"Coffee spending is controlled",text:`Coffee usage is ${coffeePct.toFixed(0)}% of its default monthly budget.`},
+  {asset:"budget-signal",image:"budget-signal.svg",tone:coffeePct>100?"red":coffeePct>75?"yellow":"green",eyebrow:"Coffee check",title:coffeePct>100?"Coffee is over budget":coffeePct>75?"Coffee is getting expensive":"Coffee spending is controlled",text:`Coffee usage is ${coffeePct.toFixed(0)}% of its default monthly budget.`},
   {asset:"electricity",tone:latestElectric?.status==="anomaly"?"red":electricDelta>5?"red":electricDelta<-5?"green":"blue",eyebrow:"Electricity trend",title:!latestElectric?"More readings needed":latestElectric.status==="anomaly"?"Review latest reading":electricDelta<-5?"Electricity is decreasing — good job!":electricDelta>5?"Electricity usage is rising":"Electricity is stable",text:latestElectric?.status==="anomaly"?`Latest physical reading is above the effective prior balance by ${Math.abs(latestElectric.rawUsed).toFixed(2)} kWh. Add the missing top-up or correct the reading.`:latestElectric?`Latest pace is ${latestElectric.daily.toFixed(1)} kWh/day (${electricDelta>=0?"+":""}${electricDelta.toFixed(1)}% versus the prior interval).`:"Add at least two readings to unlock a usage trend."},
   {asset:"calendar",tone:expenseDelta>5?"red":expenseDelta<-5?"green":"orange",eyebrow:"History trend",title:previousExpense?`Recorded expense ${expenseDelta>=0?"rose":"fell"} ${Math.abs(expenseDelta).toFixed(0)}%`:"Expense baseline is building",text:`History recorded ${fmt(thisExpense)} this month. It updates pacing only and is not deducted twice.`},
   {asset:"stocks",tone:pl<0?"red":"green",eyebrow:"Investment P/L",title:`${pl<0?"Down":"Up"} ${fmt(Math.abs(pl))} · ${percent(pl,holdingsInvested,{absolute:true})}`,text:`Investment holdings are ${fmt(holdingsPortfolio())} against ${fmt(holdingsInvested)} invested. Optional Netcash and Wallet are assets, not P/L.`},
   {asset:"stocks",tone:activeTrading.realized<0?"red":activeTrading.realized>0?"green":"blue",eyebrow:"Trading performance",title:closedTrades.length?`${activeTrading.realized<0?"Realized loss":"Realized gain"} ${fmt(Math.abs(activeTrading.realized))} · alpha ${tradingAlpha>=0?"+":""}${tradingAlpha.toFixed(2)}%`:"Trading is optional",text:state.tradingLedger.length?`Accumulated realized P/L is ${fmt(activeTrading.realized)}; open-position unrealized P/L is ${fmt(activeTrading.unrealized)}. Investment data is excluded.`:"Add a Trading position only when you want a separate active portfolio."}
  ];
- insightCards.innerHTML=insightData.map(x=>`<article class="story-card ${x.tone} insight-${x.asset}"><img src="/assets/insights/${x.asset}.png" alt="" loading="lazy"><div><small>${x.eyebrow}</small><h3>${x.title}</h3><p>${x.text}</p></div></article>`).join("");
+ insightCards.innerHTML=insightData.map(x=>`<article class="story-card ${x.tone} insight-${x.asset}"><img src="/assets/insights/${x.image||`${x.asset}.png`}" alt="" loading="lazy"><div><small>${x.eyebrow}</small><h3>${x.title}</h3><p>${x.text}</p></div></article>`).join("");
  const operatingMargin=operating.income?operating.net/operating.income*100:0;
  const usedBudget=state.budgets.reduce((sum,item)=>sum+recordedExpenseForBudget(item,state.transactions,now),0);
  const budgetUsedPct=monthlyBudget()?usedBudget/monthlyBudget()*100:0;
@@ -2021,12 +2022,15 @@ const commerceMoney=(amount,currency="IDR")=>new Intl.NumberFormat("id-ID",{styl
 const commerceDate=value=>value?new Date(value).toLocaleString(state.language==="id"?"id-ID":"en-GB",{dateStyle:"medium",timeStyle:"short"}):"—";
 function renderAccountPlan(account={}){
  const presentation=accountPlanPresentation(account);
+ latestAccountPlanPresentation=presentation;
  if(accountPlanElement){accountPlanElement.textContent=presentation.label;accountPlanElement.dataset.plan=presentation.key;}
  if(accountPlanDetailElement)accountPlanDetailElement.textContent=presentation.detail;
  return presentation;
 }
 function renderCommerceAccount(account){
- renderAccountPlan(account);
+ if(!latestAccountPlanPresentation)renderAccountPlan(account);
+ const accountPresentation=latestAccountPlanPresentation||accountPlanPresentation(account);
+ const ownsLifetime=accountPresentation?.key==="lifetime";
  const entitlements=(account?.entitlements||[]).filter(item=>item.status==="active"&&(!item.expires_at||Date.parse(item.expires_at)>Date.now()));
  const orders=account?.orders||[];
  const entitlementRows=entitlements.map(item=>{
@@ -2034,11 +2038,11 @@ function renderCommerceAccount(account){
   return `<div class="commerce-row"><span>${escapeHtml(item.sku||item.plan||"Pundi")}</span><b>${escapeHtml(item.status)}${expiry}</b></div>`;
  }).join("");
  const orderRows=orders.slice(0,10).map(item=>`<div class="commerce-row"><span>${escapeHtml(item.sku||"Pundi")} · ${escapeHtml(item.order_id||"—")}<small>${escapeHtml(commerceDate(item.created_at))}</small></span><b>${escapeHtml(item.status)}<small>${escapeHtml(commerceMoney(item.amount,item.currency))}</small></b></div>`).join("");
- commerceEntitlements.innerHTML=entitlements.length?`<h4>Active access</h4>${entitlementRows}`:"<p class=\"account-commerce-muted\">No active paid entitlement on this account.</p>";
+ commerceEntitlements.innerHTML=entitlements.length?`<h4>Active access</h4>${entitlementRows}`:ownsLifetime?"<p class=\"account-commerce-muted\">Lifetime access is active on this account.</p>":"<p class=\"account-commerce-muted\">No active paid entitlement on this account.</p>";
  commerceOrders.innerHTML=orders.length?`<h4>Purchase history</h4>${orderRows}`:"<p class=\"account-commerce-muted\">No purchases yet.</p>";
 }
 function renderCommerceCatalog(catalog,account=null){
- const presentation=account?accountPlanPresentation(account):null;
+ const presentation=latestAccountPlanPresentation|| (account?accountPlanPresentation(account):null);
  const ownsLifetime=presentation?.key==="lifetime";
  const checkoutAvailable=Boolean(catalog?.configured&&(catalog.products||[]).length);
  commerceCatalogState=checkoutAvailable?catalog:{...(catalog||{}),configured:false,products:PUNDI_FALLBACK_CATALOG};
