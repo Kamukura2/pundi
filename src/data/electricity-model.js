@@ -86,3 +86,11 @@ export function electricityHistoryEvents(readings = [], topUps = []) {
     ...topUps.map(topUp => ({ ...topUp, eventType: "topup" }))
   ]);
 }
+
+export function removeElectricityEvent(state, id, eventType) {
+  const collectionKey = eventType === "topup" ? "electricityTopups" : eventType === "reading" ? "electricity" : null;
+  if (!collectionKey || !state || !Array.isArray(state[collectionKey])) return false;
+  const before = state[collectionKey].length;
+  state[collectionKey] = state[collectionKey].filter(row => String(row?.id || "") !== String(id || ""));
+  return state[collectionKey].length !== before;
+}
