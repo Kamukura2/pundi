@@ -262,6 +262,54 @@ async function statusResponse(request, response, url) {
   return reply(response, 200, { order: safeOrder({ ...order, status: provider.transaction_status, provider_transaction_id: provider.transaction_id, payment_type: provider.payment_type }), state });
 }
 
+function checkoutPayload(orderId, checkout, config) {
+  return { order_id: orderId, token: checkout.token, redirect_url: checkout.redirect_url, client_key: config.provider.clientKey, environment: config.environment };
+}
+
+async function createSnapCheckout({ user, db, item, config, orderId, created = false }) {
+  try {
+    const checkout = await createSnapTransaction({
+      environment: config.environment,
+      serverKey: config.provider.serverKey,
+      merchantId: config.provider.merchantId,
+      orderId,
+      amount: item.amount,
+      item,
+      customerEmail: user.email,
+      notificationUrl: config.notificationUrl,
+    });
+    if (created) {
+      const { error } = await db.from("commerce_orders").update({ status: "pending" }).eq("provider_order_id", orderId).eq("user_id", user.id);
+      if (error) throw Object.assign(new Error("Pundi order could not be marked pending."), { status: 503, code: "order_status_update_failed" });
+    }
+    return checkout;
+  } catch (error) {
+    if (created) await db.from("commerce_orders").update({ status: "provider_error" }).eq("provider_order_id", orderId).eq("user_id", user.id);
+    throw error;
+  }
+}
+
+async function resumeLatestPendingCheckout({ user, db, item, config }) {
+  const { data: pendingOrders, error } = await db.from("commerce_orders")
+    .select("*")
+    .eq("user_id", user.id)
+    .eq("product_code", "PUNDI")
+    .eq("sku", item.sku)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false })
+    .limit(1);
+  if (error) throw Object.assign(new Error("Pending Pundi order lookup failed."), { status: 503, code: "pending_order_lookup_failed" });
+  const order = pendingOrders?.[0];
+  if (!order) return null;
+  if (!amountsMatch(order.expected_amount, item.amount) || String(order.currency || "").toUpperCase() !== item.currency) {
+    throw Object.assign(new Error("Pending Pundi order does not match the current catalog."), { status: 409, code: "pending_order_mismatch" });
+  }
+  // Midtrans supports requesting a fresh Snap token for the same order ID;
+  // this revokes the old token and does not create another commerce order.
+  const checkout = await createSnapCheckout({ user, db, item, config, orderId: order.provider_order_id });
+  return { orderId: order.provider_order_id, checkout };
+}
+
 async function createCheckout(request, response) {
   const { user, db } = await authenticate(request);
   const config = commerceConfiguration();
@@ -270,6 +318,10 @@ async function createCheckout(request, response) {
   if (Object.keys(body).some(key => ["amount", "gross_amount", "notification_url", "callback_url", "return_url"].includes(key))) return reply(response, 400, { error: "Price and callback fields are server-owned.", code: "client_owned_fields_not_allowed" });
   const item = findPundiSku(body.sku);
   if (!item) return reply(response, 404, { error: "Pundi product is unavailable.", code: "sku_unavailable" });
+
+  const resumed = await resumeLatestPendingCheckout({ user, db, item, config });
+  if (resumed) return reply(response, 200, checkoutPayload(resumed.orderId, resumed.checkout, config));
+
   const orderId = orderIdFor("PUNDI");
   const { data: order, error: insertError } = await db.from("commerce_orders").insert({
     user_id: user.id,
@@ -287,23 +339,8 @@ async function createCheckout(request, response) {
     expires_at: null,
   }).select("*").single();
   if (insertError || !order) throw Object.assign(new Error("Pundi order could not be created."), { status: 503, code: "order_create_failed" });
-  try {
-    const checkout = await createSnapTransaction({
-      environment: config.environment,
-      serverKey: config.provider.serverKey,
-      merchantId: config.provider.merchantId,
-      orderId,
-      amount: item.amount,
-      item,
-      customerEmail: user.email,
-      notificationUrl: config.notificationUrl,
-    });
-    await db.from("commerce_orders").update({ status: "pending" }).eq("provider_order_id", orderId);
-    return reply(response, 201, { order_id: orderId, token: checkout.token, redirect_url: checkout.redirect_url, client_key: config.provider.clientKey, environment: config.environment });
-  } catch (error) {
-    await db.from("commerce_orders").update({ status: "provider_error" }).eq("provider_order_id", orderId);
-    throw error;
-  }
+  const checkout = await createSnapCheckout({ user, db, item, config, orderId, created: true });
+  return reply(response, 201, checkoutPayload(orderId, checkout, config));
 }
 
 export async function handleCommerce(request, response, { webhook = false } = {}) {
