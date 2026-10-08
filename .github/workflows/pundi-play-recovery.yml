@@ -1,0 +1,37 @@
+name: Pundi Play acknowledgement recovery
+on:
+  schedule:
+    - cron: '17,47 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: pundi-play-acknowledgement-recovery
+  cancel-in-progress: false
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Call protected production recovery and check deadline counters
+        env:
+          PUNDI_RECOVERY_SECRET: ${{ secrets.PUNDI_RECOVERY_SECRET }}
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os,json,urllib.request
+          secret=os.environ.get('PUNDI_RECOVERY_SECRET','')
+          if not secret: raise SystemExit('Recovery authentication secret is not configured')
+          request=urllib.request.Request('https://app.pundi.online/api/cron/google-play-recovery',headers={'Authorization':'Bearer '+secret})
+          try:
+              with urllib.request.urlopen(request,timeout=75) as response:
+                  data=json.load(response)
+          except Exception:
+              raise SystemExit('Production recovery request failed; inspect protected backend health')
+          fields=['processed','acknowledged','retry','flagged','overdue','dueSoon','reconciliationRequired']
+          if data.get('ok') is not True or any(not isinstance(data.get(k),int) or data[k]<0 for k in fields):
+              raise SystemExit('Invalid sanitized recovery response')
+          print(json.dumps({k:data[k] for k in fields},sort_keys=True))
+          if any(data[k] for k in ['flagged','overdue','dueSoon','reconciliationRequired']):
+              raise SystemExit('Acknowledgement deadline or reconciliation alert; review private ledger')
+          PY
